@@ -18,12 +18,19 @@ def create_app(config: Config | None = None) -> FastAPI:
     # Init dependencies
     init_dependencies(config)
 
-    # Startup: init DB (в проде; в тестах БД подключается лениво через get_db)
+    # Startup: init DB
     @app.on_event("startup")
     async def startup():
         from medarchive.dependencies import get_db
         db = await get_db()
         await db.init()
+
+    # Shutdown: close DB
+    @app.on_event("shutdown")
+    async def shutdown():
+        from medarchive.dependencies import _db
+        if _db is not None:
+            await _db.close()
 
     # Routers
     from medarchive.routers.auth import router as auth_router
