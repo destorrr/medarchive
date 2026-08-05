@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📋 Мои заявки</h1>
+{% if my_requests %}
+<div class="card">
+    <table><thead><tr><th>Карта</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+    <tbody>
+    {% for r in my_requests %}
+    <tr>
+        <td>{{ r.card_name }}</td>
+        <td>{{ r.status }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>
+            {% if r.status in ('new', 'in_progress') %}
+            <form method="post" action="/requests/cancel" style="display:inline">
+                <input type="hidden" name="request_id" value="{{ r.id }}">
+                <button type="submit" class="btn" style="color:#e94560">Отменить</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody></table>
+</div>
+{% else %}
+<p>Нет заявок. <a href="/requests/new">Создать новую</a>.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📋 Очередь заявок</h1>
+{% if queue %}
+<div class="card">
+    <table><thead><tr><th>Карта</th><th>Запросил</th><th>Дата</th><th></th></tr></thead>
+    <tbody>
+    {% for r in queue %}
+    <tr>
+        <td>{{ r.card_name }}</td>
+        <td>user#{{ r.requested_by }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>
+            <form method="post" action="/requests/fulfill" style="display:inline">
+                <input type="hidden" name="request_id" value="{{ r.id }}">
+                <input type="hidden" name="action" value="single">
+                <select name="courier_id">
+                    <option value="0">— Курьер —</option>
+                    {% for c in couriers %}
+                    <option value="{{ c.id }}">{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Выполнить</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody></table>
+</div>
+{% else %}
+<p>Нет активных заявок.</p>
+{% endif %}
+{% endblock %}

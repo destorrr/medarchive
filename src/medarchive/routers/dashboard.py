@@ -1,9 +1,17 @@
 """Роутер дашборда и общих страниц."""
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Form
 from fastapi.responses import RedirectResponse
 from medarchive.dependencies import get_current_user, get_db, require_role
 from medarchive.domain.models import User
-from medarchive.domain.statuses import UserRole
+from medarchive.domain.statuses import UserRole, BoxStatus
+from medarchive.adapters.sqlite.database import Database
+from medarchive.adapters.sqlite.repositories import (
+    CardRepositoryImpl,
+    BoxRepositoryImpl,
+    CourierRepositoryImpl,
+)
+from medarchive.services.request_service import RequestService
+from medarchive.services.shipment_service import ShipmentService
 
 router = APIRouter()
 
@@ -89,3 +97,122 @@ async def my_shipments(
     return request.app.state.templates.TemplateResponse(
         request=request, name="my_shipments.html", context=ctx
     )
+
+
+@router.get("/requests/new")
+async def request_new_page(request: Request, user: User = Depends(require_role(UserRole.branch, UserRole.admin))):
+    ctx = _menu_context(user)
+    ctx.update({"request": request, "username": user.username, "results": None, "search_name": ""})
+    return request.app.state.templates.TemplateResponse(request=request, name="request_new.html", context=ctx)
+
+
+@router.post("/requests/new")
+async def request_new_search_or_create(
+    request: Request,
+    search_name: str | None = Form(None),
+    card_id: int | None = Form(None),
+    target_branch_id: int | None = Form(None),
+    target_department: int = Form(0),
+    user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    card_repo = CardRepositoryImpl(db)
+    box_repo = BoxRepositoryImpl(db)
+    req_service = RequestService(db, card_repo, box_repo)
+
+    # Phase 1: search
+    if search_name:
+        cards = await card_repo.find_by_name(search_name)
+        # Also get available branches as targets
+        branches = await db.fetch_all("SELECT * FROM branches WHERE id != ?", (user.branch_id or 1,))
+        ctx = _menu_context(user)
+        ctx.update({"request": request, "username": user.username, "results": [{"id": c.id, "full_name": c.full_name, "status": c.status.value} for c in cards], "branches": [dict(b) for b in branches], "search_name": search_name})
+        return request.app.state.templates.TemplateResponse(request=request, name="request_new.html", context=ctx)
+
+    # Phase 2: create
+    if card_id:
+        await req_service.create_request(card_id=card_id, requested_by=user.id, target_branch_id=target_branch_id, target_department=bool(target_department))
+        return RedirectResponse(url="/requests/my", status_code=303)
+
+    ctx = _menu_context(user)
+    ctx.update({"request": request, "username": user.username, "results": None, "search_name": ""})
+    return request.app.state.templates.TemplateResponse(request=request, name="request_new.html", context=ctx)
+
+
+@router.get("/requests/my")
+async def requests_my_page(request: Request, user: User = Depends(require_role(UserRole.branch, UserRole.admin)), db: Database = Depends(get_db)):
+    card_repo = CardRepositoryImpl(db)
+    box_repo = BoxRepositoryImpl(db)
+    req_service = RequestService(db, card_repo, box_repo)
+    my_requests = await req_service.get_my_requests(user.id)
+    ctx = _menu_context(user)
+    ctx.update({"request": request, "username": user.username, "my_requests": my_requests})
+    return request.app.state.templates.TemplateResponse(request=request, name="requests_my.html", context=ctx)
+
+
+@router.get("/requests")
+async def request_queue_page(request: Request, user: User = Depends(require_role(UserRole.archive, UserRole.admin)), db: Database = Depends(get_db)):
+    card_repo = CardRepositoryImpl(db)
+    box_repo = BoxRepositoryImpl(db)
+    req_service = RequestService(db, card_repo, box_repo)
+    queue = await req_service.get_queue()
+    courier_repo = CourierRepositoryImpl(db)
+    couriers = await courier_repo.list_all()
+    ctx = _menu_context(user)
+    ctx.update({"request": request, "username": user.username, "queue": queue, "couriers": couriers})
+    return request.app.state.templates.TemplateResponse(request=request, name="request_queue.html", context=ctx)
+
+
+@router.post("/requests/fulfill")
+async def fulfill_request(
+    request: Request,
+    request_id: int = Form(...),
+    action: str = Form("single"),
+    courier_id: int = Form(0),
+    user: User = Depends(require_role(UserRole.archive, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    card_repo = CardRepositoryImpl(db)
+    box_repo = BoxRepositoryImpl(db)
+    req_service = RequestService(db, card_repo, box_repo)
+
+    try:
+        await req_service.fulfill_request(request_id, user.id)
+    except ValueError as e:
+        ctx = _menu_context(user)
+        queue = await req_service.get_queue()
+        ctx.update({"request": request, "username": user.username, "queue": queue, "error": str(e), "couriers": []})
+        return request.app.state.templates.TemplateResponse(request=request, name="request_queue.html", context=ctx, status_code=400)
+
+    # Get the fulfilled request to create return shipment
+    req_row = await db.fetch_one("SELECT * FROM requests WHERE id = ?", (request_id,))
+    card = await card_repo.get_by_id(req_row["card_id"])
+
+    if action == "single" and courier_id > 0:
+        # Create return shipment for single card
+        courier_repo = CourierRepositoryImpl(db)
+        shipment_service = ShipmentService(db, box_repo, courier_repo, card_repo)
+        # Create a temporary box for the return card
+        return_box = await box_repo.create(f"RB-{card.id:04d}", origin_branch_id=0, created_by=user.id)
+        await box_repo.add_card(return_box.id, card.id)
+        await box_repo.update_status(return_box.id, BoxStatus.ready)
+        await shipment_service.transfer_box(return_box.id, courier_id, user.id)
+
+    return RedirectResponse(url="/requests", status_code=303)
+
+
+@router.post("/requests/cancel")
+async def cancel_request_route(
+    request: Request,
+    request_id: int = Form(...),
+    user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    card_repo = CardRepositoryImpl(db)
+    box_repo = BoxRepositoryImpl(db)
+    req_service = RequestService(db, card_repo, box_repo)
+    try:
+        await req_service.cancel_request(request_id)
+    except ValueError:
+        pass  # silently ignore invalid cancellations
+    return RedirectResponse(url="/requests/my", status_code=303)

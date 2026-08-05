@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📝 Новая заявка на возврат</h1>
+
+<div class="card">
+    <form method="post" action="/requests/new">
+        <div class="form-group">
+            <label for="search_name">Поиск карты (ФИО):</label>
+            <input type="text" id="search_name" name="search_name" autofocus
+                   value="{{ search_name }}"
+                   placeholder="Введите фамилию или ФИО...">
+        </div>
+        <button type="submit" class="btn btn-primary">🔍 Найти</button>
+    </form>
+</div>
+
+{% if results is not none %}
+<div class="card">
+    {% if results %}
+    <h3>Найдено карт:</h3>
+    <table><thead><tr><th>ФИО</th><th>Статус</th><th></th></tr></thead>
+    <tbody>
+    {% for c in results %}
+    <tr>
+        <td>{{ c.full_name }}</td>
+        <td>{{ c.status }}</td>
+        <td>
+            <form method="post" action="/requests/new" style="display:inline">
+                <input type="hidden" name="card_id" value="{{ c.id }}">
+                <select name="target_branch_id">
+                    <option value="">— Куда —</option>
+                    {% for b in branches %}
+                    <option value="{{ b.id }}">{{ b.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Запросить</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody></table>
+    {% else %}
+    <p>Карта "{{ search_name }}" не найдена.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
