@@ -10,6 +10,8 @@ class Database:
         self._conn: aiosqlite.Connection | None = None
 
     async def init(self) -> None:
+        if self._conn is not None:
+            return  # уже инициализировано — идемпотентный вызов
         self._conn = await aiosqlite.connect(self.config.db_path)
         self._conn.row_factory = aiosqlite.Row
         await self._conn.execute("PRAGMA journal_mode=WAL")
