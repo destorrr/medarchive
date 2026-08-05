@@ -36,6 +36,13 @@ def create_app(config: Config | None = None) -> FastAPI:
     from medarchive.routers.auth import router as auth_router
     app.include_router(auth_router)
 
+    # Packing router (Task 3)
+    try:
+        from medarchive.routers.packing import router as packing_router
+        app.include_router(packing_router)
+    except ImportError:
+        pass
+
     # Dashboard router imported later (Task 7)
     try:
         from medarchive.routers.dashboard import router as dashboard_router
@@ -50,5 +57,12 @@ def create_app(config: Config | None = None) -> FastAPI:
             except HTTPException:
                 return RedirectResponse(url="/login", status_code=303)
             return HTMLResponse("<h1>МедАрхив</h1><p>Дашборд появится в Task 7.</p>")
+
+    # Transfer router (Task 5)
+    try:
+        from medarchive.routers.transfer import router as transfer_router
+        app.include_router(transfer_router)
+    except ImportError:
+        pass
 
     return app

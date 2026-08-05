@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🚚 Передача курьеру</h1>
+
+<div class="card" style="margin-bottom:16px">
+{% if boxes %}
+    <form method="post" action="/transfer/confirm">
+        <div class="form-group">
+            <label for="box_id">Коробка (скан или выбор):</label>
+            <select name="box_id" id="box_id" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px">
+                <option value="">— выберите коробку —</option>
+                {% for b in boxes %}
+                <option value="{{ b.id }}">{{ b.box_number }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="courier_id">Курьер:</label>
+            <select name="courier_id" id="courier_id" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px">
+                <option value="">— выберите курьера —</option>
+                {% for c in couriers %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">✅ Подтвердить передачу</button>
+    </form>
+{% else %}
+    <p style="color:#888">Нет готовых коробок для передачи. <a href="/packing">Упакуйте коробку</a>.</p>
+{% endif %}
+</div>
+{% endblock %}
