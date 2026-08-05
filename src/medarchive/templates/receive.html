@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📥 Приёмка коробок</h1>
+<div class="card">
+    <form hx-post="/receive/scan" hx-target="#scan-result">
+        <div class="form-group">
+            <label for="box_number">Отсканируйте номер коробки</label>
+            <input type="text" id="box_number" name="box_number" autofocus
+                   placeholder="Введите или отсканируйте номер коробки...">
+        </div>
+        <button type="submit" class="btn btn-primary">Проверить</button>
+    </form>
+</div>
+<div id="scan-result"></div>
+
+{% if pending_boxes %}
+<div class="card">
+    <h3>Ожидают приёмки</h3>
+    <table>
+        <thead><tr><th>Коробка</th><th>Отправлена</th><th>Курьер</th></tr></thead>
+        <tbody>
+        {% for box in pending_boxes %}
+        <tr>
+            <td>{{ box.box_number }}</td>
+            <td>{{ box.issued_at }}</td>
+            <td>{{ box.courier_name }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

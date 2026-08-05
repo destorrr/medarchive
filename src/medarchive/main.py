@@ -43,6 +43,13 @@ def create_app(config: Config | None = None) -> FastAPI:
     except ImportError:
         pass
 
+    # Archive router (Task 7: приёмка и размещение)
+    try:
+        from medarchive.routers.archive import router as archive_router
+        app.include_router(archive_router)
+    except ImportError:
+        pass
+
     # Dashboard router imported later (Task 7)
     try:
         from medarchive.routers.dashboard import router as dashboard_router
@@ -62,6 +69,13 @@ def create_app(config: Config | None = None) -> FastAPI:
     try:
         from medarchive.routers.transfer import router as transfer_router
         app.include_router(transfer_router)
+    except ImportError:
+        pass
+
+    # Archive router (Task 7)
+    try:
+        from medarchive.routers.archive import router as archive_router
+        app.include_router(archive_router)
     except ImportError:
         pass
 

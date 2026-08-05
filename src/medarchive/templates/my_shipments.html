@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📋 Мои отправки</h1>
+
+{% if shipments %}
+<div class="card">
+    <table style="width:100%;border-collapse:collapse">
+        <thead>
+            <tr style="border-bottom:2px solid #eee;text-align:left">
+                <th style="padding:8px">Коробка</th>
+                <th style="padding:8px">Курьер</th>
+                <th style="padding:8px">Отправлена</th>
+                <th style="padding:8px">Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in shipments %}
+            <tr style="border-bottom:1px solid #f0f0f0">
+                <td style="padding:8px"><strong>{{ s.box_number }}</strong></td>
+                <td style="padding:8px">{{ s.courier_name }}</td>
+                <td style="padding:8px">{{ s.issued_at }}</td>
+                <td style="padding:8px">
+                    {% if s.status == 'issued' %}<span style="color:#f0ad4e">🚚 В пути</span>
+                    {% elif s.status == 'received' %}<span style="color:#5bc0de">📥 Принята</span>
+                    {% elif s.status == 'lost' %}<span style="color:#d9534f">❌ Потеряна</span>
+                    {% else %}{{ s.status }}{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <p style="color:#888">Нет отправок. <a href="/packing">Упакуйте коробку</a> и передайте курьеру.</p>
+</div>
+{% endif %}
+{% endblock %}
