@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📦 Упаковка коробки</h1>
+
+{% if box %}
+<div class="card" style="margin-bottom:16px">
+    <strong>Коробка:</strong> {{ box.box_number }} &nbsp;|&nbsp;
+    <strong>Карт:</strong> {{ cards_count }}
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:16px">
+    <form hx-post="/packing/scan-card" hx-target="#packing-area" hx-swap="outerHTML">
+        <label style="display:block;font-weight:600;margin-bottom:4px">Сканер (QR / ФИО):</label>
+        <input type="text" name="full_name" autofocus
+               style="width:100%;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:16px"
+               placeholder="Отсканируйте QR или введите ФИО..."
+               hx-on::after-request="this.value='';this.focus()">
+    </form>
+</div>
+
+<div id="packing-area">
+    {% if cards %}
+    <div class="card">
+        <table style="width:100%;border-collapse:collapse">
+            <thead>
+                <tr style="border-bottom:2px solid #eee;text-align:left">
+                    <th style="padding:8px">#</th>
+                    <th style="padding:8px">ФИО пациента</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for card in cards %}
+                <tr style="border-bottom:1px solid #f0f0f0">
+                    <td style="padding:8px;color:#888">{{ loop.index }}</td>
+                    <td style="padding:8px">{{ card.full_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if box %}
+    <form method="post" action="/packing/close-box" style="margin-top:16px">
+        <button type="submit" class="btn btn-primary"
+                {% if cards_count == 0 %}disabled style="opacity:0.5;cursor:not-allowed"{% endif %}>
+            🏁 Закрыть коробку
+        </button>
+        {% if cards_count == 0 %}
+        <span style="color:#999;margin-left:8px">Добавьте хотя бы одну карту</span>
+        {% endif %}
+    </form>
+    {% endif %}
+</div>
+
+{% if not box %}
+<form method="post" action="/packing/new-box" style="margin-top:16px">
+    <button type="submit" class="btn btn-primary">➕ Новая коробка</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+    // Auto-focus scanner after HTMX swaps
+    document.body.addEventListener('htmx:afterSwap', function() {
+        var input = document.querySelector('input[autofocus]');
+        if (input) { input.focus(); }
+    });
+</script>
+{% endblock %}
