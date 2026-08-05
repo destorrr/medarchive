@@ -1,32 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>🚚 Передача курьеру</h1>
-
-<div class="card" style="margin-bottom:16px">
-{% if boxes %}
+<div class="card">
+    {% if selected_box_id %}
+    <p><strong>Коробка:</strong> {{ selected_box_id }}</p>
+    {% endif %}
     <form method="post" action="/transfer/confirm">
         <div class="form-group">
-            <label for="box_id">Коробка (скан или выбор):</label>
-            <select name="box_id" id="box_id" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px">
-                <option value="">— выберите коробку —</option>
-                {% for b in boxes %}
-                <option value="{{ b.id }}">{{ b.box_number }}</option>
+            <label for="box_id">Коробка</label>
+            <select name="box_id" id="box_id">
+                <option value="">— Выберите —</option>
+                {% for box in ready_boxes %}
+                <option value="{{ box.id }}" {% if selected_box_id == box.id %}selected{% endif %}>
+                    {{ box.box_number }}
+                </option>
                 {% endfor %}
             </select>
         </div>
         <div class="form-group">
-            <label for="courier_id">Курьер:</label>
-            <select name="courier_id" id="courier_id" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px">
-                <option value="">— выберите курьера —</option>
+            <label for="courier_id">Курьер</label>
+            <select name="courier_id" id="courier_id">
+                <option value="">— Выберите —</option>
                 {% for c in couriers %}
                 <option value="{{ c.id }}">{{ c.name }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-primary">✅ Подтвердить передачу</button>
+        <button type="submit" class="btn btn-primary">Передать курьеру</button>
     </form>
-{% else %}
-    <p style="color:#888">Нет готовых коробок для передачи. <a href="/packing">Упакуйте коробку</a>.</p>
-{% endif %}
 </div>
 {% endblock %}
