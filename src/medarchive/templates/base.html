@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>МедАрхив</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; background: #f5f5f5; display: flex; min-height: 100vh; }
+        .sidebar { width: 240px; background: #1a1a2e; color: #eee; padding: 20px 0; flex-shrink: 0; }
+        .sidebar h2 { padding: 0 20px 16px; font-size: 18px; color: #e94560; border-bottom: 1px solid #333; margin-bottom: 8px; }
+        .sidebar nav a { display: block; padding: 10px 20px; color: #ccc; text-decoration: none; font-size: 14px; }
+        .sidebar nav a:hover { background: #16213e; color: #fff; }
+        .sidebar .role-badge { padding: 4px 20px 12px; font-size: 12px; color: #888; }
+        .sidebar .logout { margin-top: 20px; padding: 0 20px; }
+        .sidebar .logout a { color: #e94560; text-decoration: none; font-size: 13px; }
+        .main { flex: 1; padding: 24px; }
+        .main h1 { font-size: 22px; margin-bottom: 16px; color: #1a1a2e; }
+        .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+        .flash { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 10px 16px; margin-bottom: 12px; }
+        input, select, button { font: inherit; }
+        .btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; text-decoration: none; }
+        .btn-primary { background: #1a1a2e; color: #fff; }
+        .btn-primary:hover { background: #16213e; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <h2>📦 МедАрхив</h2>
+        <div class="role-badge">{{ role_label }}</div>
+        <nav>
+            {% for item in menu_items %}
+            <a href="{{ item.url }}">{{ item.label }}</a>
+            {% endfor %}
+        </nav>
+        <div class="logout"><a href="/logout">Выход</a></div>
+    </aside>
+    <div class="main">
+        {% if error %}<div class="flash">{{ error }}</div>{% endif %}
+        {% block content %}{% endblock %}
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

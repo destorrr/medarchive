@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Добро пожаловать, {{ username }}</h1>
+<div class="card">
+    <p>Вы вошли как <strong>{{ role_label }}</strong>.</p>
+    <p style="color: #888; margin-top: 8px;">Система управления архивом медицинских карт v0.1.0</p>
+</div>
+{% endblock %}
