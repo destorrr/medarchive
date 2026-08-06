@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS card_movements (
     action TEXT NOT NULL,
     from_location TEXT,
     to_location TEXT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER REFERENCES users(id),
     timestamp TEXT NOT NULL DEFAULT (datetime('now'))
 );
 """

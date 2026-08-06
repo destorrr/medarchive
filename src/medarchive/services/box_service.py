@@ -46,7 +46,7 @@ class BoxService:
         ms = MovementService(self.db)
         box = await self.box_repo.get_by_id(box_id)
         box_label = box.box_number if box else str(box_id)
-        await ms.log_movement(card.id, "packed", None, f"box {box_label}", user_id=0)
+        await ms.log_movement(card.id, "packed", None, f"box {box_label}")
 
         return card
 

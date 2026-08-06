@@ -6,7 +6,7 @@ class MovementService:
     def __init__(self, db: Database):
         self.db = db
 
-    async def log_movement(self, card_id: int, action: str, from_location: str | None, to_location: str | None, user_id: int) -> None:
+    async def log_movement(self, card_id: int, action: str, from_location: str | None, to_location: str | None, user_id: int | None = None) -> None:
         await self.db.execute(
             "INSERT INTO card_movements (card_id, action, from_location, to_location, user_id) VALUES (?, ?, ?, ?, ?)",
             (card_id, action, from_location, to_location, user_id),
