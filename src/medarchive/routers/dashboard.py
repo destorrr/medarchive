@@ -11,6 +11,7 @@ from medarchive.adapters.sqlite.repositories import (
     CourierRepositoryImpl,
 )
 from medarchive.services.request_service import RequestService
+from medarchive.services.return_service import ReturnService
 from medarchive.services.shipment_service import ShipmentService
 
 router = APIRouter()
@@ -199,6 +200,44 @@ async def fulfill_request(
         await shipment_service.transfer_box(return_box.id, courier_id, user.id)
 
     return RedirectResponse(url="/requests", status_code=303)
+
+
+@router.get("/receive-return")
+async def receive_return_page(
+    request: Request,
+    user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
+):
+    """Страница приёма возврата: сканер карты."""
+    ctx = _menu_context(user)
+    ctx.update({"request": request, "username": user.username})
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="receive_return.html", context=ctx
+    )
+
+
+@router.post("/receive-return/confirm")
+async def receive_return_confirm(
+    request: Request,
+    card_id: int = Form(...),
+    user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """Подтвердить получение возвращённой карты."""
+    card_repo = CardRepositoryImpl(db)
+    box_repo = BoxRepositoryImpl(db)
+    courier_repo = CourierRepositoryImpl(db)
+    return_service = ReturnService(db, card_repo, box_repo, courier_repo)
+
+    try:
+        await return_service.receive_return(card_id, user.id)
+    except ValueError as e:
+        ctx = _menu_context(user)
+        ctx.update({"request": request, "username": user.username, "error": str(e)})
+        return request.app.state.templates.TemplateResponse(
+            request=request, name="receive_return.html", context=ctx, status_code=400
+        )
+
+    return RedirectResponse(url="/my-shipments", status_code=303)
 
 
 @router.post("/requests/cancel")
