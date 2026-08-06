@@ -40,7 +40,7 @@ class ReceiveService:
 
         await self.db.conn.commit()
 
-    async def place_box(self, box_id: int, shelf_id: int, user_id: int = 0) -> None:
+    async def place_box(self, box_id: int, shelf_id: int, user_id: int | None = None) -> None:
         box = await self.box_repo.get_by_id(box_id)
         if box is None:
             raise ValueError("Коробка не найдена")
