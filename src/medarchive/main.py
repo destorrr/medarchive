@@ -25,12 +25,17 @@ def create_app(config: Config | None = None) -> FastAPI:
         db = await get_db()
         await db.init()
 
-    # Shutdown: close DB
+    # Shutdown: close DB (safe — no hang on cleanup errors)
     @app.on_event("shutdown")
     async def shutdown():
         from medarchive.dependencies import _db
         if _db is not None:
-            await _db.close()
+            try:
+                db = _db
+                _db = None  # prevent double-close
+                await db.close()
+            except Exception:
+                pass
 
     # Routers
     from medarchive.routers.auth import router as auth_router
