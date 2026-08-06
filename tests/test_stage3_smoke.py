@@ -13,10 +13,11 @@ async def stage3_client(test_config, db):
     await db.execute("INSERT OR REPLACE INTO branches (id, name, code) VALUES (1, 'B1', 'B1')")
     await db.execute("INSERT OR REPLACE INTO users (id, username, password_hash, role) "
                      "VALUES (0, 'sys', 'h', 'admin')")
+    pwd = auth.hash_password("test123")
     await db.execute("INSERT OR REPLACE INTO users (id, username, password_hash, role, branch_id) "
-                     "VALUES (1, 'branch1', ?, 'branch', 1)", (auth.hash_password("test123"),))
+                     "VALUES (1, 'branch1', ?, 'branch', 1)", (pwd,))
     await db.execute("INSERT OR REPLACE INTO users (id, username, password_hash, role) "
-                     "VALUES (2, 'arch1', ?, 'archive')", (auth.hash_password("test123"),))
+                     "VALUES (2, 'arch1', ?, 'archive')", (pwd,))
     await db.execute("INSERT OR REPLACE INTO couriers (id, name) VALUES (1, 'K1')")
     await db.execute("INSERT OR REPLACE INTO archive_sections (id, name) VALUES (1, 'Секция 1')")
     await db.execute("INSERT OR REPLACE INTO archive_shelves (id, section_id, name) "
@@ -54,10 +55,11 @@ class TestStage3E2E:
         assert r.status_code == 303
 
         # 4. Login as archive
-        await ac.post("/login", data={"username": "arch1", "password": "test123"})
+        r = await ac.post("/login", data={"username": "arch1", "password": "test123"}, follow_redirects=False)
+        assert r.status_code == 303, f"Archive login failed: {r.status_code}"
 
-        # 5. Receive box
-        r = await ac.post("/receive/scan", data={"box_number": "1"}, follow_redirects=False)
+        # 5. Receive box (box number is 0001)
+        r = await ac.post("/receive/scan", data={"box_number": "0001"}, follow_redirects=False)
         assert r.status_code == 200
         r = await ac.post("/receive/confirm", data={"box_id": "1"}, follow_redirects=False)
         assert r.status_code == 303

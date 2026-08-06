@@ -286,7 +286,7 @@ async def receive_return_confirm(
 @router.get("/history")
 async def history_page(
     request: Request,
-    user: User = Depends(require_role(UserRole.viewer, UserRole.admin)),
+    user: User = Depends(require_role(UserRole.archive, UserRole.viewer, UserRole.admin)),
     db: Database = Depends(get_db),
 ):
     from medarchive.services.movement_service import MovementService
