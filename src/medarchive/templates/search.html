@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🔍 Поиск</h1>
+<form method="post" action="/search">
+    <input type="text" name="query" value="{{ query }}" placeholder="ФИО или номер коробки..." autofocus style="width:100%;padding:12px;font-size:16px;margin-bottom:16px;">
+    <button type="submit" class="btn btn-primary">Найти</button>
+</form>
+{% if results %}
+<h2>Карты ({{ cards_found|length }})</h2>
+{% if cards_found %}
+<table><thead><tr><th>ФИО</th><th>Статус</th><th>Коробка</th><th>Место</th></tr></thead><tbody>
+{% for c in cards_found %}<tr><td>{{ c.full_name }}</td><td>{{ c.status }}</td><td>{{ c.box_number or '—' }}</td><td>{% if c.shelf_name %}{{ c.section_name }} / {{ c.shelf_name }}{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Ничего не найдено</p>{% endif %}
+
+<h2>Коробки ({{ boxes_found|length }})</h2>
+{% if boxes_found %}
+<table><thead><tr><th>Номер</th><th>Статус</th><th>Карт внутри</th></tr></thead><tbody>
+{% for b in boxes_found %}<tr><td>{{ b.box_number }}</td><td>{{ b.status }}</td><td>{{ b.card_count }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Ничего не найдено</p>{% endif %}
+{% endif %}
+{% endblock %}

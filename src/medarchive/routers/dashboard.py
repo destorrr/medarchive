@@ -75,6 +75,26 @@ async def dashboard(request: Request):
     )
 
 
+@router.get("/search")
+async def search_page(request: Request, user: User = Depends(require_role(UserRole.archive, UserRole.viewer, UserRole.admin))):
+    ctx = _menu_context(user)
+    ctx.update({"request": request, "username": user.username, "results": False, "cards_found": [], "boxes_found": [], "query": ""})
+    return request.app.state.templates.TemplateResponse(request=request, name="search.html", context=ctx)
+
+
+@router.post("/search")
+async def search_execute(request: Request, query: str = Form(...),
+                         user: User = Depends(require_role(UserRole.archive, UserRole.viewer, UserRole.admin)),
+                         db: Database = Depends(get_db)):
+    from medarchive.services.search_service import SearchService
+    svc = SearchService(db)
+    cards = await svc.search_cards(query)
+    boxes = await svc.search_boxes(query)
+    ctx = _menu_context(user)
+    ctx.update({"request": request, "username": user.username, "results": True, "cards_found": cards, "boxes_found": boxes, "query": query})
+    return request.app.state.templates.TemplateResponse(request=request, name="search.html", context=ctx)
+
+
 @router.get("/my-shipments")
 async def my_shipments(
     request: Request,
