@@ -120,5 +120,14 @@ class ReturnService:
         if shipment["box_id"] is not None:
             await self.box_repo.update_status(shipment["box_id"], BoxStatus.received)
 
+        from medarchive.services.movement_service import MovementService
+        ms = MovementService(self.db)
+        branch_row = await self.db.fetch_one(
+            "SELECT branch_id FROM users WHERE id = ?", (user_id,)
+        )
+        branch_id = branch_row["branch_id"] if branch_row is not None else None
+        to_location = f"branch {branch_id}" if branch_id is not None else "branch ?"
+        await ms.log_movement(card_id, "returned", None, to_location, user_id)
+
         await self.card_repo.update_status(card_id, CardStatus.in_branch)
         await self.db.conn.commit()

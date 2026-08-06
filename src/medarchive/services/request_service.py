@@ -59,6 +59,17 @@ class RequestService:
         )
 
         # Update card status
+        from medarchive.services.movement_service import MovementService
+        ms = MovementService(self.db)
+        box_row = await self.db.fetch_one(
+            "SELECT b.box_number FROM boxes b JOIN box_cards bc ON b.id = bc.box_id "
+            "WHERE bc.card_id = ? AND bc.removed_at IS NULL",
+            (req["card_id"],),
+        )
+        box_number = box_row["box_number"] if box_row else None
+        from_location = f"box {box_number}" if box_number else None
+        await ms.log_movement(req["card_id"], "retrieved_for_return", from_location, None, user_id)
+
         await self.card_repo.update_status(req["card_id"], CardStatus.pending_return)
 
         # Complete

@@ -42,6 +42,12 @@ class BoxService:
         await self.card_repo.update_status(card.id, CardStatus.in_box)
         card.status = CardStatus.in_box
 
+        from medarchive.services.movement_service import MovementService
+        ms = MovementService(self.db)
+        box = await self.box_repo.get_by_id(box_id)
+        box_label = box.box_number if box else str(box_id)
+        await ms.log_movement(card.id, "packed", None, f"box {box_label}", user_id=0)
+
         return card
 
     async def get_box_contents(self, box_id: int) -> list[Card]:

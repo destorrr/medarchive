@@ -32,17 +32,15 @@ class ReceiveService:
 
         # Update cards + audit log
         cards = await self.box_repo.get_cards(box_id)
+        from medarchive.services.movement_service import MovementService
+        ms = MovementService(self.db)
         for card in cards:
             await self.card_repo.update_status(card.id, CardStatus.in_archive)
-            await self.db.execute(
-                "INSERT INTO card_movements (card_id, action, from_location, to_location, user_id) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (card.id, "received", "courier", "archive", user_id),
-            )
+            await ms.log_movement(card.id, "received", None, "archive", user_id)
 
         await self.db.conn.commit()
 
-    async def place_box(self, box_id: int, shelf_id: int) -> None:
+    async def place_box(self, box_id: int, shelf_id: int, user_id: int = 0) -> None:
         box = await self.box_repo.get_by_id(box_id)
         if box is None:
             raise ValueError("Коробка не найдена")
@@ -60,8 +58,13 @@ class ReceiveService:
 
         # Update cards
         cards = await self.box_repo.get_cards(box_id)
+        shelf = await self.db.fetch_one("SELECT name FROM archive_shelves WHERE id = ?", (shelf_id,))
+        shelf_name = shelf["name"] if shelf else None
+        from medarchive.services.movement_service import MovementService
+        ms = MovementService(self.db)
         for card in cards:
             await self.card_repo.update_status(card.id, CardStatus.placed)
+            await ms.log_movement(card.id, "placed", "archive", f"shelf {shelf_name or shelf_id}", user_id)
 
         await self.db.conn.commit()
 

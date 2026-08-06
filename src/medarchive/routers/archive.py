@@ -115,7 +115,7 @@ async def confirm_placement(
 ):
     service = ReceiveService(db, BoxRepositoryImpl(db), CardRepositoryImpl(db))
     try:
-        await service.place_box(box_id, shelf_id)
+        await service.place_box(box_id, shelf_id, user_id=user.id)
     except ValueError as e:
         return HTMLResponse(f'<div class="flash">{str(e)}</div>', status_code=400)
     return RedirectResponse(url="/placement", status_code=303)
