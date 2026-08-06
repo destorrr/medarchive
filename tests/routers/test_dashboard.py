@@ -71,3 +71,23 @@ class TestDashboard:
     async def test_redirects_to_login_when_unauthenticated(self, client):
         r = await client.get("/dashboard", follow_redirects=False)
         assert r.status_code == 303
+
+    async def test_dashboard_shows_stats(self, client):
+        await client.post("/login", data={"username": "admin_user", "password": "test123"})
+        r = await client.get("/dashboard")
+        assert r.status_code == 200
+        assert "Карт всего" in r.text
+
+    async def test_dashboard_shows_recent_movements(self, client, db):
+        # Seed system user for FK
+        await db.execute("INSERT OR REPLACE INTO users (id, username, password_hash, role) VALUES (0, 'sys', 'h', 'admin')")
+        await db.execute("INSERT OR REPLACE INTO cards (id, full_name, status) VALUES (99, 'Пациент Дашборд', 'placed')")
+        await db.conn.commit()
+        from medarchive.services.movement_service import MovementService
+        ms = MovementService(db)
+        await ms.log_movement(99, "placed", None, "shelf Полка 1", user_id=0)
+
+        await client.post("/login", data={"username": "admin_user", "password": "test123"})
+        r = await client.get("/dashboard")
+        assert r.status_code == 200
+        assert "Пациент Дашборд" in r.text

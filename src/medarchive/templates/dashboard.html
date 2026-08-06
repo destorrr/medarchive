@@ -1,8 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Добро пожаловать, {{ username }}</h1>
-<div class="card">
-    <p>Вы вошли как <strong>{{ role_label }}</strong>.</p>
-    <p style="color: #888; margin-top: 8px;">Система управления архивом медицинских карт v0.1.0</p>
+<h1>📊 Панель управления</h1>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
+    <div class="card" style="text-align:center;"><h2>{{ total_cards }}</h2><p>Карт всего</p></div>
+    <div class="card" style="text-align:center;"><h2>{{ cards_placed }}</h2><p>В архиве</p></div>
+    <div class="card" style="text-align:center;"><h2>{{ cards_in_branch }}</h2><p>В филиалах</p></div>
+    <div class="card" style="text-align:center;"><h2>{{ cards_in_transit }}</h2><p>В пути</p></div>
+    <div class="card" style="text-align:center;"><h2>{{ total_boxes }}</h2><p>Коробок всего</p></div>
+    <div class="card" style="text-align:center;"><h2>{{ open_requests }}</h2><p>Открытых заявок</p></div>
 </div>
+
+<h2>Последние движения</h2>
+{% if recent_movements %}
+<table><thead><tr><th>Время</th><th>Карта</th><th>Действие</th><th>Куда</th></tr></thead><tbody>
+{% for m in recent_movements %}<tr><td>{{ m.timestamp or m.created_at or '—' }}</td><td>{{ m.card_name }}</td><td>{{ m.action }}</td><td>{{ m.to_location or '—' }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Нет записей о движениях</p>{% endif %}
 {% endblock %}

@@ -67,9 +67,32 @@ async def dashboard(request: Request):
         user = await get_current_user(request)
     except HTTPException:
         return RedirectResponse(url="/login", status_code=303)
+    db = await get_db()
     ctx = _menu_context(user)
     ctx["username"] = user.username
     ctx["request"] = request
+
+    # Статистика
+    total_cards = await db.fetch_one("SELECT COUNT(*) as cnt FROM cards")
+    cards_placed = await db.fetch_one("SELECT COUNT(*) as cnt FROM cards WHERE status='placed'")
+    cards_in_branch = await db.fetch_one("SELECT COUNT(*) as cnt FROM cards WHERE status='in_branch'")
+    cards_in_transit = await db.fetch_one("SELECT COUNT(*) as cnt FROM cards WHERE status='in_transit'")
+    total_boxes = await db.fetch_one("SELECT COUNT(*) as cnt FROM boxes")
+    open_requests = await db.fetch_one("SELECT COUNT(*) as cnt FROM requests WHERE status IN ('new','in_progress')")
+
+    from medarchive.services.movement_service import MovementService
+    ms = MovementService(db)
+    recent = await ms.get_recent_movements(5)
+
+    ctx.update({
+        "total_cards": total_cards["cnt"],
+        "cards_placed": cards_placed["cnt"],
+        "cards_in_branch": cards_in_branch["cnt"],
+        "cards_in_transit": cards_in_transit["cnt"],
+        "total_boxes": total_boxes["cnt"],
+        "open_requests": open_requests["cnt"],
+        "recent_movements": recent,
+    })
     return request.app.state.templates.TemplateResponse(
         request=request, name="dashboard.html", context=ctx
     )
