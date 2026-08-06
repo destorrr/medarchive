@@ -21,6 +21,7 @@ async def box_repo(db):
 
 async def _seed_branch_users_courier(db):
     await db.execute("INSERT OR REPLACE INTO branches (id, name, code) VALUES (1, 'B1', 'B1')")
+    await db.execute("INSERT OR REPLACE INTO users (id, username, password_hash, role) VALUES (0, 'system', 'h', 'admin')")
     await db.execute(
         "INSERT OR REPLACE INTO users (id, username, password_hash, role, branch_id) "
         "VALUES (1, 'branch1', 'h', 'branch', 1)"

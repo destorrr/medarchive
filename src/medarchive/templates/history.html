@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📜 Журнал движений</h1>
+
+{% if movements %}
+<table>
+<thead><tr><th>Время</th><th>Карта</th><th>Действие</th><th>Откуда</th><th>Куда</th></tr></thead>
+<tbody>
+{% for m in movements %}
+<tr>
+    <td>{{ m.timestamp or m.created_at or '—' }}</td>
+    <td>{{ m.card_name }}</td>
+    <td>{{ m.action }}</td>
+    <td>{{ m.from_location or '—' }}</td>
+    <td>{{ m.to_location or '—' }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p>Нет записей о движениях</p>
+{% endif %}
+{% endblock %}

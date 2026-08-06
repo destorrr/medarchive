@@ -260,6 +260,22 @@ async def receive_return_confirm(
     return RedirectResponse(url="/my-shipments", status_code=303)
 
 
+@router.get("/history")
+async def history_page(
+    request: Request,
+    user: User = Depends(require_role(UserRole.viewer, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    from medarchive.services.movement_service import MovementService
+    ms = MovementService(db)
+    movements = await ms.get_recent_movements(50)
+    ctx = _menu_context(user)
+    ctx.update({"request": request, "username": user.username, "movements": movements})
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="history.html", context=ctx
+    )
+
+
 @router.post("/requests/cancel")
 async def cancel_request_route(
     request: Request,
