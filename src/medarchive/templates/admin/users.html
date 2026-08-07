@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>👤 Пользователи</h1>
+<div class="card">
+    <h2 style="font-size:16px; margin-bottom:12px;">Создать пользователя</h2>
+    <form method="post" action="/admin/users">
+        <input type="text" name="username" placeholder="Логин" required>
+        <input type="password" name="password" placeholder="Пароль" required>
+        <select name="role">
+            {% for r in roles %}
+            <option value="{{ r.value }}">{{ role_labels.get(r, r.value) }}</option>
+            {% endfor %}
+        </select>
+        <select name="branch_id">
+            <option value="">— Без филиала —</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Создать</button>
+    </form>
+</div>
+<div class="card">
+    <table>
+        <thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Филиал</th><th>Действия</th></tr></thead>
+        <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.username }}</td>
+            <td>
+                <select name="role" form="edit-user-{{ u.id }}">
+                    {% for r in roles %}
+                    <option value="{{ r.value }}" {% if r == u.role %}selected{% endif %}>{{ role_labels.get(r, r.value) }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select name="branch_id" form="edit-user-{{ u.id }}">
+                    <option value="">—</option>
+                    {% for b in branches %}
+                    <option value="{{ b.id }}" {% if u.branch_id == b.id %}selected{% endif %}>{{ b.name }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <input type="password" name="password" placeholder="Новый пароль" form="edit-user-{{ u.id }}">
+                <button type="submit" form="edit-user-{{ u.id }}" class="btn btn-primary">Сохранить</button>
+                <form id="edit-user-{{ u.id }}" method="post" action="/admin/users/{{ u.id }}/edit" style="display:none"></form>
+                {% if u.id != user.id %}
+                <form method="post" action="/admin/users/{{ u.id }}/delete" style="display:inline"
+                      onsubmit="return confirm('Удалить пользователя «{{ u.username }}»?');">
+                    <button type="submit" class="btn">Удалить</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

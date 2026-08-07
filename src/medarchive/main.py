@@ -70,6 +70,13 @@ def create_app(config: Config | None = None) -> FastAPI:
                 return RedirectResponse(url="/login", status_code=303)
             return HTMLResponse("<h1>МедАрхив</h1><p>Дашборд появится в Task 7.</p>")
 
+    # Admin router (Этап 4: справочники)
+    try:
+        from medarchive.routers.admin import router as admin_router
+        app.include_router(admin_router)
+    except ImportError:
+        pass
+
     # Transfer router (Task 5)
     try:
         from medarchive.routers.transfer import router as transfer_router
