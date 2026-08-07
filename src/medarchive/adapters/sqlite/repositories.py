@@ -1,6 +1,6 @@
 """SQLite-реализации репозиториев."""
 from medarchive.adapters.sqlite.database import Database
-from medarchive.domain.models import Card, Box, User, Courier
+from medarchive.domain.models import Card, Box, Branch, User, Courier
 from medarchive.domain.statuses import CardStatus, BoxStatus, UserRole
 
 
@@ -120,6 +120,51 @@ class BoxRepositoryImpl:
         ]
 
 
+class BranchRepositoryImpl:
+    def __init__(self, db: Database):
+        self.db = db
+
+    async def list_all(self) -> list[Branch]:
+        rows = await self.db.fetch_all("SELECT * FROM branches ORDER BY name")
+        return [Branch(id=r["id"], name=r["name"], code=r["code"]) for r in rows]
+
+    async def get_by_id(self, branch_id: int) -> Branch | None:
+        row = await self.db.fetch_one("SELECT * FROM branches WHERE id = ?", (branch_id,))
+        if row is None:
+            return None
+        return Branch(id=row["id"], name=row["name"], code=row["code"])
+
+    async def create(self, name: str, code: str) -> Branch:
+        cursor = await self.db.execute(
+            "INSERT INTO branches (name, code) VALUES (?, ?)",
+            (name, code),
+        )
+        await self.db.conn.commit()
+        return Branch(id=cursor.lastrowid, name=name, code=code)
+
+    async def update(self, branch_id: int, name: str | None = None, code: str | None = None) -> None:
+        fields = []
+        params: list = []
+        if name is not None:
+            fields.append("name = ?")
+            params.append(name)
+        if code is not None:
+            fields.append("code = ?")
+            params.append(code)
+        if not fields:
+            return
+        params.append(branch_id)
+        await self.db.execute(
+            f"UPDATE branches SET {', '.join(fields)} WHERE id = ?",
+            tuple(params),
+        )
+        await self.db.conn.commit()
+
+    async def delete(self, branch_id: int) -> None:
+        await self.db.execute("DELETE FROM branches WHERE id = ?", (branch_id,))
+        await self.db.conn.commit()
+
+
 class UserRepositoryImpl:
     def __init__(self, db: Database):
         self.db = db
@@ -164,6 +209,54 @@ class UserRepositoryImpl:
             branch_id=branch_id,
         )
 
+    async def list_all(self) -> list[User]:
+        rows = await self.db.fetch_all("SELECT * FROM users ORDER BY username")
+        return [
+            User(
+                id=r["id"],
+                username=r["username"],
+                password_hash=r["password_hash"],
+                role=UserRole(r["role"]),
+                branch_id=r["branch_id"],
+            )
+            for r in rows
+        ]
+
+    async def update(
+        self,
+        user_id: int,
+        username: str | None = None,
+        password_hash: str | None = None,
+        role: str | None = None,
+        branch_id: int | None = None,
+    ) -> None:
+        fields = []
+        params: list = []
+        if username is not None:
+            fields.append("username = ?")
+            params.append(username)
+        if password_hash is not None:
+            fields.append("password_hash = ?")
+            params.append(password_hash)
+        if role is not None:
+            fields.append("role = ?")
+            params.append(role.value if isinstance(role, UserRole) else role)
+        if branch_id is not None:
+            fields.append("branch_id = ?")
+            params.append(branch_id)
+        if not fields:
+            return
+        params.append(user_id)
+        await self.db.execute(
+            f"UPDATE users SET {', '.join(fields)} WHERE id = ?",
+            tuple(params),
+        )
+        await self.db.conn.commit()
+
+    async def delete(self, user_id: int) -> None:
+        await self.db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        await self.db.conn.commit()
+
 
 class CourierRepositoryImpl:
     def __init__(self, db: Database):
@@ -186,3 +279,25 @@ class CourierRepositoryImpl:
         if row is None:
             return None
         return Courier(id=row["id"], name=row["name"], phone=row["phone"])
+
+    async def update(self, courier_id: int, name: str | None = None, phone: str | None = None) -> None:
+        fields = []
+        params: list = []
+        if name is not None:
+            fields.append("name = ?")
+            params.append(name)
+        if phone is not None:
+            fields.append("phone = ?")
+            params.append(phone)
+        if not fields:
+            return
+        params.append(courier_id)
+        await self.db.execute(
+            f"UPDATE couriers SET {', '.join(fields)} WHERE id = ?",
+            tuple(params),
+        )
+        await self.db.conn.commit()
+
+    async def delete(self, courier_id: int) -> None:
+        await self.db.execute("DELETE FROM couriers WHERE id = ?", (courier_id,))
+        await self.db.conn.commit()
