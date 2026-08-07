@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    @media print {
+        body { background: #fff; }
+        .sidebar, .logout, .no-print { display: none !important; }
+        .main { padding: 0 !important; }
+    }
+    .qr-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    .qr-sticker {
+        border: 1px dashed #999;
+        border-radius: 4px;
+        text-align: center;
+        padding: 8px 4px;
+        page-break-inside: avoid;
+    }
+    .qr-sticker img { width: 110px; height: 110px; }
+    .qr-sticker .label { font-weight: 600; font-size: 13px; margin-top: 4px; }
+</style>
+<h1 class="no-print">🖨️ QR-коды полок</h1>
+<p class="no-print" style="margin-bottom:12px;">
+    <a href="javascript:window.print()" class="btn btn-primary">Печать</a>
+    <a href="/admin/sections" class="btn">← К секциям</a>
+</p>
+<div class="qr-grid">
+    {% for st in stickers %}
+    <div class="qr-sticker">
+        <img src="data:image/png;base64,{{ st.qr_b64 }}" alt="{{ st.label }}">
+        <div class="label">{{ st.label }}</div>
+    </div>
+    {% else %}
+    <p style="color:#888; grid-column: 1 / -1;">Полок пока нет — создайте полки в разделе «Секции / Полки».</p>
+    {% endfor %}
+</div>
+{% endblock %}

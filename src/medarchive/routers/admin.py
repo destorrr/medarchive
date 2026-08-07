@@ -1,6 +1,11 @@
-"""Админ-роутер: справочники (филиалы, пользователи, ...)."""
-from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import RedirectResponse
+"""Админ-роутер: справочники (филиалы, пользователи, ...), QR полок, инциденты, бэкап."""
+import base64
+import io
+import shutil
+
+import qrcode
+from fastapi import APIRouter, Request, Depends, Form, UploadFile, File, HTTPException
+from fastapi.responses import RedirectResponse, Response, FileResponse
 from medarchive.dependencies import get_db, get_auth, require_role
 from medarchive.domain.models import User
 from medarchive.domain.statuses import UserRole
@@ -11,9 +16,13 @@ from medarchive.adapters.sqlite.repositories import (
     CourierRepositoryImpl,
     SectionRepositoryImpl,
     ShelfRepositoryImpl,
+    CardRepositoryImpl,
+    BoxRepositoryImpl,
 )
 from medarchive.routers.dashboard import _menu_context
 from medarchive.services.auth_service import AuthService
+from medarchive.services.incident_service import IncidentService
+from medarchive.services.backup_service import BackupService
 
 router = APIRouter()
 
@@ -23,6 +32,32 @@ ROLE_LABELS = {
     UserRole.viewer: "Просмотр",
     UserRole.admin: "Администратор",
 }
+
+
+def _shelf_qr_text(shelf: dict) -> str:
+    """Текст QR-кода полки: S{section_id}-P{shelf_id}."""
+    return f"S{shelf['section_id']}-P{shelf['id']}"
+
+
+def _qr_png_bytes(text: str) -> bytes:
+    """PNG-байты QR-кода для заданного текста."""
+    qr = qrcode.make(text)
+    buf = io.BytesIO()
+    qr.save(buf, "PNG")
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def _qr_base64(text: str) -> str:
+    """base64 PNG QR-кода (без префикса data URI)."""
+    return base64.b64encode(_qr_png_bytes(text)).decode()
+
+
+def _shelf_qr_base64(shelf: dict) -> str:
+    """base64 QR для полки: берём сохранённый, при отсутствии генерируем."""
+    if shelf.get("qr_code"):
+        return shelf["qr_code"]
+    return _qr_base64(_shelf_qr_text(shelf))
 
 
 def _ctx(user: User, request: Request, **extra) -> dict:
@@ -339,3 +374,183 @@ async def shelves_delete(
     shelf_repo = ShelfRepositoryImpl(db)
     await shelf_repo.delete(shelf_id)
     return RedirectResponse(url="/admin/sections", status_code=303)
+
+
+# --- QR-коды полок (Task 5-QR) ---
+
+
+@router.get("/admin/shelves/{shelf_id}/qr")
+async def shelf_qr_png(
+    shelf_id: int,
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """PNG с QR-кодом одной полки."""
+    shelf_repo = ShelfRepositoryImpl(db)
+    shelf = await shelf_repo.get_by_id(shelf_id)
+    if shelf is None:
+        raise HTTPException(status_code=404, detail="Полка не найдена")
+    png = _qr_png_bytes(_shelf_qr_text(shelf))
+    return Response(content=png, media_type="image/png")
+
+
+@router.post("/admin/shelves/{shelf_id}/generate-qr")
+async def shelf_generate_qr(
+    shelf_id: int,
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """Генерирует/обновляет QR-код полки и сохраняет в БД."""
+    shelf_repo = ShelfRepositoryImpl(db)
+    try:
+        await shelf_repo.generate_qr(shelf_id)
+    except ValueError:
+        pass  # полка не найдена — просто остаёмся на странице
+    return RedirectResponse(url="/admin/sections", status_code=303)
+
+
+@router.get("/admin/shelves/qr-sheet")
+async def shelves_qr_sheet(
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """HTML-страница с сеткой QR-кодов всех полок для печати на A4."""
+    shelf_repo = ShelfRepositoryImpl(db)
+    shelves = await shelf_repo.list_all()
+    stickers = [
+        {
+            "label": _shelf_qr_text(dict(sh)),
+            "qr_b64": _shelf_qr_base64(dict(sh)),
+        }
+        for sh in shelves
+    ]
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/qr_sheet.html",
+        context=_ctx(user, request, stickers=stickers),
+    )
+
+
+# --- Инциденты (Task 6) ---
+
+
+@router.get("/admin/incidents")
+async def incidents_page(
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    svc = IncidentService()
+    lost_boxes = await svc.get_lost_boxes(db)
+    damaged_shipments = await svc.get_damaged_shipments(db)
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/incidents.html",
+        context=_ctx(
+            user,
+            request,
+            lost_boxes=lost_boxes,
+            damaged_shipments=damaged_shipments,
+        ),
+    )
+
+
+@router.post("/admin/incidents/resolve-lost-box")
+async def incidents_resolve_lost_box(
+    request: Request,
+    box_id: int = Form(...),
+    action: str = Form(...),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """Разбор потерянной коробки: вернуть карты или считать утерянными."""
+    svc = IncidentService()
+    try:
+        await svc.resolve_lost_box(db, box_id, action)
+    except ValueError:
+        pass
+    return RedirectResponse(url="/admin/incidents", status_code=303)
+
+
+@router.post("/admin/incidents/resolve-card")
+async def incidents_resolve_card(
+    request: Request,
+    card_id: int = Form(...),
+    new_status: str = Form(...),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """Принудительная смена статуса карты (admin only)."""
+    svc = IncidentService()
+    try:
+        await svc.resolve_card_status(db, card_id, new_status)
+    except ValueError:
+        pass
+    return RedirectResponse(url="/admin/incidents", status_code=303)
+
+
+# --- Бэкап и восстановление (Task 7) ---
+
+
+@router.get("/admin/backup")
+async def backup_page(
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    db_info = BackupService.get_db_info(db.config.db_path)
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/backup.html",
+        context=_ctx(user, request, db_info=db_info),
+    )
+
+
+@router.post("/admin/backup/create")
+async def backup_create(
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """Скачивание .db файла как FileResponse."""
+    db_path = db.config.db_path
+    _, filename = BackupService.create_backup(db_path)
+    return FileResponse(
+        path=db_path,
+        filename=filename,
+        media_type="application/octet-stream",
+    )
+
+
+@router.post("/admin/backup/restore")
+async def backup_restore(
+    request: Request,
+    file: UploadFile = File(...),
+    confirm: str = Form(""),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """Восстановление БД из загруженного .db файла (только с подтверждением)."""
+    if confirm != "yes":
+        return RedirectResponse(url="/admin/backup", status_code=303)
+
+    data = await file.read()
+    db_path = db.config.db_path
+
+    # Сбрасываем WAL в основной файл, чтобы копия и restore были консистентны
+    try:
+        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+
+    # Авто-бэкап текущего состояния перед восстановлением
+    try:
+        shutil.copy2(db_path, db_path + ".pre_restore_backup")
+    except OSError:
+        pass
+
+    BackupService.restore_backup(db_path, data)
+    return RedirectResponse(url="/admin/backup", status_code=303)

@@ -403,3 +403,22 @@ class ShelfRepositoryImpl:
             "DELETE FROM archive_shelves WHERE id = ?", (shelf_id,)
         )
         await self.db.conn.commit()
+
+    async def generate_qr(self, shelf_id: int) -> str:
+        """Генерирует QR-код полки (текст S{section_id}-P{shelf_id})
+        и сохраняет base64 PNG в поле qr_code. Возвращает base64."""
+        import base64
+        import io
+        import qrcode
+
+        shelf = await self.get_by_id(shelf_id)
+        if shelf is None:
+            raise ValueError(f"Полка {shelf_id} не найдена")
+        text = f"S{shelf['section_id']}-P{shelf['id']}"
+        qr = qrcode.make(text)
+        buf = io.BytesIO()
+        qr.save(buf, "PNG")
+        buf.seek(0)
+        qr_code = base64.b64encode(buf.getvalue()).decode()
+        await self.update(shelf_id, qr_code=qr_code)
+        return qr_code

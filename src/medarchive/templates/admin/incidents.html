@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🚨 Инциденты</h1>
+
+<div class="card">
+    <h2 style="font-size:16px; margin-bottom:12px;">Потерянные коробки</h2>
+    {% if lost_boxes %}
+    <table style="width:100%; border-collapse:collapse;">
+        <thead>
+        <tr style="text-align:left;">
+            <th style="padding:6px; border-bottom:1px solid #ddd;">Коробка</th>
+            <th style="padding:6px; border-bottom:1px solid #ddd;">Карты в коробке</th>
+            <th style="padding:6px; border-bottom:1px solid #ddd;">Действия</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for box in lost_boxes %}
+        <tr>
+            <td style="padding:6px; border-bottom:1px solid #eee;">{{ box.box_number }}</td>
+            <td style="padding:6px; border-bottom:1px solid #eee;">
+                {% if box.cards %}
+                    {% for c in box.cards %}{{ c.full_name }} <em>({{ c.status }})</em>{% if not loop.last %}, {% endif %}{% endfor %}
+                {% else %}
+                    <em style="color:#888;">карт нет</em>
+                {% endif %}
+            </td>
+            <td style="padding:6px; border-bottom:1px solid #eee;">
+                <form method="post" action="/admin/incidents/resolve-lost-box" style="display:inline;">
+                    <input type="hidden" name="box_id" value="{{ box.id }}">
+                    <button type="submit" name="action" value="return_cards" class="btn btn-primary"
+                            onclick="return confirm('Вернуть все карты из коробки {{ box.box_number }} в филиал?');">↩️ Вернуть карты в филиал</button>
+                </form>
+                <form method="post" action="/admin/incidents/resolve-lost-box" style="display:inline;">
+                    <input type="hidden" name="box_id" value="{{ box.id }}">
+                    <button type="submit" name="action" value="mark_lost" class="btn"
+                            onclick="return confirm('Считать карты из коробки {{ box.box_number }} утерянными (статус не меняется)?');">Считать карты утерянными</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888;">Потерянных коробок нет.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2 style="font-size:16px; margin-bottom:12px;">Повреждённые / потерянные отправки</h2>
+    {% if damaged_shipments %}
+    <table style="width:100%; border-collapse:collapse;">
+        <thead>
+        <tr style="text-align:left;">
+            <th style="padding:6px; border-bottom:1px solid #ddd;">ID</th>
+            <th style="padding:6px; border-bottom:1px solid #ddd;">Коробка</th>
+            <th style="padding:6px; border-bottom:1px solid #ddd;">Курьер</th>
+            <th style="padding:6px; border-bottom:1px solid #ddd;">Статус</th>
+            <th style="padding:6px; border-bottom:1px solid #ddd;">Выдана</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for s in damaged_shipments %}
+        <tr>
+            <td style="padding:6px; border-bottom:1px solid #eee;">{{ s.id }}</td>
+            <td style="padding:6px; border-bottom:1px solid #eee;">{{ s.box_number or '—' }}</td>
+            <td style="padding:6px; border-bottom:1px solid #eee;">{{ s.courier_name or '—' }}</td>
+            <td style="padding:6px; border-bottom:1px solid #eee;">{{ s.status }}</td>
+            <td style="padding:6px; border-bottom:1px solid #eee;">{{ s.issued_at }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888;">Проблемных отправок нет.</p>
+    {% endif %}
+</div>
+{% endblock %}

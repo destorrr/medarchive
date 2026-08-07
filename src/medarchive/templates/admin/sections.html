@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>🗂 Секции и полки</h1>
+<p style="margin-bottom:12px;">
+    <a href="/admin/shelves/qr-sheet" target="_blank" class="btn btn-primary">🖨️ Печать QR полок</a>
+</p>
 <div class="card">
     <h2 style="font-size:16px; margin-bottom:12px;">Создать секцию</h2>
     <form method="post" action="/admin/sections">
@@ -45,6 +48,9 @@
             <td>
                 <button type="submit" form="edit-shelf-{{ sh.id }}" class="btn btn-primary">Сохранить</button>
                 <form id="edit-shelf-{{ sh.id }}" method="post" action="/admin/shelves/{{ sh.id }}/edit" style="display:none"></form>
+                <form method="post" action="/admin/shelves/{{ sh.id }}/generate-qr" style="display:inline">
+                    <button type="submit" class="btn" title="Сгенерировать QR-код полки">QR</button>
+                </form>
                 <form method="post" action="/admin/shelves/{{ sh.id }}/delete" style="display:inline"
                       onsubmit="return confirm('Удалить полку «{{ sh.name }}»?');">
                     <button type="submit" class="btn">Удалить</button>
