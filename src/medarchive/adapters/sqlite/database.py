@@ -12,7 +12,13 @@ class Database:
     async def init(self) -> None:
         if self._conn is not None:
             return  # уже инициализировано — идемпотентный вызов
-        self._conn = await aiosqlite.connect(self.config.db_path)
+        conn = aiosqlite.connect(self.config.db_path)
+        # Рабочий поток aiosqlite — не-daemon; если соединение не закрыть,
+        # интерпретатор зависает при выходе (тесты прошли, а процесс висит).
+        # Помечаем поток daemon — выход не блокируется, sqlite3-соединение
+        # финализируется своим __del__ при завершении процесса.
+        conn._thread.daemon = True
+        self._conn = await conn
         self._conn.row_factory = aiosqlite.Row
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.execute("PRAGMA foreign_keys=ON")

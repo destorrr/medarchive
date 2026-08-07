@@ -8,6 +8,9 @@ from medarchive.adapters.sqlite.database import Database
 from medarchive.adapters.sqlite.repositories import (
     BranchRepositoryImpl,
     UserRepositoryImpl,
+    CourierRepositoryImpl,
+    SectionRepositoryImpl,
+    ShelfRepositoryImpl,
 )
 from medarchive.routers.dashboard import _menu_context
 from medarchive.services.auth_service import AuthService
@@ -183,3 +186,156 @@ async def users_delete(
     user_repo = UserRepositoryImpl(db)
     await user_repo.delete(user_id)
     return RedirectResponse(url="/admin/users", status_code=303)
+
+
+@router.get("/admin/couriers")
+async def couriers_page(
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    courier_repo = CourierRepositoryImpl(db)
+    couriers = await courier_repo.list_all()
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/couriers.html",
+        context=_ctx(user, request, couriers=couriers),
+    )
+
+
+@router.post("/admin/couriers")
+async def couriers_create(
+    request: Request,
+    name: str = Form(...),
+    phone: str = Form(""),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    courier_repo = CourierRepositoryImpl(db)
+    await courier_repo.create(name=name.strip(), phone=phone.strip() or None)
+    return RedirectResponse(url="/admin/couriers", status_code=303)
+
+
+@router.post("/admin/couriers/{courier_id}/edit")
+async def couriers_edit(
+    courier_id: int,
+    request: Request,
+    name: str = Form(...),
+    phone: str = Form(""),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    courier_repo = CourierRepositoryImpl(db)
+    await courier_repo.update(
+        courier_id, name=name.strip(), phone=phone.strip() or None
+    )
+    return RedirectResponse(url="/admin/couriers", status_code=303)
+
+
+@router.post("/admin/couriers/{courier_id}/delete")
+async def couriers_delete(
+    courier_id: int,
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    courier_repo = CourierRepositoryImpl(db)
+    await courier_repo.delete(courier_id)
+    return RedirectResponse(url="/admin/couriers", status_code=303)
+
+
+@router.get("/admin/sections")
+async def sections_page(
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    section_repo = SectionRepositoryImpl(db)
+    shelf_repo = ShelfRepositoryImpl(db)
+    sections = await section_repo.list_all()
+    # Для каждой секции — её полки
+    for section in sections:
+        section["shelves"] = await shelf_repo.get_by_section(section["id"])
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/sections.html",
+        context=_ctx(user, request, sections=sections),
+    )
+
+
+@router.post("/admin/sections")
+async def sections_create(
+    request: Request,
+    name: str = Form(...),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    section_repo = SectionRepositoryImpl(db)
+    await section_repo.create(name=name.strip())
+    return RedirectResponse(url="/admin/sections", status_code=303)
+
+
+@router.post("/admin/sections/{section_id}/edit")
+async def sections_edit(
+    section_id: int,
+    request: Request,
+    name: str = Form(...),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    section_repo = SectionRepositoryImpl(db)
+    await section_repo.update(section_id, name=name.strip())
+    return RedirectResponse(url="/admin/sections", status_code=303)
+
+
+@router.post("/admin/sections/{section_id}/delete")
+async def sections_delete(
+    section_id: int,
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    section_repo = SectionRepositoryImpl(db)
+    try:
+        await section_repo.delete(section_id)
+    except Exception:
+        pass  # внутри секции есть полки (FK) — секцию не удаляем
+    return RedirectResponse(url="/admin/sections", status_code=303)
+
+
+@router.post("/admin/shelves")
+async def shelves_create(
+    request: Request,
+    section_id: int = Form(...),
+    name: str = Form(...),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    shelf_repo = ShelfRepositoryImpl(db)
+    await shelf_repo.create(section_id=section_id, name=name.strip())
+    return RedirectResponse(url="/admin/sections", status_code=303)
+
+
+@router.post("/admin/shelves/{shelf_id}/edit")
+async def shelves_edit(
+    shelf_id: int,
+    request: Request,
+    name: str = Form(...),
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    shelf_repo = ShelfRepositoryImpl(db)
+    await shelf_repo.update(shelf_id, name=name.strip())
+    return RedirectResponse(url="/admin/sections", status_code=303)
+
+
+@router.post("/admin/shelves/{shelf_id}/delete")
+async def shelves_delete(
+    shelf_id: int,
+    request: Request,
+    user: User = Depends(require_role(UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    shelf_repo = ShelfRepositoryImpl(db)
+    await shelf_repo.delete(shelf_id)
+    return RedirectResponse(url="/admin/sections", status_code=303)

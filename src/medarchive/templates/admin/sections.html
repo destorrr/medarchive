@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🗂 Секции и полки</h1>
+<div class="card">
+    <h2 style="font-size:16px; margin-bottom:12px;">Создать секцию</h2>
+    <form method="post" action="/admin/sections">
+        <input type="text" name="name" placeholder="Название секции" required>
+        <button type="submit" class="btn btn-primary">Создать</button>
+    </form>
+</div>
+<div class="card">
+    <h2 style="font-size:16px; margin-bottom:12px;">Добавить полку</h2>
+    <form method="post" action="/admin/shelves">
+        <select name="section_id" required>
+            <option value="">— Выберите секцию —</option>
+            {% for s in sections %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="name" placeholder="Название полки" required>
+        <button type="submit" class="btn btn-primary">Добавить</button>
+    </form>
+</div>
+
+{% for s in sections %}
+<div class="card">
+    <h2 style="font-size:16px; margin-bottom:12px;">
+        {{ s.name }}
+        <input type="text" name="name" value="{{ s.name }}" form="edit-section-{{ s.id }}" placeholder="Новое название">
+        <button type="submit" form="edit-section-{{ s.id }}" class="btn btn-primary">Переименовать</button>
+        <form id="edit-section-{{ s.id }}" method="post" action="/admin/sections/{{ s.id }}/edit" style="display:none"></form>
+        <form method="post" action="/admin/sections/{{ s.id }}/delete" style="display:inline"
+              onsubmit="return confirm('Удалить секцию «{{ s.name }}» со всеми полками?');">
+            <button type="submit" class="btn">Удалить секцию</button>
+        </form>
+    </h2>
+    {% if s.shelves %}
+    <table>
+        <thead><tr><th>ID</th><th>Полка</th><th>Действия</th></tr></thead>
+        <tbody>
+        {% for sh in s.shelves %}
+        <tr>
+            <td>{{ sh.id }}</td>
+            <td><input type="text" name="name" value="{{ sh.name }}" form="edit-shelf-{{ sh.id }}" required></td>
+            <td>
+                <button type="submit" form="edit-shelf-{{ sh.id }}" class="btn btn-primary">Сохранить</button>
+                <form id="edit-shelf-{{ sh.id }}" method="post" action="/admin/shelves/{{ sh.id }}/edit" style="display:none"></form>
+                <form method="post" action="/admin/shelves/{{ sh.id }}/delete" style="display:inline"
+                      onsubmit="return confirm('Удалить полку «{{ sh.name }}»?');">
+                    <button type="submit" class="btn">Удалить</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888;">В этой секции пока нет полок</p>
+    {% endif %}
+</div>
+{% else %}
+<div class="card">
+    <p style="color:#888;">Секций пока нет — создайте первую секцию.</p>
+</div>
+{% endfor %}
+{% endblock %}

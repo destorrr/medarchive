@@ -301,3 +301,105 @@ class CourierRepositoryImpl:
     async def delete(self, courier_id: int) -> None:
         await self.db.execute("DELETE FROM couriers WHERE id = ?", (courier_id,))
         await self.db.conn.commit()
+
+
+class SectionRepositoryImpl:
+    """Справочник секций архива."""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    async def list_all(self) -> list[dict]:
+        return await self.db.fetch_all(
+            "SELECT * FROM archive_sections ORDER BY name"
+        )
+
+    async def get_by_id(self, section_id: int) -> dict | None:
+        return await self.db.fetch_one(
+            "SELECT * FROM archive_sections WHERE id = ?", (section_id,)
+        )
+
+    async def create(self, name: str) -> int:
+        cursor = await self.db.execute(
+            "INSERT INTO archive_sections (name) VALUES (?)", (name,)
+        )
+        await self.db.conn.commit()
+        return cursor.lastrowid
+
+    async def update(self, section_id: int, name: str) -> None:
+        await self.db.execute(
+            "UPDATE archive_sections SET name = ? WHERE id = ?",
+            (name, section_id),
+        )
+        await self.db.conn.commit()
+
+    async def delete(self, section_id: int) -> None:
+        await self.db.execute(
+            "DELETE FROM archive_sections WHERE id = ?", (section_id,)
+        )
+        await self.db.conn.commit()
+
+
+class ShelfRepositoryImpl:
+    """Справочник полок архива (вложены в секции)."""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    async def list_all(self) -> list[dict]:
+        return await self.db.fetch_all(
+            """SELECT s.*, sec.name as section_name
+               FROM archive_shelves s
+               JOIN archive_sections sec ON s.section_id = sec.id
+               ORDER BY sec.name, s.name"""
+        )
+
+    async def get_by_section(self, section_id: int) -> list[dict]:
+        return await self.db.fetch_all(
+            "SELECT * FROM archive_shelves WHERE section_id = ? ORDER BY name",
+            (section_id,),
+        )
+
+    async def get_by_id(self, shelf_id: int) -> dict | None:
+        return await self.db.fetch_one(
+            "SELECT * FROM archive_shelves WHERE id = ?", (shelf_id,)
+        )
+
+    async def create(
+        self, section_id: int, name: str, qr_code: str | None = None
+    ) -> int:
+        cursor = await self.db.execute(
+            "INSERT INTO archive_shelves (section_id, name, qr_code) VALUES (?, ?, ?)",
+            (section_id, name, qr_code),
+        )
+        await self.db.conn.commit()
+        return cursor.lastrowid
+
+    async def update(
+        self,
+        shelf_id: int,
+        name: str | None = None,
+        qr_code: str | None = None,
+    ) -> None:
+        fields = []
+        params: list = []
+        if name is not None:
+            fields.append("name = ?")
+            params.append(name)
+        if qr_code is not None:
+            fields.append("qr_code = ?")
+            params.append(qr_code)
+        if not fields:
+            return
+        params.append(shelf_id)
+        await self.db.execute(
+            f"UPDATE archive_shelves SET {', '.join(fields)} WHERE id = ?",
+            tuple(params),
+        )
+        await self.db.conn.commit()
+
+    async def delete(self, shelf_id: int) -> None:
+        await self.db.execute(
+            "DELETE FROM archive_shelves WHERE id = ?", (shelf_id,)
+        )
+        await self.db.conn.commit()
