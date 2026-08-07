@@ -1,0 +1,9 @@
+[Unit]
+Description=МедАрхив — ежечасный бэкап БД
+
+[Service]
+Type=oneshot
+User=medarchive
+Group=medarchive
+Environment=MEDARCHIVE_DB_PATH=/var/lib/medarchive/medarchive.db
+ExecStart=/opt/medarchive/scripts/backup.sh
