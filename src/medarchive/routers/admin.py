@@ -287,7 +287,9 @@ async def sections_page(
 ):
     section_repo = SectionRepositoryImpl(db)
     shelf_repo = ShelfRepositoryImpl(db)
-    sections = await section_repo.list_all()
+    # fetch_all возвращает sqlite3.Row (нельзя присваивать поля) — делаем dict,
+    # чтобы добавить вложенные полки в секцию
+    sections = [dict(s) for s in await section_repo.list_all()]
     # Для каждой секции — её полки
     for section in sections:
         section["shelves"] = await shelf_repo.get_by_section(section["id"])
