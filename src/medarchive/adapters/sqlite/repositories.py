@@ -73,6 +73,22 @@ class BoxRepositoryImpl:
             status=BoxStatus(row["status"]),
         )
 
+    async def get_active_for_user(self, user_id: int) -> Box | None:
+        """Последняя незакрытая (packing) коробка пользователя — продолжается через сессии."""
+        row = await self.db.fetch_one(
+            "SELECT * FROM boxes WHERE created_by = ? AND status = ? ORDER BY id DESC LIMIT 1",
+            (user_id, BoxStatus.packing.value),
+        )
+        if row is None:
+            return None
+        return Box(
+            id=row["id"],
+            box_number=row["box_number"],
+            origin_branch_id=row["origin_branch_id"],
+            created_by=row["created_by"],
+            status=BoxStatus(row["status"]),
+        )
+
     async def create(self, box_number: str, origin_branch_id: int, created_by: int) -> Box:
         cursor = await self.db.execute(
             "INSERT INTO boxes (box_number, origin_branch_id, created_by, status) VALUES (?, ?, ?, ?)",
@@ -106,6 +122,25 @@ class BoxRepositoryImpl:
             (box_id, card_id),
         )
         await self.db.conn.commit()
+
+    async def remove_card(self, box_id: int, card_id: int) -> bool:
+        """Мягкое удаление карты из коробки. Возвращает True, если карта была в коробке."""
+        cursor = await self.db.execute(
+            "UPDATE box_cards SET removed_at = datetime('now') "
+            "WHERE box_id = ? AND card_id = ? AND removed_at IS NULL",
+            (box_id, card_id),
+        )
+        await self.db.conn.commit()
+        return cursor.rowcount > 0
+
+    async def card_in_other_boxes(self, card_id: int, exclude_box_id: int) -> bool:
+        """Есть ли карта в других (не удалённых) коробках, кроме указанной."""
+        row = await self.db.fetch_one(
+            "SELECT COUNT(*) AS cnt FROM box_cards "
+            "WHERE card_id = ? AND removed_at IS NULL AND box_id != ?",
+            (card_id, exclude_box_id),
+        )
+        return (row["cnt"] if row else 0) > 0
 
     async def get_cards(self, box_id: int) -> list[Card]:
         rows = await self.db.fetch_all(

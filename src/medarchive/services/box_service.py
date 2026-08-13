@@ -50,6 +50,21 @@ class BoxService:
 
         return card
 
+    async def remove_card(self, box_id: int, card_id: int) -> None:
+        """Убрать карту из коробки (мягкое удаление). Статус карты возвращается в in_branch,
+        если карта больше не числится ни в одной другой коробке."""
+        removed = await self.box_repo.remove_card(box_id, card_id)
+        if not removed:
+            return
+        if not await self.box_repo.card_in_other_boxes(card_id, box_id):
+            await self.card_repo.update_status(card_id, CardStatus.in_branch)
+
+        from medarchive.services.movement_service import MovementService
+        ms = MovementService(self.db)
+        box = await self.box_repo.get_by_id(box_id)
+        box_label = box.box_number if box else str(box_id)
+        await ms.log_movement(card_id, "unpacked", f"box {box_label}", None)
+
     async def get_box_contents(self, box_id: int) -> list[Card]:
         return await self.box_repo.get_cards(box_id)
 

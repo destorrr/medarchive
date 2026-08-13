@@ -36,7 +36,7 @@
         </nav>
         <div class="logout"><a href="/logout">Выход</a></div>
     </aside>
-    <div class="main">
+    <div class="main" id="main-content">
         {% if error %}<div class="flash">{{ error }}</div>{% endif %}
         {% block content %}{% endblock %}
     </div>
