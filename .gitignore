@@ -7,3 +7,5 @@ __pycache__/
 dist/
 *.db
 medarchive.db
+.env
+*.db.bak-*
