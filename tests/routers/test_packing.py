@@ -115,6 +115,22 @@ class TestPackingRouter:
         assert "Петров" in r.text
         assert "Иванов" in r.text
 
+    async def test_packing_page_lists_open_boxes(self, packing_client):
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")          # B-0001
+        await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})
+        await packing_client.post("/packing/new-box")          # B-0002
+        await packing_client.post("/packing/scan-card", data={"full_name": "Петров П.П."})
+        await packing_client.post("/packing/scan-card", data={"full_name": "Сидоров С.С."})
+
+        r = await packing_client.get("/packing")
+        assert r.status_code == 200
+        assert "Мои открытые коробки" in r.text
+        assert "B-0001" in r.text and "B-0002" in r.text       # обе открытые видны
+        assert "Перейти" in r.text                              # кнопка переключения
+        assert "Новая коробка" in r.text                        # видна всегда
+        assert r.text.count("Перейти") == 1                     # только у неактивной
+
     async def test_duplicate_scan_shows_message(self, packing_client):
         await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
         await packing_client.post("/packing/new-box")

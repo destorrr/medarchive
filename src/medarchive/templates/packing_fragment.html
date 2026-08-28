@@ -65,8 +65,44 @@
     {% endif %}
 </div>
 
-{% if not box %}
-<form method="post" action="/packing/new-box" style="margin-top:16px">
-    <button type="submit" class="btn btn-primary">➕ Новая коробка</button>
-</form>
+{% if open_boxes %}
+<div class="card" style="margin-top:16px">
+    <h3 style="margin-bottom:12px">📂 Мои открытые коробки</h3>
+    <table style="width:100%;border-collapse:collapse">
+        <thead>
+            <tr style="border-bottom:2px solid #eee;text-align:left">
+                <th style="padding:8px">Коробка</th>
+                <th style="padding:8px">Карт</th>
+                <th style="padding:8px">Создана</th>
+                <th style="padding:8px"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ob in open_boxes %}
+            <tr style="border-bottom:1px solid #f0f0f0">
+                <td style="padding:8px;font-weight:600">{{ ob.box_number }}</td>
+                <td style="padding:8px">{{ ob.cards_count }}</td>
+                <td style="padding:8px;color:#888">{{ ob.created_at }}</td>
+                <td style="padding:8px;text-align:right">
+                    {% if active_box_id == ob.id %}
+                    <span style="background:#e8f5e9;color:#2e7d32;border-radius:12px;padding:2px 10px;font-size:12px">● активная</span>
+                    {% else %}
+                    <form hx-post="/packing/open-box" hx-target="#main-content" hx-swap="innerHTML" style="display:inline">
+                        <input type="hidden" name="box_id" value="{{ ob.id }}">
+                        <button type="submit" class="btn"
+                                style="background:#eef1f6;color:#1a1a2e;padding:4px 10px;font-size:13px">Перейти</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endif %}
+
+<div style="margin-top:16px">
+    <form method="post" action="/packing/new-box">
+        <button type="submit" class="btn btn-primary">➕ Новая коробка</button>
+    </form>
+</div>
