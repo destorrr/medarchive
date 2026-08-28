@@ -1,5 +1,5 @@
 import pytest
-from medarchive.services.box_service import BoxService
+from medarchive.services.box_service import BoxService, DuplicateCardError
 from medarchive.adapters.sqlite.repositories import CardRepositoryImpl, BoxRepositoryImpl
 from medarchive.domain.statuses import BoxStatus, CardStatus
 
@@ -47,14 +47,66 @@ class TestBoxService:
         card = await box_service.scan_card(box.id, "Существующий Пациент")
         assert card.id == existing.id
 
-    async def test_scan_duplicate_in_same_box_ignored(self, box_service, db):
+    async def test_scan_duplicate_raises(self, box_service, db):
         await _seed_branch_and_user(db)
         box = await box_service.create_box(branch_id=1, user_id=1)
         await box_service.scan_card(box.id, "Дубль")
-        await box_service.scan_card(box.id, "Дубль")
+        with pytest.raises(DuplicateCardError):
+            await box_service.scan_card(box.id, "Дубль")
 
         contents = await box_service.get_box_contents(box.id)
         assert len(contents) == 1
+
+    async def test_create_box_sets_active(self, box_service, db):
+        await _seed_branch_and_user(db)
+        box = await box_service.create_box(branch_id=1, user_id=1)
+        row = await db.fetch_one("SELECT active_box_id FROM users WHERE id = 1")
+        assert row["active_box_id"] == box.id
+
+    async def test_select_box_switches_active(self, box_service, db):
+        await _seed_branch_and_user(db)
+        box1 = await box_service.create_box(branch_id=1, user_id=1)
+        box2 = await box_service.create_box(branch_id=1, user_id=1)
+        await box_service.select_box(box1.id, user_id=1)
+        row = await db.fetch_one("SELECT active_box_id FROM users WHERE id = 1")
+        assert row["active_box_id"] == box1.id
+
+    async def test_select_foreign_box_raises(self, box_service, db):
+        await _seed_branch_and_user(db)
+        await db.execute(
+            "INSERT INTO users (id, username, password_hash, role) VALUES (2, 'u2', 'h', 'branch')"
+        )
+        await db.conn.commit()
+        box = await box_service.create_box(branch_id=1, user_id=1)
+        with pytest.raises(ValueError):
+            await box_service.select_box(box.id, user_id=2)
+
+    async def test_select_closed_box_raises(self, box_service, db):
+        await _seed_branch_and_user(db)
+        box = await box_service.create_box(branch_id=1, user_id=1)
+        await box_service.scan_card(box.id, "Пациент 1")
+        await box_service.close_box(box.id, user_id=1)
+        with pytest.raises(ValueError):
+            await box_service.select_box(box.id, user_id=1)
+
+    async def test_close_active_box_resets_active(self, box_service, db):
+        await _seed_branch_and_user(db)
+        box = await box_service.create_box(branch_id=1, user_id=1)
+        await box_service.scan_card(box.id, "Пациент 1")
+        await box_service.close_box(box.id, user_id=1)
+        row = await db.fetch_one("SELECT active_box_id FROM users WHERE id = 1")
+        assert row["active_box_id"] is None
+
+    async def test_list_open_boxes(self, box_service, db):
+        await _seed_branch_and_user(db)
+        box1 = await box_service.create_box(branch_id=1, user_id=1)
+        box2 = await box_service.create_box(branch_id=1, user_id=1)
+        await box_service.scan_card(box1.id, "Пациент 1")
+        await box_service.scan_card(box2.id, "Пациент 2")
+        await box_service.close_box(box2.id, user_id=1)  # box2 закрыта, box1 остаётся открытой
+        boxes = await box_service.list_open_boxes(1)
+        assert len(boxes) == 1
+        assert boxes[0]["id"] == box1.id
 
     async def test_cannot_close_empty_box(self, box_service, db):
         await _seed_branch_and_user(db)

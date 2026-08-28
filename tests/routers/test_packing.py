@@ -114,3 +114,46 @@ class TestPackingRouter:
         r = await packing_client.post("/packing/scan-card", data={"full_name": "Петров П.П."})
         assert "Петров" in r.text
         assert "Иванов" in r.text
+
+    async def test_duplicate_scan_shows_message(self, packing_client):
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")
+        await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})
+        r = await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})
+        assert r.status_code == 200
+        assert "уже в этой коробке" in r.text
+        # карта не задвоилась: в таблице одна строка с ФИО (в hx-confirm кнопки ФИО тоже есть)
+        assert r.text.count(">Иванов И.И.<") == 1
+
+    async def test_open_box_switches_active(self, packing_client):
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")
+        await packing_client.post("/packing/new-box")
+        from medarchive.dependencies import get_db
+        db = await get_db()
+        rows = await db.fetch_all("SELECT id FROM boxes WHERE created_by = 1 ORDER BY id")
+        first_id = rows[0]["id"]
+        r = await packing_client.post("/packing/open-box", data={"box_id": first_id})
+        assert r.status_code == 200
+        row = await db.fetch_one("SELECT active_box_id FROM users WHERE id = 1")
+        assert row["active_box_id"] == first_id
+
+    async def test_close_box_by_id_keeps_active(self, packing_client):
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")
+        # в первую коробку — карту, чтобы её можно было закрыть (пустую нельзя)
+        await packing_client.post("/packing/scan-card", data={"full_name": "Карта Первой"})
+        await packing_client.post("/packing/new-box")
+        from medarchive.dependencies import get_db
+        db = await get_db()
+        rows = await db.fetch_all("SELECT id FROM boxes WHERE created_by = 1 ORDER BY id")
+        first_id, second_id = rows[0]["id"], rows[1]["id"]
+        # во вторую (активную) коробку — карту, чтобы её можно было закрыть позже
+        await packing_client.post("/packing/scan-card", data={"full_name": "Карта Второй"})
+        # закрываем ПЕРВУЮ (неактивную) коробку из списка
+        r = await packing_client.post("/packing/close-box", data={"box_id": first_id})
+        assert r.status_code == 303
+        row = await db.fetch_one("SELECT status FROM boxes WHERE id = ?", (first_id,))
+        assert row["status"] == "ready"
+        row = await db.fetch_one("SELECT active_box_id FROM users WHERE id = 1")
+        assert row["active_box_id"] == second_id  # активная не тронута
