@@ -28,8 +28,10 @@ async def _active_box(db, user: User):
 
 async def _fragment_ctx(db, user, request, box, cards, error=None) -> dict:
     """Общий контекст фрагмента: содержимое активной коробки + список открытых коробок."""
+    card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
-    open_boxes = await box_repo.list_open_for_user(user.id)
+    service = BoxService(db, card_repo, box_repo)
+    open_boxes = await service.list_open_boxes(user.id)
     return {
         "request": request,
         "error": error,

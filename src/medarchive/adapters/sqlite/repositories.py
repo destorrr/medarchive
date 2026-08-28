@@ -80,7 +80,7 @@ class BoxRepositoryImpl:
         row = await self.db.fetch_one(
             """SELECT b.* FROM boxes b
                JOIN users u ON u.active_box_id = b.id
-               WHERE u.id = ? AND b.status = ?""",
+               WHERE u.id = ? AND b.status = ? AND b.created_by = u.id""",
             (user_id, BoxStatus.packing.value),
         )
         if row is not None:

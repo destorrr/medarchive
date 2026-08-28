@@ -82,7 +82,7 @@
             <tr style="border-bottom:1px solid #f0f0f0">
                 <td style="padding:8px;font-weight:600">{{ ob.box_number }}</td>
                 <td style="padding:8px">{{ ob.cards_count }}</td>
-                <td style="padding:8px;color:#888">{{ ob.created_at }}</td>
+                <td style="padding:8px;color:#888">{{ ob.created_at[:16] }}</td>
                 <td style="padding:8px;text-align:right">
                     {% if active_box_id == ob.id %}
                     <span style="background:#e8f5e9;color:#2e7d32;border-radius:12px;padding:2px 10px;font-size:12px">● активная</span>

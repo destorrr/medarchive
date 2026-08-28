@@ -31,15 +31,8 @@ async def login(
         )
 
     from medarchive.domain.models import User
-    from medarchive.domain.statuses import UserRole
 
-    user = User(
-        id=row["id"],
-        username=row["username"],
-        password_hash=row["password_hash"],
-        role=UserRole(row["role"]),
-        branch_id=row["branch_id"],
-    )
+    user = User.from_row(row)
     token = auth.create_session_token(user)
 
     response = RedirectResponse(url="/dashboard", status_code=303)

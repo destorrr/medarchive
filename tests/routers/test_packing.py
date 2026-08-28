@@ -174,6 +174,18 @@ class TestPackingRouter:
         row = await db.fetch_one("SELECT active_box_id FROM users WHERE id = 1")
         assert row["active_box_id"] == second_id  # активная не тронута
 
+    async def test_close_active_box_without_id_resets_active(self, packing_client):
+        """POST /packing/close-box без box_id закрывает активную коробку и сбрасывает выбор."""
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")
+        await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})
+        r = await packing_client.post("/packing/close-box")
+        assert r.status_code == 303
+        from medarchive.dependencies import get_db
+        db = await get_db()
+        row = await db.fetch_one("SELECT active_box_id FROM users WHERE id = 1")
+        assert row["active_box_id"] is None
+
     async def test_close_foreign_box_redirects_not_500(self, packing_client):
         """Чужую коробку нельзя закрыть — не 500, а редирект."""
         await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
