@@ -214,6 +214,7 @@ class UserRepositoryImpl:
             password_hash=row["password_hash"],
             role=UserRole(row["role"]),
             branch_id=row["branch_id"],
+            active_box_id=row["active_box_id"],
         )
 
     async def get_by_username(self, username: str) -> User | None:
@@ -228,6 +229,7 @@ class UserRepositoryImpl:
             password_hash=row["password_hash"],
             role=UserRole(row["role"]),
             branch_id=row["branch_id"],
+            active_box_id=row["active_box_id"],
         )
 
     async def create(self, username: str, password_hash: str, role: str, branch_id: int | None) -> User:

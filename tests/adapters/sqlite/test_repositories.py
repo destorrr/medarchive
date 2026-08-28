@@ -120,6 +120,14 @@ class TestUserRepository:
         user = await user_repo.get_by_username("nobody")
         assert user is None
 
+    async def test_user_has_active_box_id_field(self, user_repo, db):
+        await db.execute(
+            "INSERT INTO users (id, username, password_hash, role) VALUES (10, 'admin1', 'hash123', 'admin')"
+        )
+        await db.conn.commit()
+        user = await user_repo.get_by_username("admin1")
+        assert user.active_box_id is None
+
 
 class TestCourierRepository:
     async def test_create_and_list_couriers(self, courier_repo):

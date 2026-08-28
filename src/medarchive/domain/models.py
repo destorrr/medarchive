@@ -45,3 +45,4 @@ class User:
     password_hash: str
     role: UserRole
     branch_id: int | None = None
+    active_box_id: int | None = None

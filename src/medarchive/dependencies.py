@@ -52,6 +52,7 @@ async def get_current_user(request: Request) -> User:
         password_hash=row["password_hash"],
         role=UserRole(row["role"]),
         branch_id=row["branch_id"],
+        active_box_id=row["active_box_id"],
     )
 
 
