@@ -46,14 +46,7 @@ async def get_current_user(request: Request) -> User:
     if row is None:
         raise HTTPException(status_code=401, detail="User not found")
 
-    return User(
-        id=row["id"],
-        username=row["username"],
-        password_hash=row["password_hash"],
-        role=UserRole(row["role"]),
-        branch_id=row["branch_id"],
-        active_box_id=row["active_box_id"],
-    )
+    return User.from_row(row)
 
 
 def require_role(*roles: UserRole):

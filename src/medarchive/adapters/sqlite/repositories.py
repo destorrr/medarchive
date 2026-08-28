@@ -208,14 +208,7 @@ class UserRepositoryImpl:
         row = await self.db.fetch_one("SELECT * FROM users WHERE id = ?", (user_id,))
         if row is None:
             return None
-        return User(
-            id=row["id"],
-            username=row["username"],
-            password_hash=row["password_hash"],
-            role=UserRole(row["role"]),
-            branch_id=row["branch_id"],
-            active_box_id=row["active_box_id"],
-        )
+        return User.from_row(row)
 
     async def get_by_username(self, username: str) -> User | None:
         row = await self.db.fetch_one(
@@ -223,14 +216,7 @@ class UserRepositoryImpl:
         )
         if row is None:
             return None
-        return User(
-            id=row["id"],
-            username=row["username"],
-            password_hash=row["password_hash"],
-            role=UserRole(row["role"]),
-            branch_id=row["branch_id"],
-            active_box_id=row["active_box_id"],
-        )
+        return User.from_row(row)
 
     async def create(self, username: str, password_hash: str, role: str, branch_id: int | None) -> User:
         cursor = await self.db.execute(
@@ -238,26 +224,18 @@ class UserRepositoryImpl:
             (username, password_hash, role, branch_id),
         )
         await self.db.conn.commit()
-        return User(
-            id=cursor.lastrowid,
-            username=username,
-            password_hash=password_hash,
-            role=UserRole(role),
-            branch_id=branch_id,
-        )
+        return User.from_row({
+            "id": cursor.lastrowid,
+            "username": username,
+            "password_hash": password_hash,
+            "role": role,
+            "branch_id": branch_id,
+            "active_box_id": None,
+        })
 
     async def list_all(self) -> list[User]:
         rows = await self.db.fetch_all("SELECT * FROM users ORDER BY username")
-        return [
-            User(
-                id=r["id"],
-                username=r["username"],
-                password_hash=r["password_hash"],
-                role=UserRole(r["role"]),
-                branch_id=r["branch_id"],
-            )
-            for r in rows
-        ]
+        return [User.from_row(r) for r in rows]
 
     async def update(
         self,

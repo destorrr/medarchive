@@ -120,13 +120,39 @@ class TestUserRepository:
         user = await user_repo.get_by_username("nobody")
         assert user is None
 
-    async def test_user_has_active_box_id_field(self, user_repo, db):
+    async def test_user_active_box_id_round_trip(self, user_repo, db):
+        await db.execute("INSERT INTO branches (id, name, code) VALUES (1, 'B1', 'B1')")
         await db.execute(
-            "INSERT INTO users (id, username, password_hash, role) VALUES (10, 'admin1', 'hash123', 'admin')"
+            "INSERT INTO users (id, username, password_hash, role) VALUES (1, 'u1', 'h', 'branch')"
+        )
+        await db.execute(
+            "INSERT INTO boxes (box_number, origin_branch_id, created_by) VALUES ('B-9001', 1, 1)"
+        )
+        await db.execute(
+            "UPDATE users SET active_box_id = (SELECT id FROM boxes WHERE box_number = 'B-9001') WHERE id = 1"
         )
         await db.conn.commit()
-        user = await user_repo.get_by_username("admin1")
-        assert user.active_box_id is None
+        row = await db.fetch_one("SELECT id FROM boxes WHERE box_number = 'B-9001'")
+
+        user = await user_repo.get_by_username("u1")
+        assert user.active_box_id == row["id"]
+        user2 = await user_repo.get_by_id(1)
+        assert user2.active_box_id == row["id"]
+
+    async def test_user_list_all_keeps_active_box_id(self, user_repo, db):
+        await db.execute("INSERT INTO branches (id, name, code) VALUES (1, 'B1', 'B1')")
+        await db.execute(
+            "INSERT INTO users (id, username, password_hash, role) VALUES (1, 'u1', 'h', 'branch')"
+        )
+        await db.execute(
+            "INSERT INTO boxes (box_number, origin_branch_id, created_by) VALUES ('B-9001', 1, 1)"
+        )
+        await db.execute(
+            "UPDATE users SET active_box_id = (SELECT id FROM boxes WHERE box_number = 'B-9001') WHERE id = 1"
+        )
+        await db.conn.commit()
+        users = await user_repo.list_all()
+        assert any(u.id == 1 and u.active_box_id is not None for u in users)
 
 
 class TestCourierRepository:

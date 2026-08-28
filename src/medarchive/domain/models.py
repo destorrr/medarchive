@@ -46,3 +46,14 @@ class User:
     role: UserRole
     branch_id: int | None = None
     active_box_id: int | None = None
+
+    @classmethod
+    def from_row(cls, row) -> "User":
+        return cls(
+            id=row["id"],
+            username=row["username"],
+            password_hash=row["password_hash"],
+            role=UserRole(row["role"]),
+            branch_id=row["branch_id"],
+            active_box_id=row["active_box_id"],
+        )
