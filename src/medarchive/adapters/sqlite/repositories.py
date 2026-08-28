@@ -47,10 +47,8 @@ class BoxRepositoryImpl:
     def __init__(self, db: Database):
         self.db = db
 
-    async def get_by_id(self, box_id: int) -> Box | None:
-        row = await self.db.fetch_one("SELECT * FROM boxes WHERE id = ?", (box_id,))
-        if row is None:
-            return None
+    @staticmethod
+    def _row_to_box(row) -> Box:
         return Box(
             id=row["id"],
             box_number=row["box_number"],
@@ -58,6 +56,12 @@ class BoxRepositoryImpl:
             created_by=row["created_by"],
             status=BoxStatus(row["status"]),
         )
+
+    async def get_by_id(self, box_id: int) -> Box | None:
+        row = await self.db.fetch_one("SELECT * FROM boxes WHERE id = ?", (box_id,))
+        if row is None:
+            return None
+        return self._row_to_box(row)
 
     async def get_by_number(self, box_number: str) -> Box | None:
         row = await self.db.fetch_one(
@@ -65,29 +69,50 @@ class BoxRepositoryImpl:
         )
         if row is None:
             return None
-        return Box(
-            id=row["id"],
-            box_number=row["box_number"],
-            origin_branch_id=row["origin_branch_id"],
-            created_by=row["created_by"],
-            status=BoxStatus(row["status"]),
-        )
+        return self._row_to_box(row)
 
     async def get_active_for_user(self, user_id: int) -> Box | None:
-        """Последняя незакрытая (packing) коробка пользователя — продолжается через сессии."""
+        """Активная коробка пользователя.
+
+        Приоритет: явно выбранная (users.active_box_id), если она ещё открыта.
+        Fallback: последняя незакрытая (packing) коробка пользователя.
+        """
+        row = await self.db.fetch_one(
+            """SELECT b.* FROM boxes b
+               JOIN users u ON u.active_box_id = b.id
+               WHERE u.id = ? AND b.status = ?""",
+            (user_id, BoxStatus.packing.value),
+        )
+        if row is not None:
+            return self._row_to_box(row)
         row = await self.db.fetch_one(
             "SELECT * FROM boxes WHERE created_by = ? AND status = ? ORDER BY id DESC LIMIT 1",
             (user_id, BoxStatus.packing.value),
         )
         if row is None:
             return None
-        return Box(
-            id=row["id"],
-            box_number=row["box_number"],
-            origin_branch_id=row["origin_branch_id"],
-            created_by=row["created_by"],
-            status=BoxStatus(row["status"]),
+        return self._row_to_box(row)
+
+    async def set_active_box(self, user_id: int, box_id: int | None) -> None:
+        """Запомнить выбранную пользователем коробку (или сбросить выбор)."""
+        await self.db.execute(
+            "UPDATE users SET active_box_id = ? WHERE id = ?",
+            (box_id, user_id),
         )
+        await self.db.conn.commit()
+
+    async def list_open_for_user(self, user_id: int) -> list[dict]:
+        """Все открытые (packing) коробки пользователя с числом карт и датой."""
+        rows = await self.db.fetch_all(
+            """SELECT b.id, b.box_number, b.created_at,
+                      (SELECT COUNT(*) FROM box_cards bc
+                       WHERE bc.box_id = b.id AND bc.removed_at IS NULL) AS cards_count
+               FROM boxes b
+               WHERE b.created_by = ? AND b.status = ?
+               ORDER BY b.id DESC""",
+            (user_id, BoxStatus.packing.value),
+        )
+        return [dict(r) for r in rows]
 
     async def create(self, box_number: str, origin_branch_id: int, created_by: int) -> Box:
         cursor = await self.db.execute(
@@ -109,19 +134,21 @@ class BoxRepositoryImpl:
         )
         await self.db.conn.commit()
 
-    async def add_card(self, box_id: int, card_id: int) -> None:
+    async def add_card(self, box_id: int, card_id: int) -> bool:
+        """Добавить карту в коробку. Возвращает False, если карта уже там."""
         # Check for duplicate
         existing = await self.db.fetch_one(
             "SELECT id FROM box_cards WHERE box_id = ? AND card_id = ? AND removed_at IS NULL",
             (box_id, card_id),
         )
         if existing is not None:
-            return  # Already in box, ignore
+            return False  # Already in box, ignore
         await self.db.execute(
             "INSERT INTO box_cards (box_id, card_id) VALUES (?, ?)",
             (box_id, card_id),
         )
         await self.db.conn.commit()
+        return True
 
     async def remove_card(self, box_id: int, card_id: int) -> bool:
         """Мягкое удаление карты из коробки. Возвращает True, если карта была в коробке."""

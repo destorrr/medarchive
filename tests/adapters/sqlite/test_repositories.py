@@ -84,12 +84,59 @@ class TestBoxRepository:
         box = await box_repo.create("B-0002", origin_branch_id=1, created_by=1)
         card = await card_repo.create("Дубль Карта")
 
-        await box_repo.add_card(box.id, card.id)
-        # Second add should be ignored (no duplicate rows in box_cards)
-        await box_repo.add_card(box.id, card.id)
+        added1 = await box_repo.add_card(box.id, card.id)
+        added2 = await box_repo.add_card(box.id, card.id)
+        assert added1 is True
+        assert added2 is False
 
         cards = await box_repo.get_cards(box.id)
         assert len(cards) == 1
+
+    async def test_set_active_box_and_priority(self, box_repo, db):
+        await db.execute("INSERT INTO branches (id, name, code) VALUES (1, 'B1', 'B1')")
+        await db.execute(
+            "INSERT INTO users (id, username, password_hash, role) VALUES (1, 'u1', 'h', 'branch')"
+        )
+        await db.conn.commit()
+        box1 = await box_repo.create("B-0101", origin_branch_id=1, created_by=1)
+        box2 = await box_repo.create("B-0102", origin_branch_id=1, created_by=1)
+
+        # Без выбора — fallback на последнюю открытую
+        active = await box_repo.get_active_for_user(1)
+        assert active.id == box2.id
+
+        # Явный выбор имеет приоритет
+        await box_repo.set_active_box(1, box1.id)
+        active = await box_repo.get_active_for_user(1)
+        assert active.id == box1.id
+
+        # Выбранная закрыта → fallback на последнюю открытую
+        await box_repo.update_status(box1.id, BoxStatus.ready)
+        active = await box_repo.get_active_for_user(1)
+        assert active.id == box2.id
+
+        # Сброс выбора
+        await box_repo.set_active_box(1, None)
+        active = await box_repo.get_active_for_user(1)
+        assert active.id == box2.id
+
+    async def test_list_open_for_user(self, box_repo, card_repo, db):
+        await db.execute("INSERT INTO branches (id, name, code) VALUES (1, 'B1', 'B1')")
+        await db.execute(
+            "INSERT INTO users (id, username, password_hash, role) VALUES (1, 'u1', 'h', 'branch')"
+        )
+        await db.conn.commit()
+        box1 = await box_repo.create("B-0201", origin_branch_id=1, created_by=1)
+        box2 = await box_repo.create("B-0202", origin_branch_id=1, created_by=1)
+        await box_repo.update_status(box2.id, BoxStatus.ready)  # закрыта — не в списке
+        card = await card_repo.create("Карта")
+        await box_repo.add_card(box1.id, card.id)
+
+        boxes = await box_repo.list_open_for_user(1)
+        assert len(boxes) == 1
+        assert boxes[0]["box_number"] == "B-0201"
+        assert boxes[0]["cards_count"] == 1
+        assert "created_at" in boxes[0]
 
     async def test_update_box_status(self, box_repo, db):
         await db.execute("INSERT INTO branches (id, name, code) VALUES (1, 'B1', 'B1')")
