@@ -77,6 +77,11 @@ class BoxService:
         return await self.box_repo.get_cards(box_id)
 
     async def close_box(self, box_id: int, user_id: int | None = None) -> None:
+        box = await self.box_repo.get_by_id(box_id)
+        if box is None:
+            raise ValueError("Коробка не найдена")
+        if user_id is not None and box.created_by != user_id:
+            raise ValueError("Нельзя закрыть чужую коробку")
         cards = await self.box_repo.get_cards(box_id)
         if not cards:
             raise ValueError("Нельзя закрыть пустую коробку")

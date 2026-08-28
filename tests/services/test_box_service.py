@@ -123,6 +123,20 @@ class TestBoxService:
         closed = await box_service.box_repo.get_by_id(box.id)
         assert closed.status == BoxStatus.ready
 
+    async def test_close_foreign_box_raises(self, box_service, db):
+        await _seed_branch_and_user(db)
+        await db.execute(
+            "INSERT INTO users (id, username, password_hash, role) VALUES (2, 'u2', 'h', 'branch')"
+        )
+        await db.conn.commit()
+        box = await box_service.create_box(branch_id=1, user_id=1)
+        await box_service.scan_card(box.id, "Пациент 1")
+        with pytest.raises(ValueError):
+            await box_service.close_box(box.id, user_id=2)
+        # статус не изменился
+        closed = await box_service.box_repo.get_by_id(box.id)
+        assert closed.status == BoxStatus.packing
+
     async def test_remove_card_from_box(self, box_service, db):
         """Удаление карты из коробки: карта исчезает из содержимого, статус → in_branch."""
         await _seed_branch_and_user(db)

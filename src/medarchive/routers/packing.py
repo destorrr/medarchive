@@ -138,5 +138,8 @@ async def close_box(request: Request, box_id: int | None = Form(default=None), u
         if box is None:
             return RedirectResponse(url="/packing", status_code=303)
         box_id = box.id
-    await service.close_box(box_id, user_id=user.id)
+    try:
+        await service.close_box(box_id, user_id=user.id)
+    except ValueError:
+        return RedirectResponse(url="/packing", status_code=303)
     return RedirectResponse(url=f"/transfer?box_id={box_id}", status_code=303)

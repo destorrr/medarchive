@@ -157,3 +157,25 @@ class TestPackingRouter:
         assert row["status"] == "ready"
         row = await db.fetch_one("SELECT active_box_id FROM users WHERE id = 1")
         assert row["active_box_id"] == second_id  # активная не тронута
+
+    async def test_close_foreign_box_redirects_not_500(self, packing_client):
+        """Чужую коробку нельзя закрыть — не 500, а редирект."""
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")
+        # создаём коробку от другого пользователя напрямую в БД
+        from medarchive.dependencies import get_db
+        db = await get_db()
+        await db.execute(
+            "INSERT INTO users (id, username, password_hash, role) VALUES (99, 'other', 'h', 'branch')"
+        )
+        await db.execute("INSERT INTO cards (id, full_name) VALUES (500, 'Чужая Карта')")
+        await db.execute(
+            "INSERT INTO boxes (id, box_number, origin_branch_id, created_by, status) "
+            "VALUES (500, 'B-0500', 1, 99, 'packing')"
+        )
+        await db.execute("INSERT INTO box_cards (box_id, card_id) VALUES (500, 500)")
+        await db.conn.commit()
+        r = await packing_client.post("/packing/close-box", data={"box_id": 500})
+        assert r.status_code == 303  # редирект, не 500
+        row = await db.fetch_one("SELECT status FROM boxes WHERE id = 500")
+        assert row["status"] == "packing"  # не закрыта
