@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('branch','archive','viewer','admin')),
-    branch_id INTEGER REFERENCES branches(id)
+    branch_id INTEGER REFERENCES branches(id),
+    active_box_id INTEGER REFERENCES boxes(id)
 );
 
 CREATE TABLE IF NOT EXISTS couriers (
@@ -108,4 +109,10 @@ CREATE TABLE IF NOT EXISTS card_movements (
 
 async def run_migrations(conn: aiosqlite.Connection) -> None:
     await conn.executescript(SCHEMA)
+
+    # Инкрементальная миграция: users.active_box_id (выбранная открытая коробка)
+    # для уже существующих БД, созданных до добавления колонки.
+    cols = await conn.execute_fetchall("PRAGMA table_info(users)")
+    if not any(row[1] == "active_box_id" for row in cols):
+        await conn.execute("ALTER TABLE users ADD COLUMN active_box_id INTEGER REFERENCES boxes(id)")
     await conn.commit()
