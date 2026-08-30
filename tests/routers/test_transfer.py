@@ -49,6 +49,34 @@ class TestTransfer:
         assert r.status_code == 200
         assert "курьер" in r.text.lower()
 
+    async def test_transfer_page_no_raw_id(self, client):
+        """Строка «Коробка: {id}» (raw id) должна отсутствовать на странице."""
+        await _login(client)
+        for url in ("/transfer", "/transfer?box_id=10"):
+            r = await client.get(url)
+            assert r.status_code == 200
+            assert "<strong>Коробка:" not in r.text
+            assert "Коробка:</strong>" not in r.text
+
+    async def test_transfer_preselect_box(self, client):
+        """При ?box_id=N коробка предвыбрана в нативном select (option selected)."""
+        await _login(client)
+        r = await client.get("/transfer?box_id=10")
+        assert r.status_code == 200
+        assert 'value="10"' in r.text
+        assert '<option value="10" selected>' in r.text
+        assert "B-0010" in r.text
+
+    async def test_transfer_form_fields(self, client):
+        """Форма содержит нативные select'ы (источник значений) с классом dd-select."""
+        await _login(client)
+        r = await client.get("/transfer")
+        assert r.status_code == 200
+        assert 'action="/transfer/confirm"' in r.text
+        assert 'name="box_id"' in r.text
+        assert 'name="courier_id"' in r.text
+        assert 'class="dd-select"' in r.text
+
     async def test_transfer_confirm_success(self, client):
         await _login(client)
         r = await client.post("/transfer/confirm", data={"box_id": "10", "courier_id": "1"}, follow_redirects=False)
