@@ -54,7 +54,7 @@
     }
     .dd.open .dd-list { display: block; }
     .dd-option {
-        padding: 8px 16px 8px 12px;
+        padding: 8px 12px;
         border-radius: 6px;
         cursor: pointer;
         color: #1a1a2e;
@@ -169,6 +169,7 @@ document.querySelectorAll('.dd').forEach(function (dd) {
     }
 
     Array.prototype.forEach.call(select.options, function (opt) {
+        if (!opt.value) return; // пропускаем placeholder «— Выберите —»
         var item = buildItem(opt);
         item.addEventListener('click', function (e) {
             e.stopPropagation();
