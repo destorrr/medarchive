@@ -1,4 +1,5 @@
 """Журнал движений карт."""
+from datetime import datetime
 from medarchive.adapters.sqlite.database import Database
 
 
@@ -8,8 +9,8 @@ class MovementService:
 
     async def log_movement(self, card_id: int, action: str, from_location: str | None, to_location: str | None, user_id: int | None = None) -> None:
         await self.db.execute(
-            "INSERT INTO card_movements (card_id, action, from_location, to_location, user_id) VALUES (?, ?, ?, ?, ?)",
-            (card_id, action, from_location, to_location, user_id),
+            "INSERT INTO card_movements (card_id, action, from_location, to_location, user_id, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
+            (card_id, action, from_location, to_location, user_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         )
         await self.db.conn.commit()
 

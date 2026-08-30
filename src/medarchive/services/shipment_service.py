@@ -1,4 +1,5 @@
 """Сервис передачи: shipment для коробки, статусы, список курьеров."""
+from datetime import datetime
 from medarchive.adapters.sqlite.database import Database
 from medarchive.adapters.sqlite.repositories import (
     BoxRepositoryImpl, CourierRepositoryImpl, CardRepositoryImpl
@@ -28,10 +29,11 @@ class ShipmentService:
             raise ValueError(f"Коробка должна быть в статусе 'ready', сейчас '{box.status.value}'")
 
         # Create shipment
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor = await self.db.execute(
-            """INSERT INTO shipments (kind, box_id, from_branch_id, courier_id, issued_by, status)
-               VALUES ('box', ?, ?, ?, ?, 'issued')""",
-            (box_id, box.origin_branch_id, courier_id, issued_by),
+            """INSERT INTO shipments (kind, box_id, from_branch_id, courier_id, issued_by, issued_at, status)
+               VALUES ('box', ?, ?, ?, ?, ?, 'issued')""",
+            (box_id, box.origin_branch_id, courier_id, issued_by, now),
         )
         await self.db.conn.commit()
         shipment_id = cursor.lastrowid

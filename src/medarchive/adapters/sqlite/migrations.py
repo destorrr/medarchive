@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS cards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     full_name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'in_branch',
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS boxes (
@@ -48,14 +48,14 @@ CREATE TABLE IF NOT EXISTS boxes (
     origin_branch_id INTEGER NOT NULL REFERENCES branches(id),
     status TEXT NOT NULL DEFAULT 'packing',
     created_by INTEGER NOT NULL REFERENCES users(id),
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS box_cards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     box_id INTEGER NOT NULL REFERENCES boxes(id),
     card_id INTEGER NOT NULL REFERENCES cards(id),
-    added_at TEXT NOT NULL DEFAULT (datetime('now')),
+    added_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     removed_at TEXT
 );
 
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS shipments (
     to_department INTEGER NOT NULL DEFAULT 0,
     courier_id INTEGER NOT NULL REFERENCES couriers(id),
     issued_by INTEGER NOT NULL REFERENCES users(id),
-    issued_at TEXT NOT NULL DEFAULT (datetime('now')),
+    issued_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     received_by INTEGER REFERENCES users(id),
     received_at TEXT,
     status TEXT NOT NULL DEFAULT 'issued'
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS box_placements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     box_id INTEGER NOT NULL REFERENCES boxes(id),
     shelf_id INTEGER NOT NULL REFERENCES archive_shelves(id),
-    placed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    placed_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     removed_at TEXT
 );
 
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS requests (
     target_branch_id INTEGER REFERENCES branches(id),
     target_department INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'new',
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
     completed_at TEXT,
     fulfilled_by INTEGER REFERENCES users(id)
 );
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS card_movements (
     from_location TEXT,
     to_location TEXT,
     user_id INTEGER REFERENCES users(id),
-    timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+    timestamp TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 """
 

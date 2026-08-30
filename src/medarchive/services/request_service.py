@@ -1,5 +1,5 @@
 """Сервис заявок на выдачу карт."""
-from datetime import datetime, timezone
+from datetime import datetime
 from medarchive.adapters.sqlite.database import Database
 from medarchive.adapters.sqlite.repositories import CardRepositoryImpl, BoxRepositoryImpl
 from medarchive.domain.statuses import CardStatus
@@ -15,9 +15,10 @@ class RequestService:
         self, card_id: int, requested_by: int, target_branch_id: int | None, target_department: bool = False
     ) -> dict:
         cursor = await self.db.execute(
-            """INSERT INTO requests (card_id, requested_by, target_branch_id, target_department, status)
-               VALUES (?, ?, ?, ?, 'new')""",
-            (card_id, requested_by, target_branch_id, int(target_department)),
+            """INSERT INTO requests (card_id, requested_by, target_branch_id, target_department, created_at, status)
+               VALUES (?, ?, ?, ?, ?, 'new')""",
+            (card_id, requested_by, target_branch_id, int(target_department),
+             datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         )
         await self.db.conn.commit()
         row = await self.db.fetch_one("SELECT * FROM requests WHERE id = ?", (cursor.lastrowid,))
@@ -55,7 +56,7 @@ class RequestService:
         # Remove card from its current box
         await self.db.execute(
             "UPDATE box_cards SET removed_at = ? WHERE card_id = ? AND removed_at IS NULL",
-            (datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), req["card_id"]),
+            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), req["card_id"]),
         )
 
         # Update card status
@@ -73,7 +74,7 @@ class RequestService:
         await self.card_repo.update_status(req["card_id"], CardStatus.pending_return)
 
         # Complete
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         await self.db.execute(
             "UPDATE requests SET status = 'completed', completed_at = ?, fulfilled_by = ? WHERE id = ?",
             (now, user_id, request_id),

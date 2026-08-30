@@ -1,4 +1,5 @@
 """SQLite-реализации репозиториев."""
+from datetime import datetime
 from medarchive.adapters.sqlite.database import Database
 from medarchive.domain.models import Card, Box, Branch, User, Courier
 from medarchive.domain.statuses import CardStatus, BoxStatus, UserRole
@@ -29,8 +30,8 @@ class CardRepositoryImpl:
 
     async def create(self, full_name: str) -> Card:
         cursor = await self.db.execute(
-            "INSERT INTO cards (full_name, status) VALUES (?, ?)",
-            (full_name, CardStatus.in_branch.value),
+            "INSERT INTO cards (full_name, status, created_at) VALUES (?, ?, ?)",
+            (full_name, CardStatus.in_branch.value, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         )
         await self.db.conn.commit()
         return Card(id=cursor.lastrowid, full_name=full_name)
@@ -116,8 +117,9 @@ class BoxRepositoryImpl:
 
     async def create(self, box_number: str, origin_branch_id: int, created_by: int) -> Box:
         cursor = await self.db.execute(
-            "INSERT INTO boxes (box_number, origin_branch_id, created_by, status) VALUES (?, ?, ?, ?)",
-            (box_number, origin_branch_id, created_by, BoxStatus.packing.value),
+            "INSERT INTO boxes (box_number, origin_branch_id, created_by, status, created_at) VALUES (?, ?, ?, ?, ?)",
+            (box_number, origin_branch_id, created_by, BoxStatus.packing.value,
+             datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         )
         await self.db.conn.commit()
         return Box(
@@ -144,8 +146,8 @@ class BoxRepositoryImpl:
         if existing is not None:
             return False  # Already in box, ignore
         await self.db.execute(
-            "INSERT INTO box_cards (box_id, card_id) VALUES (?, ?)",
-            (box_id, card_id),
+            "INSERT INTO box_cards (box_id, card_id, added_at) VALUES (?, ?, ?)",
+            (box_id, card_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         )
         await self.db.conn.commit()
         return True

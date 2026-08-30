@@ -1,5 +1,5 @@
 """Сервис приёмки и размещения коробок в архиве."""
-from datetime import datetime, timezone
+from datetime import datetime
 from medarchive.adapters.sqlite.database import Database
 from medarchive.adapters.sqlite.repositories import BoxRepositoryImpl, CardRepositoryImpl
 from medarchive.domain.statuses import BoxStatus, CardStatus
@@ -18,7 +18,7 @@ class ReceiveService:
         if box.status != BoxStatus.in_transit:
             raise ValueError(f"Коробка должна быть в статусе 'in_transit', сейчас '{box.status.value}'")
 
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Update shipment
         await self.db.execute(
@@ -49,8 +49,8 @@ class ReceiveService:
 
         # Create placement
         await self.db.execute(
-            "INSERT INTO box_placements (box_id, shelf_id) VALUES (?, ?)",
-            (box_id, shelf_id),
+            "INSERT INTO box_placements (box_id, shelf_id, placed_at) VALUES (?, ?, ?)",
+            (box_id, shelf_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         )
 
         # Update box

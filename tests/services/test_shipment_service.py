@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from medarchive.services.shipment_service import ShipmentService
 from medarchive.adapters.sqlite.repositories import (
@@ -49,6 +51,24 @@ class TestShipmentService:
         assert shipment["courier_id"] == 1
         assert shipment["issued_by"] == 1
         assert shipment["status"] == "issued"
+
+    async def test_transfer_box_issued_at_is_local_time(self, shipment_service, db):
+        """Регрессия: issued_at должен быть в локальном времени (не UTC).
+
+        SQLite DEFAULT (datetime('now')) возвращает UTC — раньше время
+        отправки отставало на часовой пояс (16:36 вместо 23:36).
+        """
+        box, _ = await _seed_env(db)
+        shipment = await shipment_service.transfer_box(
+            box_id=box.id, courier_id=1, issued_by=1
+        )
+        issued = datetime.strptime(shipment["issued_at"], "%Y-%m-%d %H:%M:%S")
+        diff = abs((datetime.now() - issued).total_seconds())
+        assert diff < 60, (
+            f"issued_at={shipment['issued_at']} не совпадает с локальным "
+            f"временем {datetime.now()}: разница {diff:.0f}с "
+            "(вероятно, записано UTC)"
+        )
 
     async def test_transfer_updates_box_and_card_statuses(self, shipment_service, db):
         box, card = await _seed_env(db)
