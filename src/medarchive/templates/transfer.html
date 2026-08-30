@@ -1,6 +1,94 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>🚚 Передача курьеру</h1>
+<style>
+    /* Кастомный dropdown (прогрессивное улучшение поверх нативного select) */
+    .dd { position: relative; }
+    .dd-toggle {
+        position: relative;
+        width: 100%;
+        padding: 8px 36px 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: #fff;
+        color: #1a1a2e;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        appearance: none;
+    }
+    .dd-toggle:hover { border-color: #b5b5b5; }
+    .dd-toggle:focus-visible { outline: 2px solid #e94560; outline-offset: -1px; border-color: #e94560; }
+    .dd-toggle .dd-arrow {
+        position: absolute;
+        right: 17px;
+        top: 50%;
+        transform: translateY(-50%);
+        flex-shrink: 0;
+        width: 12px; height: 8px;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center;
+        transition: transform 0.15s ease;
+    }
+    .dd.open .dd-toggle .dd-arrow { transform: translateY(-50%) rotate(180deg); }
+    .dd-toggle.placeholder { color: #888; }
+
+    .dd-list {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0; right: 0;
+        z-index: 50;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+        padding: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        list-style: none;
+    }
+    .dd.open .dd-list { display: block; }
+    .dd-option {
+        padding: 8px 16px 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #1a1a2e;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .dd-option:hover { background: #f0f0f0; }
+    .dd-option.selected { background: #eef4fb; color: #0d2b4a; font-weight: 600; }
+    .dd-option .check {
+        flex-shrink: 0;
+        width: 14px; height: 14px;
+        border-radius: 50%;
+        border: 1px solid #c5d5e8;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: #fff;
+    }
+    .dd-option.selected .check { background: #e94560; border-color: #e94560; }
+
+    /* Нативный select визуально скрыт только при JS (но остаётся в DOM для submit) */
+    .js .dd-select {
+        position: absolute !important;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+    }
+</style>
 <div class="card">
     <form method="post" action="/transfer/confirm">
         <div class="form-group">
@@ -30,4 +118,107 @@
         <button type="submit" class="btn btn-primary">Передать курьеру</button>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Кастомный dropdown — прогрессивное улучшение: нативный select остаётся
+// источником значений для submit, но визуально скрывается (CSS .js .dd-select).
+document.documentElement.classList.add('js');
+
+document.querySelectorAll('.dd').forEach(function (dd) {
+    var select = dd.querySelector('select.dd-select');
+    if (!select) return;
+
+    // Триггер
+    var toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'dd-toggle';
+    toggle.setAttribute('aria-haspopup', 'listbox');
+    toggle.setAttribute('aria-expanded', 'false');
+
+    // Текстовый узел для выбранного значения (первый child, как в макете)
+    toggle.appendChild(document.createTextNode(''));
+
+    var arrow = document.createElement('span');
+    arrow.className = 'dd-arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    toggle.appendChild(arrow);
+
+    // Список пунктов
+    var list = document.createElement('ul');
+    list.className = 'dd-list';
+    list.setAttribute('role', 'listbox');
+
+    function buildItem(opt) {
+        var item = document.createElement('li');
+        item.className = 'dd-option' + (opt.selected ? ' selected' : '');
+        item.setAttribute('role', 'option');
+        item.setAttribute('data-value', opt.value);
+        item.setAttribute('aria-selected', opt.selected ? 'true' : 'false');
+
+        var label = document.createElement('span');
+        label.textContent = opt.textContent;
+        var check = document.createElement('span');
+        check.className = 'check';
+        if (opt.selected) check.textContent = '\u2713';
+
+        item.appendChild(label);
+        item.appendChild(check);
+        return item;
+    }
+
+    Array.prototype.forEach.call(select.options, function (opt) {
+        var item = buildItem(opt);
+        item.addEventListener('click', function (e) {
+            e.stopPropagation();
+            select.value = item.getAttribute('data-value');
+            Array.prototype.forEach.call(list.children, function (li) {
+                var isSel = li === item;
+                li.classList.toggle('selected', isSel);
+                li.setAttribute('aria-selected', isSel ? 'true' : 'false');
+                li.querySelector('.check').textContent = isSel ? '\u2713' : '';
+            });
+            updateToggle();
+            closeAll();
+        });
+        list.appendChild(item);
+    });
+
+    // Переносим текст выбранного option в триггер (стрелка — последний child)
+    function updateToggle() {
+        var opt = select.options[select.selectedIndex];
+        var text = opt ? opt.textContent : '';
+        toggle.childNodes[0].nodeValue = text + ' ';
+        toggle.classList.toggle('placeholder', !select.value);
+    }
+
+    toggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var wasOpen = dd.classList.contains('open');
+        closeAll();
+        if (!wasOpen) {
+            dd.classList.add('open');
+            toggle.setAttribute('aria-expanded', 'true');
+        }
+    });
+
+    dd.appendChild(toggle);
+    dd.appendChild(list);
+    updateToggle();
+});
+
+function closeAll() {
+    document.querySelectorAll('.dd.open').forEach(function (dd) {
+        dd.classList.remove('open');
+        var t = dd.querySelector('.dd-toggle');
+        if (t) t.setAttribute('aria-expanded', 'false');
+    });
+}
+
+document.addEventListener('click', closeAll);
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAll();
+});
+</script>
 {% endblock %}

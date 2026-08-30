@@ -77,6 +77,14 @@ class TestTransfer:
         assert 'name="courier_id"' in r.text
         assert 'class="dd-select"' in r.text
 
+    async def test_transfer_has_dropdown_script(self, client):
+        """Кастомный dropdown — прогрессивное улучшение: js-класс + построение .dd-list."""
+        await _login(client)
+        r = await client.get("/transfer")
+        assert r.status_code == 200
+        assert "document.documentElement.classList.add('js')" in r.text
+        assert "dd-list" in r.text
+
     async def test_transfer_confirm_success(self, client):
         await _login(client)
         r = await client.post("/transfer/confirm", data={"box_id": "10", "courier_id": "1"}, follow_redirects=False)
