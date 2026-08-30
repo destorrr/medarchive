@@ -35,6 +35,14 @@ async def _login(client):
 
 
 class TestTransfer:
+    async def test_base_has_form_styles(self, client):
+        """Единые стили форм живут в base.html (передаются всем страницам)."""
+        await _login(client)
+        r = await client.get("/transfer")
+        assert r.status_code == 200
+        assert ".form-group { margin-bottom: 16px" in r.text
+        assert ".form-group select { width: 100%" in r.text
+
     async def test_transfer_page_renders(self, client):
         await _login(client)
         r = await client.get("/transfer")
