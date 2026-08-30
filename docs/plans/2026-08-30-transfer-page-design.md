@@ -30,6 +30,7 @@
   - `.form-group label { display: block; margin-bottom: 6px; font-weight: 600; color: #1a1a2e; }`
   - `.form-group select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font: inherit; background: #fff; }`
 - Убрать дублирующий `<style>` блок из `login.html` (стили переезжают в base — единый источник).
+  **Уточнение по реализации (2026-08-30, по итогам ревью):** `login.html` — standalone-страница (auth.py рендерит её без наследования base.html), поэтому буквальное удаление `<style>` сломало бы страницу входа. Фактически: стили в `login.html` приведены к тому же стандарту (16px, label mb 6px, #1a1a2e, focus #e94560) — цель дизайна достигнута, дублирование оправдано standalone-природой страницы.
 - Это улучшает все формы проекта, не только /transfer (унификация, DRY).
 
 ### 3. Кастомный dropdown — прогрессивное улучшение поверх нативного select
