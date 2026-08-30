@@ -9,3 +9,7 @@ dist/
 medarchive.db
 .env
 *.db.bak-*
+
+# SQLite WAL/SHM (побочные файлы работающей БД)
+*.db-shm
+*.db-wal
