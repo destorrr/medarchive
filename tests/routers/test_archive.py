@@ -67,6 +67,24 @@ class TestArchiveRouter:
         assert "В пути" in r.text  # russian status label
         assert "Подтвердить приёмку" in r.text  # confirm button
 
+    async def test_scan_fragment_confirm_is_plain_post_form(self, archive_client):
+        """Кнопка «Подтвердить приёмку» должна быть обычной POST-формой: при hx-swap="none"
+        303-редирект на /placement невидим для пользователя (страница не обновляется)."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        r = await archive_client.post("/receive/scan", data={"box_number": "B-0010"})
+        assert r.status_code == 200
+        assert 'method="post"' in r.text
+        assert 'action="/receive/confirm"' in r.text
+        assert "hx-post" not in r.text
+        assert "hx-swap" not in r.text
+
+    async def test_confirm_receive_redirects_to_placement(self, archive_client):
+        """Подтверждение приёмки: 303 -> /placement с выбранной коробкой."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        r = await archive_client.post("/receive/confirm", data={"box_id": "10"})
+        assert r.status_code == 303
+        assert r.headers["location"] == "/placement?box_id=10"
+
     async def test_placement_page_shows_sections(self, archive_client):
         await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
         r = await archive_client.get("/placement")
