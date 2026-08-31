@@ -69,12 +69,14 @@ class TestArchiveRouter:
 
     async def test_scan_fragment_confirm_is_htmx(self, archive_client):
         """Кнопка «Подтвердить приёмку» — htmx-форма: hx-post на /receive/confirm,
-        ответ вставляется в #scan-result, страница не перезагружается."""
+        ответ вставляется в отдельный контейнер #confirm-error ПОД кнопкой,
+        чтобы состав коробки оставался на экране. Страница не перезагружается."""
         await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
         r = await archive_client.post("/receive/scan", data={"box_number": "B-0010"})
         assert r.status_code == 200
         assert 'hx-post="/receive/confirm"' in r.text
-        assert 'hx-target="#scan-result"' in r.text
+        assert 'hx-target="#confirm-error"' in r.text
+        assert 'id="confirm-error"' in r.text
         assert 'method="post"' not in r.text
 
     async def test_confirm_receive_success_sends_hx_redirect(self, archive_client):

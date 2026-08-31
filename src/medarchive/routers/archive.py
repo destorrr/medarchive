@@ -65,11 +65,12 @@ async def scan_box(
         <tbody>{rows}</tbody>
     </table>
     <div style="margin-top:16px">
-    <form hx-post="/receive/confirm" hx-target="#scan-result">
+    <form hx-post="/receive/confirm" hx-target="#confirm-error">
         <input type="hidden" name="box_id" value="{box.id}">
         <button type="submit" class="btn btn-primary">Подтвердить приёмку</button>
     </form>
     </div>
+    <div id="confirm-error" style="margin-top:14px"></div>
 </div>"""
     return HTMLResponse(fragment)
 
