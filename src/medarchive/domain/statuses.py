@@ -50,6 +50,16 @@ BOX_STATUS_TRANSITIONS: dict[BoxStatus, set[BoxStatus]] = {
 }
 
 
+BOX_STATUS_LABELS: dict[BoxStatus, str] = {
+    BoxStatus.packing: "Упаковывается",
+    BoxStatus.ready: "Готова",
+    BoxStatus.in_transit: "В пути",
+    BoxStatus.received: "Принята",
+    BoxStatus.placed: "Размещена",
+    BoxStatus.lost: "Потеряна",
+}
+
+
 class ShipmentStatus(str, Enum):
     issued = "issued"
     received = "received"
