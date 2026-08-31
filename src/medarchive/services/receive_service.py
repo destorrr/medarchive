@@ -2,7 +2,7 @@
 from datetime import datetime
 from medarchive.adapters.sqlite.database import Database
 from medarchive.adapters.sqlite.repositories import BoxRepositoryImpl, CardRepositoryImpl
-from medarchive.domain.statuses import BoxStatus, CardStatus
+from medarchive.domain.statuses import BoxStatus, CardStatus, BOX_STATUS_LABELS
 
 
 class ReceiveService:
@@ -16,7 +16,10 @@ class ReceiveService:
         if box is None:
             raise ValueError("Коробка не найдена")
         if box.status != BoxStatus.in_transit:
-            raise ValueError(f"Коробка должна быть в статусе 'in_transit', сейчас '{box.status.value}'")
+            raise ValueError(
+                f"Коробка должна быть в статусе '{BOX_STATUS_LABELS[BoxStatus.in_transit]}', "
+                f"сейчас '{BOX_STATUS_LABELS[box.status]}'"
+            )
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -45,7 +48,10 @@ class ReceiveService:
         if box is None:
             raise ValueError("Коробка не найдена")
         if box.status != BoxStatus.received:
-            raise ValueError(f"Коробка должна быть в статусе 'received', сейчас '{box.status.value}'")
+            raise ValueError(
+                f"Коробка должна быть в статусе '{BOX_STATUS_LABELS[BoxStatus.received]}', "
+                f"сейчас '{BOX_STATUS_LABELS[box.status]}'"
+            )
 
         # Create placement
         await self.db.execute(

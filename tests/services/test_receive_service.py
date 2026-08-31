@@ -47,6 +47,26 @@ async def _seed_transferred_box(db):
     return box, card
 
 
+async def _seed_ready_box(db):
+    """Create a box in status 'ready' (packed, not yet transferred to courier)."""
+    await db.execute("INSERT OR REPLACE INTO branches (id, name, code) VALUES (1, 'B1', 'B1')")
+    await db.execute(
+        "INSERT OR REPLACE INTO users (id, username, password_hash, role, branch_id) "
+        "VALUES (1, 'u1', 'h', 'branch', 1)"
+    )
+    await db.execute(
+        "INSERT OR REPLACE INTO users (id, username, password_hash, role) "
+        "VALUES (2, 'archivist', 'h2', 'archive')"
+    )
+    await db.conn.commit()
+
+    box_repo = BoxRepositoryImpl(db)
+    box = await box_repo.create("B-0501", origin_branch_id=1, created_by=1)
+    await box_repo.update_status(box.id, BoxStatus.ready)
+    await db.conn.commit()
+    return box
+
+
 async def _seed_archive_location(db):
     """Create section + shelf."""
     await db.execute("INSERT OR REPLACE INTO archive_sections (id, name) VALUES (1, 'Секция 1')")
@@ -102,9 +122,14 @@ class TestReceiveService:
         assert len(pending) >= 1
         assert any(b["id"] == box.id for b in pending)
 
-    async def test_cannot_place_unreceived_box(self, receive_service, db):
+    async def test_cannot_receive_ready_box(self, receive_service, db):
+        box = await _seed_ready_box(db)
+        with pytest.raises(ValueError, match="в статусе 'В пути', сейчас 'Готова'"):
+            await receive_service.receive_box(box.id, user_id=2)
+
+    async def test_cannot_place_in_transit_box(self, receive_service, db):
         box, _ = await _seed_transferred_box(db)
         await _seed_archive_location(db)
         # Box still in_transit, not received yet
-        with pytest.raises(ValueError, match="received"):
+        with pytest.raises(ValueError, match="в статусе 'Принята', сейчас 'В пути'"):
             await receive_service.place_box(box.id, shelf_id=1)
