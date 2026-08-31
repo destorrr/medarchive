@@ -8,6 +8,7 @@ from medarchive.domain.statuses import (
     UserRole,
     CARD_STATUS_TRANSITIONS,
     BOX_STATUS_TRANSITIONS,
+    CARD_STATUS_LABELS,
 )
 
 
@@ -15,6 +16,17 @@ class TestCardStatus:
     def test_all_statuses_defined(self):
         expected = {"in_branch", "in_box", "in_transit", "in_archive", "placed", "pending_return"}
         assert {s.value for s in CardStatus} == expected
+
+    def test_labels_cover_all_statuses(self):
+        expected = {
+            CardStatus.in_branch: "В филиале",
+            CardStatus.in_box: "В коробке",
+            CardStatus.in_transit: "В пути",
+            CardStatus.in_archive: "В архиве",
+            CardStatus.placed: "Размещена",
+            CardStatus.pending_return: "Возврат",
+        }
+        assert CARD_STATUS_LABELS == expected
 
     @pytest.mark.parametrize("from_s,to_s", [
         (CardStatus.in_branch, CardStatus.in_box),

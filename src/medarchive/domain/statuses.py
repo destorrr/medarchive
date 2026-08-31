@@ -21,6 +21,16 @@ CARD_STATUS_TRANSITIONS: dict[CardStatus, set[CardStatus]] = {
 }
 
 
+CARD_STATUS_LABELS: dict[CardStatus, str] = {
+    CardStatus.in_branch: "В филиале",
+    CardStatus.in_box: "В коробке",
+    CardStatus.in_transit: "В пути",
+    CardStatus.in_archive: "В архиве",
+    CardStatus.placed: "Размещена",
+    CardStatus.pending_return: "Возврат",
+}
+
+
 class BoxStatus(str, Enum):
     packing = "packing"
     ready = "ready"
