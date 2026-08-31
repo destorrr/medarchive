@@ -101,7 +101,8 @@ class TestStage1E2E:
         assert r.status_code == 200
 
         r = await client.post("/receive/confirm", data={"box_id": str(box_id)}, follow_redirects=False)
-        assert r.status_code == 303
+        assert r.status_code == 200
+        assert r.headers["HX-Redirect"] == f"/placement?box_id={box_id}"
 
         # === ARCHIVE: Размещение ===
         r = await client.get("/placement")

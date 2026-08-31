@@ -67,23 +67,33 @@ class TestArchiveRouter:
         assert "В пути" in r.text  # russian status label
         assert "Подтвердить приёмку" in r.text  # confirm button
 
-    async def test_scan_fragment_confirm_is_plain_post_form(self, archive_client):
-        """Кнопка «Подтвердить приёмку» должна быть обычной POST-формой: при hx-swap="none"
-        303-редирект на /placement невидим для пользователя (страница не обновляется)."""
+    async def test_scan_fragment_confirm_is_htmx(self, archive_client):
+        """Кнопка «Подтвердить приёмку» — htmx-форма: hx-post на /receive/confirm,
+        ответ вставляется в #scan-result, страница не перезагружается."""
         await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
         r = await archive_client.post("/receive/scan", data={"box_number": "B-0010"})
         assert r.status_code == 200
-        assert 'method="post"' in r.text
-        assert 'action="/receive/confirm"' in r.text
-        assert "hx-post" not in r.text
-        assert "hx-swap" not in r.text
+        assert 'hx-post="/receive/confirm"' in r.text
+        assert 'hx-target="#scan-result"' in r.text
+        assert 'method="post"' not in r.text
 
-    async def test_confirm_receive_redirects_to_placement(self, archive_client):
-        """Подтверждение приёмки: 303 -> /placement с выбранной коробкой."""
+    async def test_confirm_receive_success_sends_hx_redirect(self, archive_client):
+        """Успешная приёмка: 200 + HX-Redirect на /placement (htmx выполняет переход)."""
         await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
         r = await archive_client.post("/receive/confirm", data={"box_id": "10"})
-        assert r.status_code == 303
-        assert r.headers["location"] == "/placement?box_id=10"
+        assert r.status_code == 200
+        assert r.headers["HX-Redirect"] == "/placement?box_id=10"
+
+    async def test_confirm_receive_error_returns_fragment(self, archive_client, db):
+        """Коробка не в статусе in_transit: 200 + flash-фрагмент с русским текстом —
+        вставляется в блок скана, страница не перезагружается."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        await db.execute("UPDATE boxes SET status = 'received' WHERE id = 10")
+        await db.conn.commit()
+        r = await archive_client.post("/receive/confirm", data={"box_id": "10"})
+        assert r.status_code == 200
+        assert 'class="flash"' in r.text
+        assert "в статусе 'В пути', сейчас 'Принята'" in r.text
 
     async def test_placement_page_shows_sections(self, archive_client):
         await archive_client.post("/login", data={"username": "arch1", "password": "test123"})

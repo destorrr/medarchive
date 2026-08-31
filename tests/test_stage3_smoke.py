@@ -62,7 +62,8 @@ class TestStage3E2E:
         r = await ac.post("/receive/scan", data={"box_number": "0001"}, follow_redirects=False)
         assert r.status_code == 200
         r = await ac.post("/receive/confirm", data={"box_id": "1"}, follow_redirects=False)
-        assert r.status_code == 303
+        assert r.status_code == 200
+        assert r.headers["HX-Redirect"] == "/placement?box_id=1"
 
         # 6. Place box
         r = await ac.post("/placement/confirm", data={"box_id": "1", "shelf_id": "1"}, follow_redirects=False)

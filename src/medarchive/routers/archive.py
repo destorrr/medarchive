@@ -1,6 +1,6 @@
 """Роутеры архива: приёмка и размещение (роль: Архив)."""
 from fastapi import APIRouter, Request, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from medarchive.dependencies import get_current_user, get_db, require_role
 from medarchive.domain.models import User
 from medarchive.domain.statuses import UserRole, CARD_STATUS_LABELS
@@ -65,7 +65,7 @@ async def scan_box(
         <tbody>{rows}</tbody>
     </table>
     <div style="margin-top:16px">
-    <form method="post" action="/receive/confirm">
+    <form hx-post="/receive/confirm" hx-target="#scan-result">
         <input type="hidden" name="box_id" value="{box.id}">
         <button type="submit" class="btn btn-primary">Подтвердить приёмку</button>
     </form>
@@ -85,8 +85,8 @@ async def confirm_receive(
     try:
         await service.receive_box(box_id, user.id)
     except ValueError as e:
-        return HTMLResponse(f'<div class="flash">{str(e)}</div>', status_code=400)
-    return RedirectResponse(url=f"/placement?box_id={box_id}", status_code=303)
+        return HTMLResponse(f'<div class="flash">{str(e)}</div>')
+    return Response(status_code=200, headers={"HX-Redirect": f"/placement?box_id={box_id}"})
 
 
 # === Размещение ===
