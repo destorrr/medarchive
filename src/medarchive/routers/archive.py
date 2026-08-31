@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from medarchive.dependencies import get_current_user, get_db, require_role
 from medarchive.domain.models import User
-from medarchive.domain.statuses import UserRole
+from medarchive.domain.statuses import UserRole, CARD_STATUS_LABELS
 from medarchive.adapters.sqlite.database import Database
 from medarchive.adapters.sqlite.repositories import BoxRepositoryImpl, CardRepositoryImpl
 from medarchive.services.receive_service import ReceiveService
@@ -48,15 +48,29 @@ async def scan_box(
         return HTMLResponse('<div class="flash">Коробка не найдена</div>')
 
     cards = await box_repo.get_cards(box.id)
-    rows = "".join(f"<tr><td>{c.full_name}</td><td>{c.status.value}</td></tr>" for c in cards)
-    fragment = f"""<div id="box-contents">
-    <h3>Состав коробки {box.box_number}</h3>
-    <table><thead><tr><th>ФИО</th><th>Статус</th></tr></thead><tbody>{rows}</tbody></table>
+    rows = "".join(
+        f"<tr style='border-bottom:1px solid #f0f0f0'>"
+        f"<td style='padding:8px;color:#888'>{i}</td>"
+        f"<td style='padding:8px'>{c.full_name}</td>"
+        f"<td style='padding:8px'><span class=\"badge badge-{c.status.value}\">{CARD_STATUS_LABELS[c.status]}</span></td>"
+        f"</tr>"
+        for i, c in enumerate(cards, start=1)
+    )
+    fragment = f"""<div class="card">
+    <h3 style="margin-bottom:12px;font-size:15px;color:#1a1a2e">Состав коробки {box.box_number}</h3>
+    <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:2px solid #eee;text-align:left">
+            <th style="padding:8px">#</th><th style="padding:8px">ФИО</th><th style="padding:8px">Статус</th>
+        </tr></thead>
+        <tbody>{rows}</tbody>
+    </table>
+    <div style="margin-top:16px">
     <form hx-post="/receive/confirm" hx-swap="none">
         <input type="hidden" name="box_id" value="{box.id}">
         <button type="submit" class="btn btn-primary">Подтвердить приёмку</button>
     </form>
-    </div>"""
+    </div>
+</div>"""
     return HTMLResponse(fragment)
 
 

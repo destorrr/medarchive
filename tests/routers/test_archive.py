@@ -56,13 +56,16 @@ class TestArchiveRouter:
         await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
         r = await archive_client.get("/receive")
         assert r.status_code == 200
-        assert "приёмк" in r.text.lower()
+        assert "Ожидают приёмки" in r.text
 
     async def test_scan_box_shows_contents(self, archive_client):
         await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
         r = await archive_client.post("/receive/scan", data={"box_number": "B-0010"})
         assert r.status_code == 200
-        assert "Пациент 1" in r.text  # card name in contents
+        assert "Состав коробки B-0010" in r.text  # card name in contents
+        assert 'class="badge badge-in_transit"' in r.text  # status badge
+        assert "В пути" in r.text  # russian status label
+        assert "Подтвердить приёмку" in r.text  # confirm button
 
     async def test_placement_page_shows_sections(self, archive_client):
         await archive_client.post("/login", data={"username": "arch1", "password": "test123"})

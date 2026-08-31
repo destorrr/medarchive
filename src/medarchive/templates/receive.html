@@ -4,9 +4,11 @@
 <div class="card">
     <form hx-post="/receive/scan" hx-target="#scan-result">
         <div class="form-group">
-            <label for="box_number">Отсканируйте номер коробки</label>
+            <label for="box_number">Номер коробки</label>
             <input type="text" id="box_number" name="box_number" autofocus
-                   placeholder="Введите или отсканируйте номер коробки...">
+                   placeholder="Введите или отсканируйте номер коробки..."
+                   style="width:100%;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:16px"
+                   hx-on::after-request="this.value='';this.focus()">
         </div>
         <button type="submit" class="btn btn-primary">Проверить</button>
     </form>
@@ -15,15 +17,21 @@
 
 {% if pending_boxes %}
 <div class="card">
-    <h3>Ожидают приёмки</h3>
-    <table>
-        <thead><tr><th>Коробка</th><th>Отправлена</th><th>Курьер</th></tr></thead>
+    <h3 style="margin-bottom:12px">⏳ Ожидают приёмки</h3>
+    <table style="width:100%;border-collapse:collapse">
+        <thead>
+            <tr style="border-bottom:2px solid #eee;text-align:left">
+                <th style="padding:8px">Коробка</th>
+                <th style="padding:8px">Отправлена</th>
+                <th style="padding:8px">Курьер</th>
+            </tr>
+        </thead>
         <tbody>
         {% for box in pending_boxes %}
-        <tr>
-            <td>{{ box.box_number }}</td>
-            <td>{{ box.issued_at }}</td>
-            <td>{{ box.courier_name }}</td>
+        <tr style="border-bottom:1px solid #f0f0f0">
+            <td style="padding:8px;font-weight:600">{{ box.box_number }}</td>
+            <td style="padding:8px">{{ box.issued_at }}</td>
+            <td style="padding:8px">{{ box.courier_name }}</td>
         </tr>
         {% endfor %}
         </tbody>
