@@ -178,6 +178,17 @@ class TestReceiveService:
         assert entry["received_at"] == "2026-09-01 10:30:00"
         assert entry["cards_count"] == 2
 
+    async def test_get_received_boxes_counts_only_active_cards(self, receive_service, db):
+        """cards_count не учитывает мягко удалённые карты (removed_at IS NOT NULL)."""
+        box = await _seed_received_box(db)
+        cards = await receive_service.box_repo.get_cards(box.id)
+        await receive_service.box_repo.remove_card(box.id, cards[0].id)
+
+        received = await receive_service.get_received_boxes()
+        entry = next(b for b in received if b["id"] == box.id)
+
+        assert entry["cards_count"] == 1
+
     async def test_place_box_returns_shelf_name(self, receive_service, db):
         box, _ = await _seed_transferred_box(db)
         await receive_service.receive_box(box.id, user_id=2)

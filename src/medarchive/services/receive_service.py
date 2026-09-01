@@ -74,7 +74,7 @@ class ReceiveService:
         ms = MovementService(self.db)
         for card in cards:
             await self.card_repo.update_status(card.id, CardStatus.placed)
-            await ms.log_movement(card.id, "placed", "archive", f"shelf {shelf_name or shelf_id}", user_id)
+            await ms.log_movement(card.id, "placed", "archive", f"shelf {shelf_name}", user_id)
 
         await self.db.conn.commit()
         return shelf_name
@@ -93,7 +93,7 @@ class ReceiveService:
     async def get_received_boxes(self) -> list[dict]:
         rows = await self.db.fetch_all(
             """SELECT b.*, br.name AS branch_name, s.received_at,
-                      (SELECT COUNT(*) FROM box_cards bc WHERE bc.box_id = b.id) AS cards_count
+                      (SELECT COUNT(*) FROM box_cards bc WHERE bc.box_id = b.id AND bc.removed_at IS NULL) AS cards_count
                FROM boxes b
                JOIN branches br ON br.id = b.origin_branch_id
                LEFT JOIN shipments s ON s.box_id = b.id AND s.status = 'received'
