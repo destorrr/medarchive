@@ -28,13 +28,13 @@
                     <td style="padding:8px;text-align:right">
                         <button class="btn btn-primary" style="padding:4px 12px;font-size:13px"
                                 hx-get="/placement/select?box_id={{ box.id }}"
-                                hx-target="#panel-row-{{ box.id }}"
+                                hx-target="#panel-td-{{ box.id }}"
                                 hx-swap="innerHTML"
-                                hx-on::after-request="document.getElementById('row-{{ box.id }}').style.display='none';document.getElementById('panel-row-{{ box.id }}').style.display='';">Разместить</button>
+                                hx-on::after-request="if(event.detail.successful){document.getElementById('row-{{ box.id }}').style.display='none';document.getElementById('panel-row-{{ box.id }}').style.display='';}">Разместить</button>
                     </td>
                 </tr>
                 <tr id="panel-row-{{ box.id }}" {% if selected_box_id != box.id %}style="display:none"{% endif %}>
-                    <td colspan="6" style="padding:0">
+                    <td id="panel-td-{{ box.id }}" colspan="6" style="padding:0">
                         {% if selected_box_id == box.id %}
                         {% include "placement_panel.html" %}
                         {% endif %}

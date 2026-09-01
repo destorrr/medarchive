@@ -161,9 +161,10 @@ class TestArchiveRouter:
         assert "B-0020" in r.text
         assert "B1" in r.text  # branch_name из JOIN branches
         assert "2026-09-01 10:12" in r.text  # received_at из shipments
-        # htmx-кнопка «Разместить» → GET /placement/select в контейнер панели
+        # htmx-кнопка «Разместить» → GET /placement/select в контейнер панели (td, чтобы свап был валидным HTML)
         assert 'hx-get="/placement/select?box_id=20"' in r.text
-        assert 'hx-target="#panel-row-20"' in r.text
+        assert 'hx-target="#panel-td-20"' in r.text
+        assert "if(event.detail.successful)" in r.text  # строку не прячем при ошибке запроса
         # скрытая строка-контейнер панели под строкой коробки
         assert 'id="panel-row-20"' in r.text
         assert "display:none" in r.text
@@ -181,12 +182,13 @@ class TestArchiveRouter:
         assert "📦 B-0020" in r.text
         assert "2 карт" in r.text
         assert "принята 2026-09-01 10:12" in r.text
-        # каскад «Секция → Полка»
-        assert 'id="section"' in r.text
-        assert 'id="shelf"' in r.text
+        # каскад «Секция → Полка» (id уникальны на коробку)
+        assert 'id="section-20"' in r.text
+        assert 'id="shelf-20"' in r.text
         assert "Секция 1" in r.text
         assert "— Сначала выберите секцию —" in r.text
         assert "var SHELVES =" in r.text  # данные каскада для JS
+        assert 'hx-disabled-elt="button[type=\'submit\']"' in r.text  # защита от двойного сабмита
         # скрытый box_id в форме
         assert 'name="box_id"' in r.text
         assert 'value="20"' in r.text
