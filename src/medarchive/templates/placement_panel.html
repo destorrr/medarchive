@@ -1,0 +1,84 @@
+<div id="place-panel-{{ box.id }}" style="background:#fafbfc;border:1px dashed #c5c9d4;border-radius:8px;padding:14px 16px;margin:6px 0 12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px">
+        <span style="font-weight:600;background:#eef1f6;border-radius:6px;padding:2px 10px;font-size:13px">📦 {{ box.box_number }}</span>
+        <span style="color:#888;font-size:13px">{{ box.cards_count }} карт(ы) · принята {{ box.received_at[:16] if box.received_at else '—' }}</span>
+    </div>
+
+    <form hx-post="/placement/confirm" hx-target="#placement-area" hx-swap="outerHTML">
+        <input type="hidden" name="box_id" value="{{ box.id }}">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div>
+                <label for="section" style="display:block;margin-bottom:6px;font-weight:600;color:#1a1a2e">Секция</label>
+                <select id="section" name="section_id"
+                        style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font:inherit;background:#fff;color:#1a1a2e">
+                    <option value="">— Выберите секцию —</option>
+                    {% for sec_id, sec in sections.items() %}
+                    <option value="{{ sec_id }}">{{ sec.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="shelf" style="display:block;margin-bottom:6px;font-weight:600;color:#1a1a2e">Полка</label>
+                <select id="shelf" name="shelf_id" disabled
+                        style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font:inherit;background:#f5f5f5;color:#999">
+                    <option value="">— Сначала выберите секцию —</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:14px">
+            <button type="submit" class="btn btn-primary" disabled>Разместить</button>
+            <button type="button" class="btn btn-secondary"
+                    style="background:#eef1f6;color:#1a1a2e"
+                    onclick="document.getElementById('panel-row-{{ box.id }}').style.display='none';document.getElementById('row-{{ box.id }}').style.display='';document.getElementById('panel-row-{{ box.id }}').innerHTML='';">Отмена</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    {# Ключи дерева секций приводим к строкам — иначе JS не найдёт секцию по value селекта #}
+    {% set sections_js = {} %}
+    {% for sec_id, sec in sections.items() %}
+    {% set _ = sections_js.update({sec_id|string: sec}) %}
+    {% endfor %}
+    var SHELVES = {{ sections_js | tojson }};
+    (function () {
+        var panel = document.getElementById('place-panel-{{ box.id }}');
+        if (!panel) return;
+        var section = panel.querySelector('#section');
+        var shelf = panel.querySelector('#shelf');
+        var submit = panel.querySelector('button[type="submit"]');
+
+        function fillShelves() {
+            var sid = section.value;
+            shelf.innerHTML = '';
+            if (!sid) {
+                shelf.disabled = true;
+                shelf.innerHTML = '<option value="">— Сначала выберите секцию —</option>';
+                submit.disabled = true;
+                return;
+            }
+            var sec = SHELVES[sid];
+            var opts = '<option value="">— Выберите полку —</option>';
+            if (sec && sec.shelves) {
+                for (var i = 0; i < sec.shelves.length; i++) {
+                    var s = sec.shelves[i];
+                    opts += '<option value="' + s.id + '">' + s.name + (s.qr ? ' (' + s.qr + ')' : '') + '</option>';
+                }
+            }
+            shelf.innerHTML = opts;
+            shelf.disabled = false;
+            submit.disabled = !shelf.value;
+        }
+
+        function updateSubmit() {
+            submit.disabled = !(section.value && shelf.value);
+        }
+
+        section.addEventListener('change', fillShelves);
+        section.addEventListener('input', updateSubmit);
+        shelf.addEventListener('change', updateSubmit);
+        shelf.addEventListener('input', updateSubmit);
+    })();
+</script>

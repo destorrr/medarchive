@@ -103,6 +103,100 @@ class TestArchiveRouter:
         assert r.status_code == 200
         assert "размещен" in r.text.lower() or "секци" in r.text.lower()
 
+    # === /placement — partial'ы списка и панели (Задача 2 редизайна) ===
+
+    async def _make_received_box(self, db, box_id=20, box_number="B-0020",
+                                 received_at="2026-09-01 10:12:00"):
+        """Вспомогательный: коробка received + shipment received + 2 карты + секция/полка."""
+        await db.execute(
+            "INSERT INTO cards (id, full_name, status) VALUES (2, 'Пациент 2', 'in_transit')"
+        )
+        await db.execute(
+            "INSERT INTO cards (id, full_name, status) VALUES (3, 'Пациент 3', 'in_transit')"
+        )
+        await db.execute(
+            "INSERT INTO boxes (id, box_number, origin_branch_id, created_by, status) "
+            "VALUES (?, ?, 1, 1, 'received')",
+            (box_id, box_number),
+        )
+        await db.execute(
+            "INSERT INTO box_cards (id, box_id, card_id) VALUES (2, ?, 2)",
+            (box_id,),
+        )
+        await db.execute(
+            "INSERT INTO box_cards (id, box_id, card_id) VALUES (3, ?, 3)",
+            (box_id,),
+        )
+        await db.execute(
+            "INSERT INTO shipments (id, kind, box_id, from_branch_id, courier_id, issued_by, "
+            "received_at, status) VALUES (2, 'box', ?, 1, 1, 1, ?, 'received')",
+            (box_id, received_at),
+        )
+        await db.conn.commit()
+
+    async def test_placement_empty_state(self, archive_client):
+        """GET /placement без принятых коробок → карточка пустого состояния
+        «Все коробки размещены» + стили флешей в base.html."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        r = await archive_client.get("/placement")
+        assert r.status_code == 200
+        assert "Все коробки размещены" in r.text
+        assert "Новых коробок, ожидающих размещения, нет." in r.text
+        assert "Коробки появляются здесь после приёмки на странице „Приёмка“." in r.text
+        # стили флешей (base.html)
+        assert ".flash-success" in r.text
+        assert ".flash-error" in r.text
+
+    async def test_placement_lists_received_boxes(self, archive_client, db):
+        """GET /placement с принятой коробкой → карточка «Ожидают размещения (N)»,
+        заголовки таблицы, htmx-кнопка и скрытый контейнер панели #panel-row-N."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        await self._make_received_box(db)
+
+        r = await archive_client.get("/placement")
+        assert r.status_code == 200
+        assert "Ожидают размещения" in r.text
+        for header in ("Коробка", "Откуда", "Принята", "Карт"):
+            assert header in r.text
+        assert "B-0020" in r.text
+        assert "B1" in r.text  # branch_name из JOIN branches
+        assert "2026-09-01 10:12" in r.text  # received_at из shipments
+        # htmx-кнопка «Разместить» → GET /placement/select в контейнер панели
+        assert 'hx-get="/placement/select?box_id=20"' in r.text
+        assert 'hx-target="#panel-row-20"' in r.text
+        # скрытая строка-контейнер панели под строкой коробки
+        assert 'id="panel-row-20"' in r.text
+        assert "display:none" in r.text
+
+    async def test_placement_selected_box_renders_panel_inline(self, archive_client, db):
+        """?box_id=N (переход с приёмки через HX-Redirect) → панель каскада
+        рендерится инлайн: строка скрыта, панель видима, селекты «Секция → Полка»,
+        hidden input box_id, данные SHELVES для JS."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        await self._make_received_box(db)
+
+        r = await archive_client.get("/placement", params={"box_id": "20"})
+        assert r.status_code == 200
+        # шапка панели: chip + мета
+        assert "📦 B-0020" in r.text
+        assert "2 карт" in r.text
+        assert "принята 2026-09-01 10:12" in r.text
+        # каскад «Секция → Полка»
+        assert 'id="section"' in r.text
+        assert 'id="shelf"' in r.text
+        assert "Секция 1" in r.text
+        assert "— Сначала выберите секцию —" in r.text
+        assert "var SHELVES =" in r.text  # данные каскада для JS
+        # скрытый box_id в форме
+        assert 'name="box_id"' in r.text
+        assert 'value="20"' in r.text
+        # форма confirm через htmx — целится в #placement-area
+        assert 'hx-post="/placement/confirm"' in r.text
+        assert 'hx-target="#placement-area"' in r.text
+        # строка скрыта, контейнер панели есть
+        assert 'id="row-20"' in r.text
+        assert 'id="panel-row-20"' in r.text
+
     async def test_branch_cannot_access_receive(self, archive_client):
         await archive_client.post("/login", data={"username": "branch1", "password": "test123"})
         r = await archive_client.get("/receive")

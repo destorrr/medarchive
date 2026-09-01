@@ -1,0 +1,57 @@
+<div id="placement-area">
+    {% if flash %}
+    <div class="flash flash-{{ flash.type }}">{{ flash.text }}</div>
+    {% endif %}
+
+    {% if received_boxes %}
+    <div class="card">
+        <h3 style="margin-bottom:12px">📦 Ожидают размещения ({{ received_boxes|length }})</h3>
+        <table style="width:100%;border-collapse:collapse">
+            <thead>
+                <tr style="border-bottom:2px solid #eee;text-align:left">
+                    <th style="padding:8px;width:40px">#</th>
+                    <th style="padding:8px">Коробка</th>
+                    <th style="padding:8px">Откуда</th>
+                    <th style="padding:8px">Принята</th>
+                    <th style="padding:8px;width:60px">Карт</th>
+                    <th style="padding:8px;width:110px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for box in received_boxes %}
+                <tr id="row-{{ box.id }}" style="border-bottom:1px solid #f0f0f0{% if selected_box_id == box.id %};display:none{% endif %}">
+                    <td style="padding:8px;color:#888">{{ loop.index }}</td>
+                    <td style="padding:8px;font-weight:600">{{ box.box_number }}</td>
+                    <td style="padding:8px">{{ box.branch_name }}</td>
+                    <td style="padding:8px">{{ box.received_at[:16] if box.received_at else '—' }}</td>
+                    <td style="padding:8px">{{ box.cards_count }}</td>
+                    <td style="padding:8px;text-align:right">
+                        <button class="btn btn-primary" style="padding:4px 12px;font-size:13px"
+                                hx-get="/placement/select?box_id={{ box.id }}"
+                                hx-target="#panel-row-{{ box.id }}"
+                                hx-swap="innerHTML"
+                                hx-on::after-request="document.getElementById('row-{{ box.id }}').style.display='none';document.getElementById('panel-row-{{ box.id }}').style.display='';">Разместить</button>
+                    </td>
+                </tr>
+                <tr id="panel-row-{{ box.id }}" {% if selected_box_id != box.id %}style="display:none"{% endif %}>
+                    <td colspan="6" style="padding:0">
+                        {% if selected_box_id == box.id %}
+                        {% include "placement_panel.html" %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card">
+        <div style="text-align:center;padding:28px 20px">
+            <div style="font-size:34px;margin-bottom:8px">🎉</div>
+            <p style="font-weight:600">Все коробки размещены</p>
+            <p style="color:#666">Новых коробок, ожидающих размещения, нет.</p>
+            <p style="margin-top:6px;font-size:12px;color:#999">Коробки появляются здесь после приёмки на странице „Приёмка“.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>

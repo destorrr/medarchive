@@ -1,48 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>📍 Размещение коробок</h1>
-
-{% if selected_box_id %}
-<div class="card">
-    <p>Коробка принята. Выберите место для размещения:</p>
-    <form method="post" action="/placement/confirm">
-        <input type="hidden" name="box_id" value="{{ selected_box_id }}">
-        <div class="form-group">
-            <label for="shelf_id">Место (секция → полка)</label>
-            <select name="shelf_id" id="shelf_id">
-                <option value="">— Выберите —</option>
-                {% for sec_id, sec in sections.items() %}
-                <optgroup label="{{ sec.name }}">
-                    {% for shelf in sec.shelves %}
-                    <option value="{{ shelf.id }}">{{ shelf.name }} {% if shelf.qr %}({{ shelf.qr }}){% endif %}</option>
-                    {% endfor %}
-                </optgroup>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit" class="btn btn-primary">Разместить</button>
-    </form>
-</div>
-{% else %}
-<div class="card">
-    <p>Выберите коробку для размещения:</p>
-</div>
-{% endif %}
-
-{% if received_boxes %}
-<div class="card">
-    <h3>Принятые коробки (ожидают размещения)</h3>
-    <table>
-        <thead><tr><th>Коробка</th><th>Действие</th></tr></thead>
-        <tbody>
-        {% for box in received_boxes %}
-        <tr>
-            <td>{{ box.box_number }}</td>
-            <td><a href="/placement?box_id={{ box.id }}" class="btn btn-primary">Разместить</a></td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% endif %}
+{% include "placement_area.html" %}
 {% endblock %}
