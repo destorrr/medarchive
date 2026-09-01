@@ -97,12 +97,6 @@ class TestArchiveRouter:
         assert 'class="flash"' in r.text
         assert "в статусе 'В пути', сейчас 'Принята'" in r.text
 
-    async def test_placement_page_shows_sections(self, archive_client):
-        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
-        r = await archive_client.get("/placement")
-        assert r.status_code == 200
-        assert "размещен" in r.text.lower() or "секци" in r.text.lower()
-
     # === /placement — partial'ы списка и панели (Задача 2 редизайна) ===
 
     async def _make_received_box(self, db, box_id=20, box_number="B-0020",
@@ -198,6 +192,93 @@ class TestArchiveRouter:
         # строка скрыта, контейнер панели есть
         assert 'id="row-20"' in r.text
         assert 'id="panel-row-20"' in r.text
+
+    # === /placement — htmx-фрагменты select/confirm (Задача 3 редизайна) ===
+
+    async def test_select_fragment_renders_panel(self, archive_client, db):
+        """GET /placement/select?box_id=N (принятая коробка) → 200, панель:
+        chip с номером, каскад «Секция → Полка» (полка disabled), hidden box_id,
+        форма hx-post на /placement/confirm, кнопка «Разместить»."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        await self._make_received_box(db)
+
+        r = await archive_client.get("/placement/select", params={"box_id": "20"})
+        assert r.status_code == 200
+        assert "📦 B-0020" in r.text
+        assert 'id="section-20"' in r.text
+        assert 'id="shelf-20"' in r.text
+        assert "disabled" in r.text  # полка изначально disabled до выбора секции
+        assert 'name="box_id"' in r.text
+        assert 'value="20"' in r.text
+        assert 'hx-post="/placement/confirm"' in r.text
+        assert "Разместить" in r.text
+
+    async def test_select_not_found_returns_error_flash(self, archive_client):
+        """GET /placement/select для несуществующей коробки → 200, error-флеш «не найдена»."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        r = await archive_client.get("/placement/select", params={"box_id": "999"})
+        assert r.status_code == 200
+        assert 'class="flash flash-error"' in r.text
+        assert "Коробка не найдена" in r.text
+
+    async def test_select_non_received_box_returns_status_error(self, archive_client):
+        """GET /placement/select для коробки не в статусе received (in_transit) →
+        200, error-флеш про статус (с русскими лейблами)."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        r = await archive_client.get("/placement/select", params={"box_id": "10"})
+        assert r.status_code == 200
+        assert 'class="flash flash-error"' in r.text
+        assert "должна быть в статусе 'Принята'" in r.text
+        assert "В пути" in r.text
+
+    async def test_confirm_success_returns_area_and_places_box(self, archive_client, db):
+        """POST /placement/confirm (box_id + shelf_id) → 200, success-флеш с именем
+        полки, в списке коробки больше нет, в БД статус placed."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        await self._make_received_box(db)
+
+        r = await archive_client.post(
+            "/placement/confirm", data={"box_id": "20", "shelf_id": "1"}
+        )
+        assert r.status_code == 200
+        assert 'class="flash flash-success"' in r.text
+        assert "размещена на полке" in r.text
+        assert "Полка 3" in r.text
+        # в списке строки коробки больше нет — пустое состояние
+        assert 'id="row-20"' not in r.text
+        assert "Все коробки размещены" in r.text
+        # в БД статус placed
+        row = await db.fetch_one("SELECT status FROM boxes WHERE id = 20")
+        assert row["status"] == "placed"
+
+    async def test_confirm_repeat_returns_error_and_list_unchanged(self, archive_client, db):
+        """Повторный POST /placement/confirm для размещённой коробки → 200,
+        error-флеш со статусом «Размещена», список без изменений."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        await self._make_received_box(db)
+        await archive_client.post(
+            "/placement/confirm", data={"box_id": "20", "shelf_id": "1"}
+        )
+
+        r = await archive_client.post(
+            "/placement/confirm", data={"box_id": "20", "shelf_id": "1"}
+        )
+        assert r.status_code == 200
+        assert 'class="flash flash-error"' in r.text
+        assert "Размещена" in r.text
+        assert 'id="row-20"' not in r.text  # размещённой коробки в списке нет
+
+    async def test_confirm_without_shelf_returns_error(self, archive_client, db):
+        """POST /placement/confirm без shelf_id → 200, error-флеш «Выберите полку»,
+        коробка остаётся в списке."""
+        await archive_client.post("/login", data={"username": "arch1", "password": "test123"})
+        await self._make_received_box(db)
+
+        r = await archive_client.post("/placement/confirm", data={"box_id": "20"})
+        assert r.status_code == 200
+        assert 'class="flash flash-error"' in r.text
+        assert "Выберите полку" in r.text
+        assert 'id="row-20"' in r.text  # коробка ещё в списке
 
     async def test_branch_cannot_access_receive(self, archive_client):
         await archive_client.post("/login", data={"username": "branch1", "password": "test123"})

@@ -65,9 +65,10 @@ class TestStage3E2E:
         assert r.status_code == 200
         assert r.headers["HX-Redirect"] == "/placement?box_id=1"
 
-        # 6. Place box
+        # 6. Place box — htmx-фрагмент: 200 + success-флеш «размещена на полке»
         r = await ac.post("/placement/confirm", data={"box_id": "1", "shelf_id": "1"}, follow_redirects=False)
-        assert r.status_code == 303
+        assert r.status_code == 200
+        assert "размещена на полке" in r.text
 
         # 7. Search — find the card
         r = await ac.get("/search")

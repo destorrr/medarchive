@@ -113,7 +113,9 @@ class TestStage1E2E:
             data={"box_id": str(box_id), "shelf_id": "1"},
             follow_redirects=False,
         )
-        assert r.status_code == 303
+        # htmx-фрагмент: всегда 200, успех — success-флеш «размещена на полке»
+        assert r.status_code == 200
+        assert "размещена на полке" in r.text
 
         # === VERIFY: Проверить финальные статусы в БД ===
         db = await get_db()
