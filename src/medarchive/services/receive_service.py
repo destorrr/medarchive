@@ -43,7 +43,7 @@ class ReceiveService:
 
         await self.db.conn.commit()
 
-    async def place_box(self, box_id: int, shelf_id: int, user_id: int | None = None) -> None:
+    async def place_box(self, box_id: int, shelf_id: int, user_id: int | None = None) -> str:
         box = await self.box_repo.get_by_id(box_id)
         if box is None:
             raise ValueError("Коробка не найдена")
@@ -52,6 +52,12 @@ class ReceiveService:
                 f"Коробка должна быть в статусе '{BOX_STATUS_LABELS[BoxStatus.received]}', "
                 f"сейчас '{BOX_STATUS_LABELS[box.status]}'"
             )
+
+        # Guard: полка должна существовать
+        shelf = await self.db.fetch_one("SELECT name FROM archive_shelves WHERE id = ?", (shelf_id,))
+        if shelf is None:
+            raise ValueError("Полка не найдена")
+        shelf_name = shelf["name"]
 
         # Create placement
         await self.db.execute(
@@ -64,8 +70,6 @@ class ReceiveService:
 
         # Update cards
         cards = await self.box_repo.get_cards(box_id)
-        shelf = await self.db.fetch_one("SELECT name FROM archive_shelves WHERE id = ?", (shelf_id,))
-        shelf_name = shelf["name"] if shelf else None
         from medarchive.services.movement_service import MovementService
         ms = MovementService(self.db)
         for card in cards:
@@ -73,6 +77,7 @@ class ReceiveService:
             await ms.log_movement(card.id, "placed", "archive", f"shelf {shelf_name or shelf_id}", user_id)
 
         await self.db.conn.commit()
+        return shelf_name
 
     async def get_pending_boxes(self) -> list[dict]:
         rows = await self.db.fetch_all(
@@ -87,7 +92,13 @@ class ReceiveService:
 
     async def get_received_boxes(self) -> list[dict]:
         rows = await self.db.fetch_all(
-            "SELECT * FROM boxes WHERE status = 'received' ORDER BY box_number"
+            """SELECT b.*, br.name AS branch_name, s.received_at,
+                      (SELECT COUNT(*) FROM box_cards bc WHERE bc.box_id = b.id) AS cards_count
+               FROM boxes b
+               JOIN branches br ON br.id = b.origin_branch_id
+               LEFT JOIN shipments s ON s.box_id = b.id AND s.status = 'received'
+               WHERE b.status = 'received'
+               ORDER BY b.box_number"""
         )
         return [dict(r) for r in rows]
 
