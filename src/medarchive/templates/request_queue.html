@@ -1,33 +1,47 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>📋 Очередь заявок</h1>
+<style>
+    /* Страница /requests — очередь (редизайн контура возврата, макет v3, экран 3).
+       Базовые стили (таблицы .data, .badge-*, .btn, select.row-sel, флеш) — в base.html;
+       здесь только локальные для страницы. */
+    .act .with-sel { display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end; }
+    .empty-state { text-align: center; padding: 24px 16px; }
+    .empty-state p { color: #666; }
+    .search-hint { margin-top: 12px; font-size: 12.5px; color: #888; }
+</style>
 {% if queue %}
 <div class="card">
-    <table><thead><tr><th>Карта</th><th>Запросил</th><th>Дата</th><th></th></tr></thead>
-    <tbody>
-    {% for r in queue %}
-    <tr>
-        <td>{{ r.card_name }}</td>
-        <td>user#{{ r.requested_by }}</td>
-        <td>{{ r.created_at }}</td>
-        <td>
-            <form method="post" action="/requests/fulfill" style="display:inline">
-                <input type="hidden" name="request_id" value="{{ r.id }}">
-                <input type="hidden" name="action" value="single">
-                <select name="courier_id">
-                    <option value="0">— Курьер —</option>
-                    {% for c in couriers %}
-                    <option value="{{ c.id }}">{{ c.name }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-primary">Выполнить</button>
-            </form>
-        </td>
-    </tr>
-    {% endfor %}
-    </tbody></table>
+    <table class="data">
+        <colgroup><col><col style="width:130px"><col style="width:118px"><col style="width:140px"><col style="width:290px"></colgroup>
+        <thead><tr><th>Карта</th><th>Филиал</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+        <tbody>
+        {% for r in queue %}
+        <tr>
+            <td class="fio">{{ r.card_name }}</td>
+            <td>{{ r.branch_name or '' }}</td>
+            <td><span class="badge {{ r.status_badge }}">{{ r.status_label }}</span></td>
+            <td class="date muted">{{ r.created_at_display }}</td>
+            <td class="act">
+                <form method="post" action="/requests/fulfill" class="with-sel">
+                    <input type="hidden" name="request_id" value="{{ r.id }}">
+                    <input type="hidden" name="action" value="single">
+                    <select name="courier_id" class="row-sel">
+                        <option value="0">Без отправки</option>
+                        {% for c in couriers %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary">Выполнить</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div class="search-hint">«Выполнить» — карта изымается со стеллажа и переходит в статус «Возврат» (заявка: «Новая» → «В работе» → «Выполнена»).</div>
 </div>
 {% else %}
-<p>Нет активных заявок.</p>
+<div class="card"><div class="empty-state"><p>Нет активных заявок.</p></div></div>
 {% endif %}
 {% endblock %}

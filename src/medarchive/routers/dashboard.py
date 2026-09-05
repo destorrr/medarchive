@@ -9,7 +9,6 @@ from medarchive.dependencies import get_current_user, get_db, require_role
 from medarchive.domain.models import User
 from medarchive.domain.statuses import (
     UserRole,
-    BoxStatus,
     CARD_STATUS_LABELS,
     BOX_STATUS_LABELS,
     REQUEST_STATUS_LABELS,
@@ -22,7 +21,6 @@ from medarchive.adapters.sqlite.repositories import (
 )
 from medarchive.services.request_service import RequestService
 from medarchive.services.return_service import ReturnService
-from medarchive.services.shipment_service import ShipmentService
 
 router = APIRouter()
 
@@ -467,15 +465,23 @@ async def requests_my_page(request: Request, user: User = Depends(require_role(U
 
 @router.get("/requests")
 async def request_queue_page(request: Request, user: User = Depends(require_role(UserRole.archive, UserRole.admin)), db: Database = Depends(get_db)):
+    """Очередь заявок архива (редизайн контура возврата, задача 4).
+
+    Строки обогащаются _prepare_request_rows (русский статус-бейдж, дата
+    «ДД.ММ.ГГГГ ЧЧ:ММ»), branch_name приходит из get_queue (JOIN branches —
+    филиал-получатель вместо сырого requested_by); в действии строки —
+    селект курьеров + «Выполнить». Одноразовый флеш (после
+    /requests/fulfill) читается через _render_page."""
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     req_service = RequestService(db, card_repo, box_repo)
     queue = await req_service.get_queue()
+    queue = _prepare_request_rows(queue)
     courier_repo = CourierRepositoryImpl(db)
     couriers = await courier_repo.list_all()
     ctx = _menu_context(user)
     ctx.update({"request": request, "username": user.username, "queue": queue, "couriers": couriers})
-    return request.app.state.templates.TemplateResponse(request=request, name="request_queue.html", context=ctx)
+    return _render_page(request, "request_queue.html", ctx)
 
 
 @router.post("/requests/fulfill")
@@ -487,6 +493,14 @@ async def fulfill_request(
     user: User = Depends(require_role(UserRole.archive, UserRole.admin)),
     db: Database = Depends(get_db),
 ):
+    """Выполнить заявку из очереди (редизайн контура возврата, задача 4).
+
+    Успех → 303 на /requests с одноразовым флешем «Заявка выполнена»
+    (при courier_id>0 — «…и передана курьеру»); ValueError (заявки нет,
+    статус не new/in_progress) — тоже 303, но с флешем-error (текст ошибки
+    сервиса сохранён) вместо прежнего рендера 400. Бизнес-логика fulfill и
+    создание возвратной отправки (RB-коробка + transfer_box при курьере)
+    не менялись; courier_id=0 — выполнение без отправки."""
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     req_service = RequestService(db, card_repo, box_repo)
@@ -494,26 +508,32 @@ async def fulfill_request(
     try:
         await req_service.fulfill_request(request_id, user.id)
     except ValueError as e:
-        ctx = _menu_context(user)
-        queue = await req_service.get_queue()
-        ctx.update({"request": request, "username": user.username, "queue": queue, "error": str(e), "couriers": []})
-        return request.app.state.templates.TemplateResponse(request=request, name="request_queue.html", context=ctx, status_code=400)
+        return _flash_redirect("/requests", "error", str(e))
 
     # Get the fulfilled request to create return shipment
     req_row = await db.fetch_one("SELECT * FROM requests WHERE id = ?", (request_id,))
     card = await card_repo.get_by_id(req_row["card_id"])
 
     if action == "single" and courier_id > 0:
-        # Create return shipment for single card
+        # Возвратная отправка одиночной карты — в филиал-заказчик заявки
+        # (to_branch_id = target_branch_id): shipment kind='card', как в
+        # smoke-E2E; её принимает /receive-return на стороне филиала.
+        # Легаси-ветка (RB-коробка с origin_branch_id=0 + transfer_box)
+        # падала с FK-ошибкой: филиала 0 не существует (boxes.origin_branch_id
+        # REFERENCES branches(id)) — заменена на штатный ReturnService.
         courier_repo = CourierRepositoryImpl(db)
-        shipment_service = ShipmentService(db, box_repo, courier_repo, card_repo)
-        # Create a temporary box for the return card
-        return_box = await box_repo.create(f"RB-{card.id:04d}", origin_branch_id=0, created_by=user.id)
-        await box_repo.add_card(return_box.id, card.id)
-        await box_repo.update_status(return_box.id, BoxStatus.ready)
-        await shipment_service.transfer_box(return_box.id, courier_id, user.id)
+        return_service = ReturnService(db, card_repo, box_repo, courier_repo)
+        await return_service.return_single_card(
+            card_id=card.id,
+            courier_id=courier_id,
+            to_branch_id=req_row["target_branch_id"],
+            issued_by=user.id,
+        )
+        return _flash_redirect(
+            "/requests", "success", "Заявка выполнена и передана курьеру."
+        )
 
-    return RedirectResponse(url="/requests", status_code=303)
+    return _flash_redirect("/requests", "success", "Заявка выполнена.")
 
 
 @router.get("/receive-return")

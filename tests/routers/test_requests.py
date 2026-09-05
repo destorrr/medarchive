@@ -253,3 +253,148 @@ class TestRequestQueue:
         await _login(req_client, "branch1")
         r = await req_client.get("/requests")
         assert r.status_code == 403
+
+
+class TestRequestQueueRedesign:
+    """Задача 4 редизайна контура возврата: очередь /requests — колонка
+    «Филиал» (имя филиала-получателя, JOIN branches в get_queue), русские
+    статусы-бейджи (REQUEST_STATUS_LABELS), дата «ДД.ММ.ГГГГ ЧЧ:ММ»,
+    селект курьера + «Выполнить» в строке; вместо сырого user#<id> — филиал;
+    выполнение → 303 + одноразовый флеш; ошибки → 303 + флеш-error;
+    пустое состояние."""
+
+    @staticmethod
+    async def _seed_request(
+        db, *, status="new", target_branch_id=2, requested_by=1,
+        created_at="2026-09-05 16:48:13",
+    ):
+        """Прямой посев заявки (статусы/филиал/дата для проверки рендера)."""
+        await db.execute(
+            "INSERT INTO requests (card_id, requested_by, target_branch_id, "
+            "target_department, created_at, status) VALUES (1, ?, ?, 0, ?, ?)",
+            (requested_by, target_branch_id, created_at, status),
+        )
+        await db.conn.commit()
+
+    async def test_queue_row_shows_branch_status_date_courier(self, req_client, db):
+        """Строка очереди: имя филиала-получателя (B2/B1), русский статус-
+        бейдж («Новая»/«В работе»), дата «ДД.ММ.ГГГГ ЧЧ:ММ», селект курьера
+        (option курьера) и кнопка «Выполнить»; сырых user#<id>, 'new' и
+        «YYYY-MM-DD HH:MM:SS» в таблице нет."""
+        await _login(req_client, "arch1")
+        await self._seed_request(
+            db, status="new", target_branch_id=2, created_at="2026-09-05 16:48:13"
+        )
+        await self._seed_request(
+            db, status="in_progress", target_branch_id=1, created_at="2026-09-05 15:02:00"
+        )
+        r = await req_client.get("/requests")
+        assert r.status_code == 200
+        # заголовки колонок: Карта | Филиал | Статус | Дата | действие
+        assert "<th>Карта</th>" in r.text
+        assert "<th>Филиал</th>" in r.text
+        assert "<th>Статус</th>" in r.text
+        assert "<th>Дата</th>" in r.text
+        # имя филиала-получателя в строке (не user#<id>)
+        assert "<td>B2</td>" in r.text
+        assert "<td>B1</td>" in r.text
+        assert "user#" not in r.text
+        # русские статусы-бейджи, а не сырые значения
+        assert '<span class="badge badge-new">Новая</span>' in r.text
+        assert '<span class="badge badge-in_progress">В работе</span>' in r.text
+        assert "<td>new</td>" not in r.text
+        # дата «ДД.ММ.ГГГГ ЧЧ:ММ»; сырой формат хранения не показывается
+        assert '<td class="date muted">05.09.2026 16:48</td>' in r.text
+        assert "2026-09-05 16:48:13" not in r.text
+        # действие: селект курьера (option курьера K1, «Без отправки» = 0)
+        # + кнопка «Выполнить» в каждой строке
+        assert 'name="courier_id"' in r.text
+        assert '<option value="1">K1</option>' in r.text
+        assert '<option value="0">Без отправки</option>' in r.text
+        assert r.text.count(">Выполнить</button>") == 2
+
+    async def test_queue_empty_state(self, req_client):
+        """Заявок нет — пустое состояние «Нет активных заявок»."""
+        await _login(req_client, "arch1")
+        r = await req_client.get("/requests")
+        assert r.status_code == 200
+        assert "Нет активных заявок" in r.text
+
+    async def test_fulfill_success_303_flash_once(self, req_client, db):
+        """Выполнение заявки без курьера (courier_id=0) end-to-end: 303 на
+        /requests + флеш «Заявка выполнена» (cookie одноразовый — первый GET
+        показывает, повторный нет); в БД статус completed."""
+        await _login(req_client, "branch1")
+        await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
+        req_row = await db.fetch_one("SELECT id FROM requests ORDER BY id DESC LIMIT 1")
+        await req_client.get("/logout")
+        await _login(req_client, "arch1")
+        r = await req_client.post(
+            "/requests/fulfill",
+            data={"request_id": str(req_row["id"]), "action": "single", "courier_id": "0"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        assert "/requests" in r.headers["location"]
+        g1 = await req_client.get("/requests")
+        assert "flash flash-success" in g1.text
+        assert "Заявка выполнена" in g1.text
+        g2 = await req_client.get("/requests")
+        assert "Заявка выполнена" not in g2.text
+        upd = await db.fetch_one("SELECT status FROM requests WHERE id = ?", (req_row["id"],))
+        assert upd["status"] == "completed"
+
+    async def test_fulfill_with_courier_creates_return_shipment(self, req_client, db):
+        """Курьер выбран (courier_id>0): заявка выполнена, создаётся возвратная
+        отправка (запись в shipments с курьером), карта уходит in_transit;
+        303 + флеш «…и передана курьеру»."""
+        await _login(req_client, "branch1")
+        await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
+        req_row = await db.fetch_one("SELECT id FROM requests ORDER BY id DESC LIMIT 1")
+        await req_client.get("/logout")
+        await _login(req_client, "arch1")
+        r = await req_client.post(
+            "/requests/fulfill",
+            data={"request_id": str(req_row["id"]), "action": "single", "courier_id": "1"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        sh = await db.fetch_one("SELECT * FROM shipments ORDER BY id DESC LIMIT 1")
+        assert sh is not None
+        assert sh["courier_id"] == 1
+        card = await db.fetch_one("SELECT status FROM cards WHERE id = 1")
+        assert card["status"] == "in_transit"
+        g1 = await req_client.get("/requests")
+        assert "передана курьеру" in g1.text
+
+    async def test_fulfill_missing_request_error_flash(self, req_client):
+        """Невалидный request_id — не 500: 303 + флеш-error «Заявка не найдена»."""
+        await _login(req_client, "arch1")
+        r = await req_client.post(
+            "/requests/fulfill",
+            data={"request_id": "999999", "action": "single"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        assert "/requests" in r.headers["location"]
+        g1 = await req_client.get("/requests")
+        assert "flash flash-error" in g1.text
+        assert "Заявка не найдена" in g1.text
+
+    async def test_fulfill_completed_request_error_flash(self, req_client, db):
+        """Уже выполненная заявка — не 500: 303 + флеш-error с текстом сервиса
+        («Нельзя выполнить заявку в статусе …»)."""
+        await _login(req_client, "arch1")
+        await self._seed_request(db, status="completed", target_branch_id=1)
+        req_row = await db.fetch_one(
+            "SELECT id FROM requests WHERE status = 'completed' ORDER BY id DESC LIMIT 1"
+        )
+        r = await req_client.post(
+            "/requests/fulfill",
+            data={"request_id": str(req_row["id"]), "action": "single", "courier_id": "0"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        g1 = await req_client.get("/requests")
+        assert "flash flash-error" in g1.text
+        assert "Нельзя выполнить заявку в статусе" in g1.text

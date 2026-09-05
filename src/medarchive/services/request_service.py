@@ -25,9 +25,17 @@ class RequestService:
         return dict(row) if row else {}
 
     async def get_queue(self) -> list[dict]:
+        """Очередь активных заявок (new/in_progress) для архива.
+
+        Строка: все поля заявки + card_name (ФИО карты) и branch_name
+        (имя филиала-получателя через LEFT JOIN branches по
+        target_branch_id — колонка «Филиал» очереди, редизайн контура
+        возврата, задача 4)."""
         rows = await self.db.fetch_all(
-            """SELECT r.*, c.full_name as card_name
-               FROM requests r JOIN cards c ON r.card_id = c.id
+            """SELECT r.*, c.full_name as card_name, b.name as branch_name
+               FROM requests r
+               JOIN cards c ON r.card_id = c.id
+               LEFT JOIN branches b ON r.target_branch_id = b.id
                WHERE r.status IN ('new', 'in_progress')
                ORDER BY r.created_at ASC"""
         )
