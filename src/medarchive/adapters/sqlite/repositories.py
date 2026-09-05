@@ -171,11 +171,12 @@ class BoxRepositoryImpl:
         return row is not None
 
     async def card_other_boxes(self, card_id: int, exclude_box_id: int) -> list[dict]:
-        """Активные коробки карты кроме указанной: [{box_id, box_number, status}]."""
+        """Активные коробки карты кроме указанной: [{box_id, box_number, status, branch_name}]."""
         rows = await self.db.fetch_all(
-            """SELECT b.id AS box_id, b.box_number, b.status
+            """SELECT b.id AS box_id, b.box_number, b.status, br.name AS branch_name
                FROM box_cards bc
                JOIN boxes b ON b.id = bc.box_id
+               JOIN branches br ON br.id = b.origin_branch_id
                WHERE bc.card_id = ? AND bc.removed_at IS NULL AND bc.box_id != ?
                ORDER BY b.id""",
             (card_id, exclude_box_id),
@@ -185,6 +186,7 @@ class BoxRepositoryImpl:
                 "box_id": r["box_id"],
                 "box_number": r["box_number"],
                 "status": BoxStatus(r["status"]),
+                "branch_name": r["branch_name"],
             }
             for r in rows
         ]

@@ -3,9 +3,11 @@
 <div class="flash" style="margin-bottom:16px">
     <div style="margin-bottom:8px">
         ⚠️ Карта «{{ transfer.card_name }}» уже числится в
-        {%- for b in transfer.boxes %} {{ b.box_number }} ({{ b.status_label }}){% if not loop.last %},{% endif %}{% endfor %}.
+        {%- for b in transfer.boxes %} {{ b.box_number }} ({{ b.status_label }}{% if b.branch_name %}, филиал «{{ b.branch_name }}»{% endif %}){% if not loop.last %},{% endif %}{% endfor %}.
+        Перенос снимет её с этих коробок.
     </div>
-    <form hx-post="/packing/transfer-card" hx-target="#main-content" hx-swap="innerHTML" style="margin:0">
+    <form hx-post="/packing/transfer-card" hx-target="#main-content" hx-swap="innerHTML" style="margin:0"
+          hx-confirm="Перенести карту «{{ transfer.card_name }}» в эту коробку и снять её с перечисленных коробок?">
         <input type="hidden" name="card_id" value="{{ transfer.card_id }}">
         <button type="submit" class="btn btn-primary">Перенести в эту коробку</button>
     </form>

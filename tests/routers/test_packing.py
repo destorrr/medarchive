@@ -233,6 +233,7 @@ class TestCardInAnotherBoxGuard:
         assert r.status_code == 200
         assert "уже числится" in r.text
         assert "B-0001" in r.text and "Упаковывается" in r.text  # номер и статус старой коробки
+        assert "филиал «B1»" in r.text  # виден владелец коробки (полировка по quality-ревью)
         assert "Перенести в эту коробку" in r.text
         # в содержимом текущей коробки карты нет
         db = await self._db()

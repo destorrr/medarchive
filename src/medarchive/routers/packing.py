@@ -102,6 +102,7 @@ async def scan_card(request: Request, full_name: str = Form(...), user: User = D
                 {
                     "box_number": b["box_number"],
                     "status_label": BOX_STATUS_LABELS[b["status"]],
+                    "branch_name": b.get("branch_name"),
                 }
                 for b in exc.other_boxes
             ],
