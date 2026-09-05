@@ -1,45 +1,48 @@
-{# Заглушка Задачи 2: htmx-фрагмент результатов (полный макет .ci*/.bi* — Задача 3). #}
-{% if query %}
+{# Результаты /search — итоговый макет (вариант C + остатки B-1).
+   Состояния: idle (query пуст) → «ничего не найдено» → списки карт (.ci)
+   и коробок (.bi); пустые секции не рендерятся.
+   full_name и box_number приходят от роутера уже с экранированной подсветкой
+   <mark> (markupsafe.Markup); всё остальное — через Jinja-autoescape. #}
+{%- macro cards_plural(n) -%}{%- if n % 10 == 1 and n % 100 != 11 -%}{{ n }} карта{%- elif n % 10 >= 2 and n % 10 <= 4 and (n % 100 < 12 or n % 100 > 14) -%}{{ n }} карты{%- else -%}{{ n }} карт{%- endif -%}{%- endmacro -%}
+{% if not query %}
+<div class="card" id="state-empty">
+    <div class="empty-state">
+        <div class="icon">🔎</div>
+        <p>Введите ФИО пациента или номер коробки, чтобы найти карту и её место хранения.</p>
+        <p class="hint">Например: <b>Иванов</b> или <b>B-0010</b></p>
+    </div>
+</div>
+{% elif not cards and not boxes %}
+<div class="card" id="state-noresults">
+    <div class="empty-state">
+        <div class="icon">😕</div>
+        <p>По запросу «{{ query }}» ничего не найдено.</p>
+        <p class="hint">Проверьте написание или попробуйте часть ФИО / номера.</p>
+    </div>
+</div>
+{% else %}
 {% if cards %}
-<section class="search-section">
-    <h2>Карты ({{ cards|length }})</h2>
+<div class="card" id="card-sec">
+    <h3>🧑 Карты <span class="cnt">({{ cards|length }})</span></h3>
     {% for c in cards %}
     <div class="ci">
-        <div class="ci-fio">{{ c.full_name }}</div>
-        <span class="badge {{ c.status_badge }}">{{ c.status_label }}</span>
-        <div class="ci-place">
-        {%- if c.box_number -%}
-            {%- if c.place -%}
-                {{ c.place }}
-            {%- else -%}
-                в коробке {{ c.box_number }}
-            {%- endif -%}
-        {%- else -%}
-            нет активной коробки
-        {%- endif -%}
-        </div>
-        {% if c.stale %}
-        <div class="ci-stale">не выписана из коробок: {{ c.stale|join(", ") }}</div>
+        <div class="ci-top"><span class="ci-fio">{{ c.full_name }}</span><span class="badge {{ c.status_badge }}">{{ c.status_label }}</span></div>
+        {% if c.box_number %}
+        <div class="ci-detail">{% if c.place %}<span class="ci-place">{{ c.place }}</span>{% endif %}<span class="ci-ctx">в коробке {{ c.box_number }}</span></div>
+        {% else %}
+        <div class="ci-nobox">нет активной коробки</div>
         {% endif %}
+        {% if c.stale %}<div class="ci-stale">не выписана из коробок: {{ c.stale|join(", ") }}</div>{% endif %}
     </div>
     {% endfor %}
-</section>
+</div>
 {% endif %}
-
 {% if boxes %}
-<section class="search-section">
-    <h2>Коробки ({{ boxes|length }})</h2>
+<div class="card" id="box-sec">
+    <h3>📦 Коробки <span class="cnt">({{ boxes|length }})</span></h3>
     {% for b in boxes %}
-    <div class="bi">
-        <span class="bi-number">{{ b.box_number }}</span>
-        <span class="badge {{ b.status_badge }}">{{ b.status_label }}</span>
-        <span class="bi-meta">{{ b.place or "—" }} · {{ b.card_count }} карт</span>
-    </div>
+    <div class="bi"><span class="bi-num">{{ b.box_number }}</span><span class="badge {{ b.status_badge }}">{{ b.status_label }}</span><span class="bi-meta">{% if b.place %}{{ b.place }} · {% endif %}{{ cards_plural(b.card_count) }}</span></div>
     {% endfor %}
-</section>
-{% endif %}
-
-{% if not cards and not boxes %}
-<p class="search-empty">ничего не найдено</p>
+</div>
 {% endif %}
 {% endif %}

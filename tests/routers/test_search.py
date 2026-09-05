@@ -128,7 +128,7 @@ class TestSearchPage:
         assert "МедАрхив" not in r.text
         assert "Выход" not in r.text
         assert 'class="ci"' in r.text
-        assert "Карты (1)" in r.text
+        assert "Карты (1)" in _strip_tags(r.text)
 
     async def test_box_query_shows_boxes_hides_cards(self, search_client):
         """GET /search?query=B-0010 → секция коробок (номер, подпись «карт»),
@@ -137,10 +137,12 @@ class TestSearchPage:
         r = await search_client.get("/search", params={"query": "B-0010"})
         assert r.status_code == 200
         assert "B-0010" in r.text
-        assert "Коробки (1)" in r.text
-        assert "карт" in r.text
+        assert "Коробки (1)" in _strip_tags(r.text)
+        assert "1 карта" in _strip_tags(r.text)
+        assert "Секция А / Полка 1 · 1 карта" in _strip_tags(r.text)
+        assert 'class="ci"' not in r.text
         assert "Иванов Иван Иванович" not in r.text
-        assert "Карты (" not in r.text
+        assert "Карты" not in _strip_tags(r.text)
 
     async def test_no_matches_shows_empty_state(self, search_client):
         """Запрос без совпадений → «ничего не найдено»."""
@@ -199,6 +201,144 @@ class TestSearchPage:
         assert "&lt;script&gt;" in r.text
         assert "<script>alert" not in r.text
         assert "Смирнов" in _strip_tags(r.text)
+
+
+class TestSearchPageLayout:
+    """Задача 3 — итоговый макет (вариант C + остатки B-1): разметка карточек
+    .ci*/.bi*, idle-состояние, «ничего не найдено», склонение «N карт»."""
+
+    async def _add_second_placed_box(self, db, box_id=11, box_number="B-0003",
+                                     placed_at="2025-01-01 10:00:00"):
+        """Вторая размещённая коробка для карты 1 (старее актуальной) → stale."""
+        await db.execute(
+            "INSERT OR REPLACE INTO boxes (id, box_number, origin_branch_id, created_by, status) "
+            f"VALUES ({box_id}, '{box_number}', 1, 1, 'placed')"
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO box_cards (id, box_id, card_id) "
+            f"VALUES ({box_id * 100 + 2}, {box_id}, 1)"
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO box_placements (id, box_id, shelf_id, placed_at) "
+            f"VALUES ({box_id}, {box_id}, 2, '{placed_at}')"
+        )
+        await db.conn.commit()
+
+    async def test_page_has_full_mockup_markup(self, search_client):
+        """Страница поиска: поле (.search-box/.btn-clear), hint с .kbd, htmx-атрибуты
+        и области макета (.card, #search-results)."""
+        await _login(search_client)
+        r = await search_client.get("/search", params={"query": "иванов"})
+        assert r.status_code == 200
+        assert 'class="search-box"' in r.text
+        assert 'class="btn-clear"' in r.text
+        assert 'class="kbd"' in r.text
+        assert "Результаты обновляются по мере ввода" in r.text
+        assert 'id="search-results"' in r.text
+        assert 'hx-get="/search/results"' in r.text
+        assert 'hx-trigger="input changed delay:350ms, search"' in r.text
+        assert 'hx-target="#search-results"' in r.text
+        assert 'hx-swap="innerHTML"' in r.text
+
+    async def test_result_cards_follow_mockup_classes(self, search_client):
+        """Карточка результата по макету C: .ci-top с .ci-fio+бейджем, .ci-detail
+        с зелёным .ci-place и .ci-ctx «в коробке …», mark-подсветка."""
+        await _login(search_client)
+        r = await search_client.get("/search", params={"query": "иванов"})
+        assert r.status_code == 200
+        assert 'class="ci"' in r.text
+        assert 'class="ci-top"' in r.text
+        assert 'class="ci-fio"' in r.text
+        assert 'class="ci-detail"' in r.text
+        assert 'class="ci-place"' in r.text
+        assert 'class="ci-ctx"' in r.text
+        assert "в коробке B-0010" in r.text
+        assert "<mark>Иванов</mark>" in r.text
+        assert '<span class="badge badge-placed">Размещена</span>' in r.text
+
+    async def test_card_with_stale_boxes_shows_stale_line(self, search_client, db):
+        """Карта числится в нескольких активных коробках → серая строка
+        «не выписана из коробок: B-…» (остатки B-1), актуальная — с местом."""
+        await self._add_second_placed_box(db)
+        await _login(search_client)
+        r = await search_client.get("/search", params={"query": "иванов"})
+        assert r.status_code == 200
+        assert 'class="ci-stale"' in r.text
+        assert "не выписана из коробок: B-0003" in r.text
+        # Актуальная коробка — B-0010 (свежее размещение): место и «в коробке B-0010».
+        assert "Секция А / Полка 1" in r.text
+        assert "в коробке B-0010" in r.text
+
+    async def test_stale_line_in_htmx_fragment(self, search_client, db):
+        """Фрагмент /search/results показывает ту же строку остатков, без полной
+        страницы."""
+        await self._add_second_placed_box(db)
+        await _login(search_client)
+        r = await search_client.get("/search/results", params={"query": "иванов"})
+        assert r.status_code == 200
+        assert "не выписана из коробок: B-0003" in r.text
+        assert 'class="ci-stale"' in r.text
+        assert "<html" not in r.text.lower()
+
+    async def test_empty_query_shows_idle_state(self, search_client):
+        """GET /search без query → idle-карточка макета (🔎 «Введите ФИО …»,
+        примеры), без списков и «ничего не найдено»."""
+        await _login(search_client)
+        r = await search_client.get("/search")
+        assert r.status_code == 200
+        assert "Введите ФИО пациента или номер коробки" in r.text
+        assert "Иванов" in r.text  # пример в подсказке idle-состояния
+        assert "B-0010" in r.text
+        assert 'class="ci"' not in r.text
+        assert "ничего не найдено." not in r.text
+
+    async def test_no_results_state_escapes_query(self, search_client):
+        """«По запросу „…“ ничего не найдено»: query экранируется (дизайн, п.5)."""
+        await _login(search_client)
+        r = await search_client.get("/search", params={"query": "<script>x</script>"})
+        assert r.status_code == 200
+        assert "ничего не найдено" in r.text
+        assert "&lt;script&gt;x&lt;/script&gt;" in r.text
+        assert "<script>x</script>" not in r.text
+
+    async def test_card_section_hidden_and_box_meta(self, search_client, db):
+        """Коробка с двумя картами: секция «Карты» скрыта, .bi-meta —
+        «место · 2 карты» (склонение), номер коробки с mark."""
+        await db.execute(
+            "INSERT OR REPLACE INTO cards (id, full_name, status) "
+            "VALUES (5, 'Аксёнов Алексей Алексеевич', 'placed')"
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO cards (id, full_name, status) "
+            "VALUES (6, 'Аксёнова Анна Алексеевна', 'placed')"
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO boxes (id, box_number, origin_branch_id, created_by, status) "
+            "VALUES (12, 'B-0099', 1, 1, 'placed')"
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO box_cards (id, box_id, card_id) VALUES (2001, 12, 5)"
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO box_cards (id, box_id, card_id) VALUES (2002, 12, 6)"
+        )
+        await db.execute(
+            "INSERT OR REPLACE INTO box_placements (id, box_id, shelf_id, placed_at) "
+            "VALUES (12, 12, 2, '2026-02-01 10:00:00')"
+        )
+        await db.conn.commit()
+
+        await _login(search_client)
+        r = await search_client.get("/search", params={"query": "B-0099"})
+        assert r.status_code == 200
+        assert 'class="bi"' in r.text
+        assert 'class="bi-num"' in r.text
+        assert 'class="bi-meta"' in r.text
+        assert "<mark>B-0099</mark>" in r.text
+        text = _strip_tags(r.text)
+        assert "Секция А / Полка 2 · 2 карты" in text
+        assert "Карты" not in text
+        assert 'class="ci"' not in r.text
 
 
 class TestSearchPostRedirect:
