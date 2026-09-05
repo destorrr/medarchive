@@ -2,9 +2,11 @@
 {% block content %}
 <h1>📝 Новая заявка на возврат</h1>
 <style>
-    /* Страница /requests/new — редизайн контура возврата (макет v3, экран 1).
-       Базовые стили (таблицы .data, .badge-*, .btn, .card, флеш) — в base.html;
-       здесь только локальные для страницы. */
+    /* Страница /requests/new — живой поиск (макет v5, экран 1; задача 3
+       раунда 2): крупный инпут как в /search, без кнопки «Найти» и без
+       подсказки про филиал; результаты — htmx-фрагмент /requests/new/search
+       в #results по мере ввода. Базовые стили (.card, .badge-*, .btn) — в
+       base.html; здесь локальные для страницы и фрагмента. */
     .search-box { display: flex; gap: 8px; align-items: center; }
     .search-box input {
         flex: 1; padding: 12px 14px; border: 2px solid #ddd; border-radius: 8px;
@@ -12,61 +14,47 @@
     }
     .search-box input:focus { border-color: #e94560; }
     .search-box input::placeholder { color: #aaa; }
+    .search-hint { margin-top: 8px; font-size: 12px; color: #888; }
     .card h3 { font-size: 15px; margin-bottom: 10px; color: #1a1a2e; }
     .card h3 .muted { font-weight: 400; }
-    .search-hint { margin-top: 12px; font-size: 12.5px; color: #888; }
-    .search-hint b { color: #1a1a2e; }
-    td.act form { display: inline; }
+
+    /* Строка результата (макет v5, экран 1/1б): слева ФИО + статус-бейдж,
+       справа кнопка «Запросить» или текст guard-состояния */
+    .row-hit { display: flex; align-items: center; gap: 14px; padding: 10px 2px; border-bottom: 1px solid #f0f0f0; }
+    .row-hit:last-child { border-bottom: none; }
+    .row-hit .hit-main { flex: 1; min-width: 0; }
+    .row-hit .hit-note { margin-top: 3px; }
+    .row-hit .hit-state { font-size: 13px; color: #888; white-space: nowrap; }
+    .row-hit .hit-state a { color: #1a1a2e; }
+
+    /* Пустые состояния (idle / ничего не найдено) */
     .empty-state { text-align: center; padding: 24px 16px; }
     .empty-state .icon { font-size: 30px; margin-bottom: 8px; }
     .empty-state p { color: #666; }
+    .empty-state .hint { margin-top: 6px; font-size: 12px; color: #999; }
 </style>
 
 <div class="card">
-    <form method="post" action="/requests/new">
-        <div class="form-group">
-            <label for="search_name">Поиск карты (ФИО)</label>
-            <div class="search-box">
-                <input type="text" id="search_name" name="search_name" autofocus
-                       value="{{ search_name }}"
-                       placeholder="Фамилия или ФИО…" autocomplete="off">
-                <button type="submit" class="btn btn-primary">Найти</button>
-            </div>
+    <div class="form-group">
+        <label for="request-q">Поиск карты (ФИО)</label>
+        <div class="search-box">
+            <input type="text" id="request-q" name="query"
+                   placeholder="Фамилия или ФИО…" autocomplete="off" autofocus
+                   hx-get="/requests/new/search"
+                   hx-trigger="input changed delay:350ms, search"
+                   hx-target="#results" hx-swap="innerHTML">
         </div>
-    </form>
-    {% if has_branch %}
-    <div class="search-hint">Филиал возврата — <b>{{ user_branch }}</b> (ваш, из учётной записи). Поле выбора филиала убрано.</div>
-    {% endif %}
-</div>
-
-{% if results is not none %}
-<div class="card">
-    {% if results %}
-    <h3>Найдено карт <span class="muted">({{ results|length }})</span></h3>
-    <table class="data">
-        <colgroup><col><col style="width:140px"><col style="width:150px"></colgroup>
-        <thead><tr><th>ФИО</th><th>Статус</th><th></th></tr></thead>
-        <tbody>
-        {% for c in results %}
-        <tr>
-            <td class="fio">{{ c.full_name }}</td>
-            <td><span class="badge {{ c.status_badge }}">{{ c.status_label }}</span></td>
-            <td class="act">
-                <form method="post" action="/requests/new">
-                    <input type="hidden" name="card_id" value="{{ c.id }}">
-                    <button type="submit" class="btn btn-primary">Запросить</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">
-        <div class="icon">🔍</div>
-        <p>По запросу «{{ search_name }}» карт не найдено.</p>
+        <div class="search-hint">Результаты обновляются по мере ввода · поиск без учёта регистра</div>
     </div>
-    {% endif %}
 </div>
-{% endif %}
+<div id="results">
+    {% include "request_new_results.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    // Возврат фокуса в поле поиска при загрузке страницы (после флеш-ошибки)
+    var input = document.getElementById('request-q');
+    if (input) { input.focus(); }
+</script>
 {% endblock %}

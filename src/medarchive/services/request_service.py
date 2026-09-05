@@ -14,6 +14,20 @@ class RequestService:
     async def create_request(
         self, card_id: int, requested_by: int, target_branch_id: int | None, target_department: bool = False
     ) -> dict:
+        """Создать заявку на возврат карты (guard дублей, задача 3 раунда 2).
+
+        На карту с активной заявкой (new/in_progress) вторую создать нельзя:
+        проверка ДО INSERT (SELECT ... LIMIT 1) → ValueError
+        «На карту уже есть активная заявка». Guard на сервере — основной
+        (UI-скрытие кнопки в живой выдаче /requests/new — вторично: форма
+        может прийти устаревшей, POST защищён здесь).
+        """
+        active = await self.db.fetch_one(
+            "SELECT id FROM requests WHERE card_id = ? AND status IN ('new', 'in_progress') LIMIT 1",
+            (card_id,),
+        )
+        if active is not None:
+            raise ValueError("На карту уже есть активная заявка")
         cursor = await self.db.execute(
             """INSERT INTO requests (card_id, requested_by, target_branch_id, target_department, created_at, status)
                VALUES (?, ?, ?, ?, ?, 'new')""",

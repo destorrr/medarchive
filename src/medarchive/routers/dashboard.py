@@ -228,37 +228,20 @@ def highlight_match(text: str, query: str) -> Markup:
     )
 
 
-def _request_new_context(
-    request: Request, user: User, *, results, search_name: str
-) -> dict:
-    """Контекст страницы /requests/new: базовый + результаты поиска.
+def _request_new_context(request: Request, user: User) -> dict:
+    """Контекст страницы /requests/new (задача 3 раунда 2): базовый + username.
 
-    has_branch — реально ли к учётной записи привязан филиал: подсказку
-    про авто-филиал показываем только тогда (у роли branch там имя филиала,
-    у пользователя без филиала — подпись роли, подсказка не нужна).
+    Живой поиск карт — GET-фрагмент /requests/new/search, который рендерится
+    в #results по мере ввода (как /search); страница больше ничего не несёт:
+    ни результатов (раньше — рендер после POST search_name), ни подсказки
+    про филиал (has_branch удалена вместе с подсказкой).
     """
     ctx = _menu_context(user)
     ctx.update({
         "request": request,
         "username": user.username,
-        "results": results,
-        "search_name": search_name,
-        "has_branch": user.branch_id is not None,
     })
     return ctx
-
-
-def _card_result_row(card) -> dict:
-    """Строка результата поиска карты: сырой статус + русская подпись
-    (CARD_STATUS_LABELS) и класс бейджа badge-<status> для шаблона."""
-    status = card.status.value
-    return {
-        "id": card.id,
-        "full_name": card.full_name,
-        "status": status,
-        "status_label": _CARD_STATUS_LABELS_BY_VALUE.get(status, status),
-        "status_badge": f"badge-{status}",
-    }
 
 
 def _prepare_search_rows(cards: list[dict], boxes: list[dict], query: str):
@@ -412,70 +395,124 @@ async def my_shipments(
 
 @router.get("/requests/new")
 async def request_new_page(request: Request, user: User = Depends(require_role(UserRole.branch, UserRole.admin))):
-    """Страница новой заявки: форма поиска карты + подсказка про авто-филиал.
-    Селект филиала убран — филиал возврата берётся из учётной записи."""
-    ctx = _request_new_context(request, user, results=None, search_name="")
+    """Страница новой заявки: живой htmx-поиск карт (задача 3 раунда 2).
+
+    Крупный инпут (как /search) шлёт GET /requests/new/search во фрагмент
+    #results по мере ввода; кнопка «Найти», подсказка «Филиал возврата — …»
+    и POST-ветка поиска удалены — создание идёт только по card_id из формы
+    строки результата. Флеш (guard дублей/ошибки) — через _render_page."""
+    ctx = _request_new_context(request, user)
     return _render_page(request, "request_new.html", ctx)
 
 
-@router.post("/requests/new")
-async def request_new_search_or_create(
+@router.get("/requests/new/search")
+async def request_new_search_fragment(
     request: Request,
-    search_name: str | None = Form(None),
+    query: str | None = None,
+    user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """htmx-фрагмент живого поиска карт для /requests/new (задача 3 раунда 2).
+
+    Поиск по ФИО — подстрока в Python c .lower() (кириллица регистро-
+    независимо; фаза 1 как у SearchService). Для найденных карт одним
+    запросом IN (...) подтягиваются активные заявки (new/in_progress):
+    has_active — любая активная, my_active — активная заявка текущего
+    пользователя (по requested_by). В строки кладутся русская подпись
+    статуса (CARD_STATUS_LABELS) и класс бейджа; шаблон request_new_results
+    рисует кнопку «Запросить» только если активной заявки нет (серверный
+    guard в RequestService.create_request — основной)."""
+    query = (query or "").strip()
+    cards: list[dict] = []
+    if query:
+        needle = query.lower()
+        rows = await db.fetch_all(
+            "SELECT id, full_name, status FROM cards ORDER BY full_name"
+        )
+        cards = [
+            {"id": r["id"], "full_name": r["full_name"], "status": r["status"]}
+            for r in rows
+            if needle in r["full_name"].lower()
+        ]
+        if cards:
+            ids = tuple(c["id"] for c in cards)
+            placeholders = ",".join("?" for _ in ids)
+            active = await db.fetch_all(
+                f"""SELECT card_id, requested_by FROM requests
+                    WHERE card_id IN ({placeholders}) AND status IN ('new', 'in_progress')""",
+                ids,
+            )
+            mine = {a["card_id"] for a in active if a["requested_by"] == user.id}
+            anyone = {a["card_id"] for a in active}
+            for c in cards:
+                cid = c["id"]
+                status = c["status"]
+                c["has_active"] = cid in anyone
+                c["my_active"] = cid in mine
+                c["status_label"] = _CARD_STATUS_LABELS_BY_VALUE.get(status, status)
+                c["status_badge"] = f"badge-{status}"
+    ctx = {"request": request, "query": query, "cards": cards}
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="request_new_results.html", context=ctx
+    )
+
+
+@router.post("/requests/new")
+async def request_new_create(
+    request: Request,
     card_id: int | None = Form(None),
     user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
     db: Database = Depends(get_db),
 ):
-    """POST /requests/new: поиск карты по ФИО или создание заявки.
+    """POST /requests/new — создание заявки на возврат по card_id.
 
-    Создание — с авто-филиалом: target_branch_id берётся из user.branch_id,
-    форма его больше не шлёт (селект убран). Если к учётной записи филиал
-    не привязан — 400 с флеш-ошибкой вместо 500.
+    Параметр search_name из POST убран: поиск — живой GET-фрагмент
+    /requests/new/search, форма строки результата шлёт только hidden card_id
+    (задача 3 раунда 2). Филиал возврата — авто из user.branch_id (раунд 1,
+    селект убран); без филиала — 400 со страницей и текстом (не 500).
+    Guard дублей (активная заявка new/in_progress на карту уже есть) ловится
+    как ValueError → 303 на /requests/new с флешем-error: пользователь
+    остаётся на форме и сразу видит состояние карты в живой выдаче.
     """
+    if card_id is None:
+        return _flash_redirect("/requests/new", "error", "Не указана карта для заявки.")
+
+    target_branch_id = user.branch_id
+    if target_branch_id is None:
+        ctx = _request_new_context(request, user)
+        ctx["flash"] = {"type": "error", "text": "К вашей учётной записи не привязан филиал"}
+        response = request.app.state.templates.TemplateResponse(
+            request=request, name="request_new.html", context=ctx, status_code=400
+        )
+        # старый flash-cookie (если был) не должен всплыть на странице ошибки
+        response.delete_cookie("ma_flash", path="/")
+        return response
+
+    branch_name = getattr(user, "branch_name", None) or ""
+    if not branch_name:
+        row = await db.fetch_one(
+            "SELECT name FROM branches WHERE id = ?", (target_branch_id,)
+        )
+        branch_name = row["name"] if row else ""
+
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     req_service = RequestService(db, card_repo, box_repo)
-
-    # Phase 1: поиск карты — строки с русской подписью статуса и бейджем.
-    if search_name:
-        cards = await card_repo.find_by_name(search_name)
-        results = [_card_result_row(c) for c in cards]
-        ctx = _request_new_context(request, user, results=results, search_name=search_name)
-        return _render_page(request, "request_new.html", ctx)
-
-    # Phase 2: создание заявки с авто-филиалом из учётной записи.
-    if card_id:
-        target_branch_id = user.branch_id
-        if target_branch_id is None:
-            ctx = _request_new_context(request, user, results=None, search_name="")
-            ctx["flash"] = {"type": "error", "text": "К вашей учётной записи не привязан филиал"}
-            response = request.app.state.templates.TemplateResponse(
-                request=request, name="request_new.html", context=ctx, status_code=400
-            )
-            # старый flash-cookie (если был) не должен всплыть на странице ошибки
-            response.delete_cookie("ma_flash", path="/")
-            return response
-        branch_name = getattr(user, "branch_name", None) or ""
-        if not branch_name:
-            row = await db.fetch_one(
-                "SELECT name FROM branches WHERE id = ?", (target_branch_id,)
-            )
-            branch_name = row["name"] if row else ""
+    try:
         await req_service.create_request(
             card_id=card_id,
             requested_by=user.id,
             target_branch_id=target_branch_id,
             target_department=False,
         )
-        return _flash_redirect(
-            "/requests/my",
-            "success",
-            f"Заявка на возврат создана. Карта будет доставлена в «{branch_name}».",
-        )
-
-    # Ни поиск, ни создание (пустой POST) — просто страница.
-    ctx = _request_new_context(request, user, results=None, search_name="")
-    return _render_page(request, "request_new.html", ctx)
+    except ValueError as e:
+        # guard дублей: активная заявка (своя или чужая) уже есть на карту
+        return _flash_redirect("/requests/new", "error", str(e))
+    return _flash_redirect(
+        "/requests/my",
+        "success",
+        f"Заявка на возврат создана. Карта будет доставлена в «{branch_name}».",
+    )
 
 
 @router.get("/requests/my")

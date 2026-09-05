@@ -29,34 +29,118 @@ async def _login(client, role="branch1"):
 
 
 class TestRequestNew:
+    """Задача 3 раунда 2 редизайна контура возврата: /requests/new — живой
+    htmx-поиск карт (GET /requests/new/search, подстрока .lower() — кириллица
+    регистронезависимо, как /search фаза 1), guard дублей на сервере
+    (RequestService.create_request), подсказка про филиал и кнопка «Найти»
+    удалены; POST принимает только card_id (авто-филиал из учётки, раунд 1)."""
+
     async def test_request_new_page_renders(self, req_client):
         await _login(req_client)
         r = await req_client.get("/requests/new")
         assert r.status_code == 200
         assert "заявк" in r.text.lower() or "поиск" in r.text.lower()
 
-    async def test_auto_branch_hint_on_search_page(self, req_client):
-        """GET /requests/new: подсказка про авто-филиал с именем филиала
-        пользователя; селекта филиала (target_branch_id) на странице нет."""
+    async def test_page_has_live_search_no_hint_no_find_button(self, req_client):
+        """GET /requests/new: живой поиск (инпут hx-get=/requests/new/search
+        с debounce, контейнер #results); подсказка «Филиал возврата» и
+        кнопка «Найти» отсутствуют; старой POST-формы поиска (search_name)
+        и селекта филиала (target_branch_id) на странице нет."""
         await _login(req_client)
         r = await req_client.get("/requests/new")
         assert r.status_code == 200
-        assert "Филиал возврата" in r.text
-        assert "B1" in r.text  # имя филиала пользователя branch1 (branch_id=1)
-        assert "(ваш, из учётной записи)" in r.text
-        assert "Поле выбора филиала убрано" in r.text
+        assert "Филиал возврата" not in r.text
+        assert "(ваш, из учётной записи)" not in r.text
+        assert ">Найти</button>" not in r.text
+        assert "Результаты обновляются по мере ввода" in r.text
+        # живой htmx-поиск: инпут + целевой контейнер фрагмента
+        assert 'hx-get="/requests/new/search"' in r.text
+        assert 'hx-trigger="input changed delay:350ms, search"' in r.text
+        assert 'id="results"' in r.text
+        assert 'name="search_name"' not in r.text
         assert "target_branch_id" not in r.text
 
-    async def test_create_request_uses_user_branch(self, req_client, db):
-        """POST create БЕЗ target_branch_id (форма селект не шлёт): заявка
-        создаётся с target_branch_id == user.branch_id; 303 на /requests/my."""
+    async def test_live_search_finds_by_substring_case_insensitive(self, req_client):
+        """Живой поиск по ФИО — подстрока, регистронезависимо (кириллица:
+        «ИВАНОВ», «иванов», «Иванов И.И.» находят карту «Иванов И.И.»)."""
         await _login(req_client)
-        # Поиск карты: результат — русская подпись статуса, бейдж, кнопка «Запросить».
-        r = await req_client.post("/requests/new", data={"search_name": "Иванов И.И."})
+        for q in ("ИВАНОВ", "иванов", "Иванов И.И."):
+            r = await req_client.get("/requests/new/search", params={"query": q})
+            assert r.status_code == 200
+            assert "Иванов И.И." in r.text
+
+    async def test_live_search_row_request_form(self, req_client):
+        """Карта без активной заявки: в строке фрагмента кнопка «Запросить»
+        в форме POST /requests/new с hidden card_id; статус — русский бейдж
+        «Размещена» (badge-placed), заголовок «Найдено карт (1)»."""
+        await _login(req_client)
+        r = await req_client.get("/requests/new/search", params={"query": "иванов"})
+        assert r.status_code == 200
+        assert "Найдено карт" in r.text
+        assert "Иванов И.И." in r.text
+        assert '<span class="badge badge-placed">Размещена</span>' in r.text
+        assert 'action="/requests/new"' in r.text
+        assert 'name="card_id" value="1"' in r.text
+        assert ">Запросить</button>" in r.text
+
+    async def test_live_search_my_active_hides_button(self, req_client, db):
+        """Карта под МОЕЙ активной заявкой: кнопки «Запросить» нет, вместо
+        неё строка «заявка уже создана» со ссылкой на /requests/my."""
+        await _login(req_client)
+        await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
+        r = await req_client.get("/requests/new/search", params={"query": "иванов"})
+        assert r.status_code == 200
+        assert ">Запросить</button>" not in r.text
+        assert "заявка уже создана" in r.text
+        assert 'href="/requests/my"' in r.text
+
+    async def test_live_search_foreign_active_shows_requested(self, req_client, db):
+        """Карта под ЧУЖОЙ активной заявкой (другой branch-пользователь):
+        кнопки нет, текст «карта уже запрошена» (серверный guard всё равно
+        блокирует создание)."""
+        await _login(req_client)
+        await db.execute(
+            "INSERT OR REPLACE INTO users (id, username, password_hash, role, branch_id) "
+            "VALUES (4, 'branch2', 'x', 'branch', 2)"
+        )
+        await db.execute(
+            "INSERT INTO requests (card_id, requested_by, target_branch_id, "
+            "target_department, created_at, status) VALUES (1, 4, 2, 0, '2026-09-06 00:05:00', 'new')"
+        )
+        await db.conn.commit()
+        r = await req_client.get("/requests/new/search", params={"query": "иванов"})
+        assert r.status_code == 200
+        assert ">Запросить</button>" not in r.text
+        assert "карта уже запрошена" in r.text
+
+    async def test_search_empty_query_idle_state(self, req_client):
+        """Пустой query: пустое состояние-подсказка (не «Найдено карт»)."""
+        await _login(req_client)
+        r = await req_client.get("/requests/new/search")
+        assert r.status_code == 200
+        assert "Найдено карт" not in r.text
+        assert ">Запросить</button>" not in r.text
+
+    async def test_search_no_results_empty_state(self, req_client):
+        """Живой поиск без совпадений: пустое состояние «не найдено»,
+        а не голая таблица с кнопками."""
+        await _login(req_client)
+        r = await req_client.get("/requests/new/search", params={"query": "Неизвестный Пациент"})
+        assert r.status_code == 200
+        assert "не найдено" in r.text
+        assert ">Запросить</button>" not in r.text
+
+    async def test_create_request_uses_user_branch(self, req_client, db):
+        """POST create БЕЗ target_branch_id (живой поиск — GET-фрагмент,
+        форма шлёт только card_id): заявка с target_branch_id == user.branch_id;
+        303 на /requests/my."""
+        await _login(req_client)
+        # Живой поиск находит карту: русская подпись статуса, бейдж, кнопка «Запросить».
+        r = await req_client.get("/requests/new/search", params={"query": "иванов"})
         assert r.status_code == 200
         assert "Иванов И.И." in r.text
         assert "Размещена" in r.text  # русская подпись placed через CARD_STATUS_LABELS
-        assert "Запросить" in r.text
+        assert ">Запросить</button>" in r.text
         assert "target_branch_id" not in r.text
         # Создание заявки без поля филиала в форме.
         r = await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
@@ -87,12 +171,42 @@ class TestRequestNew:
         cnt = await db.fetch_one("SELECT COUNT(*) as cnt FROM requests")
         assert cnt["cnt"] == 0
 
-    async def test_search_no_results_empty_state(self, req_client):
-        """Поиск без совпадений: пустое состояние, а не голая таблица."""
+    async def test_create_duplicate_own_active_blocked(self, req_client, db):
+        """Guard дублей на сервере: повторный POST create на карту со СВОЕЙ
+        активной заявкой → 303 на /requests/new + флеш-error «активная
+        заявка»; вторая заявка не создаётся (count == 1)."""
         await _login(req_client)
-        r = await req_client.post("/requests/new", data={"search_name": "Неизвестный Пациент"})
-        assert r.status_code == 200
-        assert "не найдено" in r.text
+        r1 = await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
+        assert r1.status_code == 303
+        r2 = await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
+        assert r2.status_code == 303
+        assert "/requests/new" in r2.headers["location"]
+        cnt = await db.fetch_one("SELECT COUNT(*) as cnt FROM requests")
+        assert cnt["cnt"] == 1
+        page = await req_client.get("/requests/new")
+        assert "На карту уже есть активная заявка" in page.text
+
+    async def test_create_on_foreign_active_request_blocked(self, req_client, db):
+        """Guard дублей на сервере: POST create на карту с ЧУЖОЙ активной
+        заявкой → 303 + флеш-error, новая заявка не создана (count не вырос)."""
+        await _login(req_client)
+        await db.execute(
+            "INSERT OR REPLACE INTO users (id, username, password_hash, role, branch_id) "
+            "VALUES (4, 'branch2', 'x', 'branch', 2)"
+        )
+        await db.execute(
+            "INSERT INTO requests (card_id, requested_by, target_branch_id, "
+            "target_department, created_at, status) VALUES (1, 4, 2, 0, '2026-09-06 00:05:00', 'new')"
+        )
+        await db.conn.commit()
+        cnt_before = (await db.fetch_one("SELECT COUNT(*) as cnt FROM requests"))["cnt"]
+        r = await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
+        assert r.status_code == 303
+        assert "/requests/new" in r.headers["location"]
+        cnt = await db.fetch_one("SELECT COUNT(*) as cnt FROM requests")
+        assert cnt["cnt"] == cnt_before  # новая заявка не создана
+        page = await req_client.get("/requests/new")
+        assert "На карту уже есть активная заявка" in page.text
 
     async def test_my_requests_page(self, req_client, db):
         await _login(req_client)

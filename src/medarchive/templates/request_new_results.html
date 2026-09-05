@@ -1,0 +1,46 @@
+{# Фрагмент живого поиска карт /requests/new (задача 3 раунда 2, макет v5
+   экраны 1/1б): idle (пустой ввод) → «ничего не найдено» → список строк.
+   Рендерится и как htmx-ответ в #results, и инклюдом на GET-странице
+   (query пуст — idle-состояние). Для карт с активной заявкой кнопки
+   «Запросить» нет: своя (my_active) — «заявка уже создана → мои заявки»,
+   чужая (has_active) — «карта уже запрошена»; серверный guard в
+   RequestService.create_request всё равно блокирует создание второй. #}
+{% if not query %}
+<div class="card">
+    <div class="empty-state">
+        <div class="icon">🔎</div>
+        <p>Введите фамилию или ФИО, чтобы найти карту.</p>
+        <p class="hint">Например: <b>Иванов</b></p>
+    </div>
+</div>
+{% elif not cards %}
+<div class="card">
+    <div class="empty-state">
+        <div class="icon">😕</div>
+        <p>По запросу «{{ query }}» карт не найдено.</p>
+        <p class="hint">Проверьте написание или попробуйте часть ФИО.</p>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <h3>Найдено карт <span class="muted">({{ cards|length }})</span></h3>
+    {% for c in cards %}
+    <div class="row-hit">
+        <div class="hit-main">
+            <div class="fio">{{ c.full_name }}</div>
+            <div class="hit-note"><span class="badge {{ c.status_badge }}">{{ c.status_label }}</span></div>
+        </div>
+        {% if c.my_active %}
+        <span class="hit-state">⏳ заявка уже создана — <a href="/requests/my">мои заявки</a></span>
+        {% elif c.has_active %}
+        <span class="hit-state">карта уже запрошена</span>
+        {% else %}
+        <form method="post" action="/requests/new">
+            <input type="hidden" name="card_id" value="{{ c.id }}">
+            <button type="submit" class="btn btn-primary">Запросить</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
