@@ -1,23 +1,38 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>📥 Приём возврата</h1>
+<style>
+    /* Страница /receive-return — редизайн контура возврата (макет v3, экран 4).
+       Двухшаговый приём: сканер → превью во фрагменте #scan-result (стили
+       таблиц .data/.badge-*/.table-footer — в base.html, h3 карточки — в
+       receive_return_result.html). */
+    .search-box { display: flex; gap: 8px; align-items: center; }
+    .search-box input {
+        flex: 1; padding: 12px 14px; border: 2px solid #ddd; border-radius: 8px;
+        font: inherit; font-size: 16px; outline: none; background: #fff; color: #1a1a2e;
+    }
+    .search-box input:focus { border-color: #e94560; }
+    .search-box input::placeholder { color: #aaa; }
+</style>
 
-<div class="card" style="margin-bottom:16px">
-    <p style="color:#666;margin-bottom:12px">
-        Отсканируйте QR-код возвращаемой карты или введите её ID.
-    </p>
-    <form method="post" action="/receive-return/confirm">
-        <label style="display:block;font-weight:600;margin-bottom:4px">Сканер (ID карты):</label>
-        <input type="text" name="card_id" autofocus
-               style="width:100%;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:16px"
-               placeholder="Отсканируйте QR или введите ID карты...">
-        <button type="submit" class="btn btn-primary" style="margin-top:12px">✅ Подтвердить получение</button>
+<div class="card">
+    <form hx-post="/receive-return/check" hx-target="#scan-result">
+        <div class="form-group">
+            <label for="card_id">Сканер (QR-код или ID карты)</label>
+            <div class="search-box">
+                <input type="text" id="card_id" name="card_id" autofocus autocomplete="off"
+                       placeholder="Отсканируйте QR или введите ID карты…"
+                       hx-on::after-request="this.value='';this.focus()">
+                <button type="submit" class="btn btn-primary">Проверить</button>
+            </div>
+        </div>
     </form>
 </div>
+<div id="scan-result"></div>
 {% endblock %}
 {% block scripts %}
 <script>
-    // Возврат фокуса в поле сканера после отправки формы
+    // Возврат фокуса в поле сканера при загрузке страницы (после флеш-ошибки)
     var input = document.querySelector('input[autofocus]');
     if (input) { input.focus(); }
 </script>

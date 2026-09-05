@@ -85,6 +85,76 @@ class ReturnService:
         row = await self.db.fetch_one("SELECT * FROM shipments WHERE id = ?", (cursor.lastrowid,))
         return dict(row) if row else {}
 
+    async def _find_active_return_shipment(self, card_id: int):
+        """Активная возвратная отправка карты (строки shipments) или None.
+
+        Общая выборка для receive_return (приём) и get_receivable_card_info
+        (превью): 1) одиночная карта — kind='card' по card_id; 2) карта в
+        коробке возврата — kind='box' через box_cards (removed_at IS NULL).
+        Семантика поиска одна, состояние не меняется. Возвращает id/box_id/
+        kind/to_branch_id/from_branch_id — для превью нужен kind и адресат.
+        """
+        shipment = await self.db.fetch_one(
+            """SELECT id, box_id, kind, to_branch_id, from_branch_id
+               FROM shipments
+               WHERE card_id = ? AND status = 'issued' AND kind = 'card'""",
+            (card_id,),
+        )
+        if shipment is not None:
+            return shipment
+        return await self.db.fetch_one(
+            """SELECT s.id, s.box_id, s.kind, s.to_branch_id, s.from_branch_id
+               FROM shipments s
+               JOIN box_cards bc ON bc.box_id = s.box_id
+               WHERE bc.card_id = ? AND bc.removed_at IS NULL
+                 AND s.status = 'issued' AND s.kind = 'box'
+               LIMIT 1""",
+            (card_id,),
+        )
+
+    async def get_receivable_card_info(self, card_id: int) -> dict:
+        """Превью карты для /receive-return/check — проверка БЕЗ изменения
+        состояния.
+
+        Те же проверки, что в receive_return (карта есть, статус in_transit,
+        есть активная возвратная отправка), но без UPDATE: страница
+        «Проверить» не должна двигать статусы. Ошибки — теми же текстами
+        ValueError (их покажет и подтверждение).
+
+        Возврат: card_id, full_name, status, shipment_kind ('card'|'box'),
+        destination — имя филиала-получателя или None. Для kind='card'
+        назначение = to_branch_id (филиал-заказчик возврата из заявки); для
+        kind='box' в shipments to_branch_id нет — есть только from_branch_id
+        (филиал, откуда ушла RB-коробка), получатель в данных не закодирован,
+        поэтому destination=None (интерфейс показывает «—», а не врёт
+        отправителем как назначением).
+        """
+        card = await self.card_repo.get_by_id(card_id)
+        if card is None:
+            raise ValueError("Карта не найдена")
+        if card.status != CardStatus.in_transit:
+            raise ValueError(
+                f"Карта должна быть в статусе 'in_transit', сейчас '{card.status.value}'"
+            )
+        shipment = await self._find_active_return_shipment(card_id)
+        if shipment is None:
+            raise ValueError("Не найдена активная отправка для приёмки возврата")
+
+        info = {
+            "card_id": card.id,
+            "full_name": card.full_name,
+            "status": card.status.value,
+            "shipment_kind": shipment["kind"],
+            "destination": None,
+        }
+        if shipment["kind"] == "card" and shipment["to_branch_id"] is not None:
+            row = await self.db.fetch_one(
+                "SELECT name FROM branches WHERE id = ?", (shipment["to_branch_id"],)
+            )
+            if row is not None:
+                info["destination"] = row["name"]
+        return info
+
     async def receive_return(self, card_id: int, user_id: int) -> None:
         card = await self.card_repo.get_by_id(card_id)
         if card is None:
@@ -92,21 +162,7 @@ class ReturnService:
         if card.status != CardStatus.in_transit:
             raise ValueError(f"Карта должна быть в статусе 'in_transit', сейчас '{card.status.value}'")
 
-        # 1) Одиночная карта — shipment kind='card'
-        shipment = await self.db.fetch_one(
-            "SELECT id, box_id FROM shipments WHERE card_id = ? AND status = 'issued' AND kind = 'card'",
-            (card_id,),
-        )
-        # 2) Карта в коробке возврата — shipment kind='box' через box_cards
-        if shipment is None:
-            shipment = await self.db.fetch_one(
-                """SELECT s.id, s.box_id FROM shipments s
-                   JOIN box_cards bc ON bc.box_id = s.box_id
-                   WHERE bc.card_id = ? AND bc.removed_at IS NULL
-                     AND s.status = 'issued' AND s.kind = 'box'
-                   LIMIT 1""",
-                (card_id,),
-            )
+        shipment = await self._find_active_return_shipment(card_id)
 
         if shipment is None:
             raise ValueError("Не найдена активная отправка для приёмки возврата")

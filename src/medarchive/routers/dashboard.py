@@ -554,11 +554,58 @@ async def receive_return_page(
     request: Request,
     user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
 ):
-    """Страница приёма возврата: сканер карты."""
+    """Страница приёма возврата (редизайн контура возврата, задача 5).
+
+    Двухшаговый паттерн /receive: карточка сканера (input card_id + кнопка
+    «Проверить») с htmx-формой на /receive-return/check (target #scan-result),
+    результат проверки приходит фрагментом в #scan-result. Рендер через
+    _render_page — одноразовый флеш (ошибка подтверждения) показывается
+    вверху страницы и удаляется из cookie.
+    """
     ctx = _menu_context(user)
     ctx.update({"request": request, "username": user.username})
+    return _render_page(request, "receive_return.html", ctx)
+
+
+@router.post("/receive-return/check")
+async def receive_return_check(
+    request: Request,
+    card_id: int = Form(...),
+    user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """Проверка карты для приёма возврата (htmx-фрагмент в #scan-result).
+
+    Состояние НЕ меняется — только превью (return_service.get_receivable_card_info:
+    карта есть, статус in_transit, есть активная возвратная отправка).
+    Успех — карточка «Карта к приёму» (таблица Карта | Статус | Назначение)
+    с ОБЫЧНОЙ формой подтверждения (POST /receive-return/confirm, не htmx):
+    успех подтверждения — 303-редирект на /my-shipments, и 303 браузер
+    выполняет штатно только для обычной навигации. Ошибки — фрагмент
+    с div.flash.flash-error и текстом сервиса; статус 200 (htmx не подменяет
+    контент на 4xx/5xx по умолчанию).
+    """
+    card_repo = CardRepositoryImpl(db)
+    box_repo = BoxRepositoryImpl(db)
+    courier_repo = CourierRepositoryImpl(db)
+    return_service = ReturnService(db, card_repo, box_repo, courier_repo)
+
+    ctx = {"request": request, "info": None, "error": None}
+    try:
+        info = await return_service.get_receivable_card_info(card_id)
+    except ValueError as e:
+        ctx["error"] = str(e)
+        return request.app.state.templates.TemplateResponse(
+            request=request, name="receive_return_result.html", context=ctx
+        )
+    # Обогащение строки для шаблона (как _card_result_row): русская подпись
+    # статуса и класс бейджа badge-<status>.
+    status = info["status"]
+    info["status_label"] = _CARD_STATUS_LABELS_BY_VALUE.get(status, status)
+    info["status_badge"] = f"badge-{status}"
+    ctx["info"] = info
     return request.app.state.templates.TemplateResponse(
-        request=request, name="receive_return.html", context=ctx
+        request=request, name="receive_return_result.html", context=ctx
     )
 
 
@@ -569,7 +616,14 @@ async def receive_return_confirm(
     user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
     db: Database = Depends(get_db),
 ):
-    """Подтвердить получение возвращённой карты."""
+    """Подтвердить получение возвращённой карты.
+
+    Бизнес-логика не менялась (return_service.receive_return; обратная
+    совместимость: smoke-E2E шлёт card_id и ждёт 303 на /my-shipments).
+    Рендер ошибок приведён к флеш-паттерну контура: вместо 400-страницы —
+    303 на /receive-return с одноразовым флешем-error (текст сервиса),
+    который показывает GET-страница через _render_page.
+    """
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     courier_repo = CourierRepositoryImpl(db)
@@ -578,11 +632,7 @@ async def receive_return_confirm(
     try:
         await return_service.receive_return(card_id, user.id)
     except ValueError as e:
-        ctx = _menu_context(user)
-        ctx.update({"request": request, "username": user.username, "error": str(e)})
-        return request.app.state.templates.TemplateResponse(
-            request=request, name="receive_return.html", context=ctx, status_code=400
-        )
+        return _flash_redirect("/receive-return", "error", str(e))
 
     return RedirectResponse(url="/my-shipments", status_code=303)
 

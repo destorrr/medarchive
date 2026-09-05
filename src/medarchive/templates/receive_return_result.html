@@ -1,0 +1,33 @@
+{# Фрагмент результата проверки приёма возврата (htmx, target #scan-result).
+   Два состояния: error — div.flash.flash-error с текстом сервиса (без таблицы);
+   info — карточка «Карта к приёму»: таблица Карта | Статус | Назначение и
+   ОБЫЧНАЯ форма подтверждения POST /receive-return/confirm (не htmx: успех —
+   303-редирект на /my-shipments, который браузер выполняет штатно только для
+   обычной навигации). Значения экранирует Jinja-autoescape. #}
+<style>
+    .card h3 { font-size: 15px; margin-bottom: 10px; color: #1a1a2e; }
+</style>
+{% if error %}
+<div class="flash flash-error">{{ error }}</div>
+{% else %}
+<div class="card">
+    <h3>Карта к приёму</h3>
+    <table class="data">
+        <colgroup><col><col style="width:118px"><col style="width:170px"></colgroup>
+        <thead><tr><th>Карта</th><th>Статус</th><th>Назначение</th></tr></thead>
+        <tbody>
+            <tr>
+                <td class="fio">{{ info.full_name }}</td>
+                <td><span class="badge {{ info.status_badge }}">{{ info.status_label }}</span></td>
+                <td>{{ info.destination or '—' }}</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="table-footer">
+        <form method="post" action="/receive-return/confirm">
+            <input type="hidden" name="card_id" value="{{ info.card_id }}">
+            <button type="submit" class="btn btn-primary">Подтвердить получение</button>
+        </form>
+    </div>
+</div>
+{% endif %}
