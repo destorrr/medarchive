@@ -92,7 +92,7 @@ def highlight_match(text: str, query: str) -> Markup:
     idx = hay.lower().find(needle)
     if idx < 0:
         return Markup(escape(hay))
-    end = idx + len(query)
+    end = idx + len(needle)
     # Все части — Markup (escape() уже возвращает Markup, теги оборачиваем
     # отдельно): Markup + str экранировал бы литеральные <mark>-теги.
     return (

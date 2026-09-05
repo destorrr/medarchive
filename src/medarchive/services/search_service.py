@@ -79,7 +79,7 @@ class SearchService:
                 box = dict(row)
                 per_box = boxes_by_card.setdefault(box["card_id"], {})
                 prev = per_box.get(box["box_id"])
-                if prev is None or box["placed_at"] > (prev["placed_at"] or ""):
+                if prev is None or (box["placed_at"] or "") > (prev["placed_at"] or ""):
                     per_box[box["box_id"]] = box
 
         results: list[dict] = []
