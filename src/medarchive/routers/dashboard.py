@@ -190,6 +190,11 @@ def _prepare_request_rows(requests: list[dict]) -> list[dict]:
     """Обогащение строк заявок для шаблона (по образцу _prepare_search_rows):
     status_label — русская подпись (REQUEST_STATUS_LABELS), status_badge —
     класс badge-<status>, created_at_display — дата «ДД.ММ.ГГГГ ЧЧ:ММ».
+    Для строк с картой (get_my_requests, JOIN cards даёт card_status) —
+    карточные поля card_status_label (CARD_STATUS_LABELS по value) и
+    card_status_badge (badge-<status>) для колонки «Карта сейчас»
+    (/requests/my, задача 4 раунда 2); строки очереди (get_queue, без
+    card_status) получают пустые значения и эти поля в шаблоне не используют.
     Используется /requests/my и /requests (очередь, задача 4)."""
     prepared: list[dict] = []
     for req in requests:
@@ -197,6 +202,12 @@ def _prepare_request_rows(requests: list[dict]) -> list[dict]:
         status = row.get("status") or ""
         row["status_label"] = _REQUEST_STATUS_LABELS_BY_VALUE.get(status, status)
         row["status_badge"] = f"badge-{status}"
+        card_status = row.get("card_status") or ""
+        row["card_status_label"] = (
+            _CARD_STATUS_LABELS_BY_VALUE.get(card_status, card_status)
+            if card_status else ""
+        )
+        row["card_status_badge"] = f"badge-{card_status}" if card_status else ""
         row["created_at_display"] = _format_created_at(row.get("created_at"))
         prepared.append(row)
     return prepared

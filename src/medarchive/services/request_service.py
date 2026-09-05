@@ -56,8 +56,14 @@ class RequestService:
         return [dict(r) for r in rows]
 
     async def get_my_requests(self, user_id: int) -> list[dict]:
+        """Заявки текущего пользователя (для /requests/my), новые сверху.
+
+        Строка: все поля заявки + card_name (ФИО карты) и card_status
+        (текущий статус карты через JOIN cards — колонка «Карта сейчас»,
+        задача 4 раунда 2: филиал видит, где карта сейчас — архив/полка,
+        в пути или уже в филиале, а не только статус самой заявки)."""
         rows = await self.db.fetch_all(
-            """SELECT r.*, c.full_name as card_name
+            """SELECT r.*, c.full_name as card_name, c.status as card_status
                FROM requests r JOIN cards c ON r.card_id = c.id
                WHERE r.requested_by = ?
                ORDER BY r.created_at DESC""",

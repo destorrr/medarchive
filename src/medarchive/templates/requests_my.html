@@ -2,24 +2,28 @@
 {% block content %}
 <h1>📋 Мои заявки</h1>
 <style>
-    /* Страница /requests/my — редизайн контура возврата (макет v3, экран 2).
-       Базовые стили (таблицы .data, .badge-*, .btn, .card, флеш-блок) — в base.html;
-       здесь только локальные для страницы. */
+    /* Страница /requests/my — редизайн контура возврата (макет v5, экран 2;
+       задача 4 раунда 2: колонка «Карта сейчас» — бейдж текущего статуса
+       карты; «Статус» переименован в «Заявка»). Базовые стили (таблицы
+       .data, .badge-*, .btn, .card, флеш-блок) — в base.html; здесь только
+       локальные для страницы. */
     td.act form { display: inline; }
     .empty-state { text-align: center; padding: 24px 16px; }
     .empty-state p { color: #666; }
     .empty-state a { color: #1a1a2e; }
+    .search-hint { margin-top: 12px; font-size: 12.5px; color: #888; }
 </style>
 {% if my_requests %}
 <div class="card">
     <table class="data">
-        <colgroup><col><col style="width:118px"><col style="width:140px"><col style="width:125px"></colgroup>
-        <thead><tr><th>Карта</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+        <colgroup><col><col style="width:112px"><col style="width:128px"><col style="width:132px"><col style="width:112px"></colgroup>
+        <thead><tr><th>Карта</th><th>Заявка</th><th>Карта сейчас</th><th>Дата</th><th></th></tr></thead>
         <tbody>
         {% for r in my_requests %}
         <tr>
             <td class="fio">{{ r.card_name }}</td>
             <td><span class="badge {{ r.status_badge }}">{{ r.status_label }}</span></td>
+            <td><span class="badge {{ r.card_status_badge }}">{{ r.card_status_label }}</span></td>
             <td class="date muted">{{ r.created_at_display }}</td>
             <td class="act">
                 {% if r.status in ('new', 'in_progress') %}
@@ -33,6 +37,7 @@
         {% endfor %}
         </tbody>
     </table>
+    <div class="search-hint">«Карта сейчас» — текущее место карты: архив/полка, в пути к вам или уже в филиале.</div>
 </div>
 {% else %}
 <div class="card"><div class="empty-state"><p>Нет заявок. <a href="/requests/new">Создать новую</a>.</p></div></div>

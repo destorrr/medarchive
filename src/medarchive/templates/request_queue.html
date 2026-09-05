@@ -2,13 +2,14 @@
 {% block content %}
 <h1>📋 Очередь заявок</h1>
 <style>
-    /* Страница /requests — очередь (редизайн контура возврата, макет v3, экран 3).
-       Базовые стили (таблицы .data, .badge-*, .btn, select.row-sel, флеш) — в base.html;
-       здесь только локальные для страницы. */
+    /* Страница /requests — очередь (редизайн контура возврата, макет v5,
+       экран 3; задача 4 раунда 2: подсказка про «Выполнить» удалена — её
+       нет в макете). Базовые стили (таблицы .data, .badge-*, .btn,
+       select.row-sel, флеш) — в base.html; здесь только локальные для
+       страницы. */
     .act .with-sel { display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end; }
     .empty-state { text-align: center; padding: 24px 16px; }
     .empty-state p { color: #666; }
-    .search-hint { margin-top: 12px; font-size: 12.5px; color: #888; }
 </style>
 {% if queue %}
 <div class="card">
@@ -39,7 +40,6 @@
         {% endfor %}
         </tbody>
     </table>
-    <div class="search-hint">«Выполнить» — карта изымается со стеллажа и переходит в статус «Возврат» (заявка: «Новая» → «В работе» → «Выполнена»).</div>
 </div>
 {% else %}
 <div class="card"><div class="empty-state"><p>Нет активных заявок.</p></div></div>

@@ -217,18 +217,19 @@ class TestRequestNew:
 
 
 class TestRequestsMy:
-    """Задача 3 редизайна контура возврата: /requests/my — русские статусы-бейджи,
+    """Задачи 3/4 редизайна контура возврата: /requests/my — русские статусы-бейджи,
     формат даты «ДД.ММ.ГГГГ ЧЧ:ММ», кнопка «Отменить» только для активных,
-    одноразовые флеши отмены, пустое состояние."""
+    одноразовые флеши отмены, пустое состояние; задача 4 — колонка «Карта
+    сейчас» (бейдж статуса карты CARD_STATUS_LABELS) и подсказка под таблицей."""
 
     @staticmethod
-    async def _seed_request(db, *, status="new", requested_by=1, created_at="2026-09-05 16:48:13"):
+    async def _seed_request(db, *, status="new", requested_by=1, card_id=1, created_at="2026-09-05 16:48:13"):
         """Прямой посев заявки с фиксированным created_at (сервис пишет только
         'new' и текущее время — для проверки рендера нужны разные статусы/даты)."""
         await db.execute(
             "INSERT INTO requests (card_id, requested_by, target_branch_id, "
-            "target_department, created_at, status) VALUES (1, ?, 1, 0, ?, ?)",
-            (requested_by, created_at, status),
+            "target_department, created_at, status) VALUES (?, ?, 1, 0, ?, ?)",
+            (card_id, requested_by, created_at, status),
         )
         await db.conn.commit()
 
@@ -341,6 +342,62 @@ class TestRequestsMy:
         assert "Создать новую" in r.text
         assert 'href="/requests/new"' in r.text
 
+    # --- Задача 4 раунда 2: колонка «Карта сейчас» ---
+
+    async def test_card_now_column_header_and_hint(self, req_client, db):
+        """Задача 4: таблица /requests/my — колонки Карта | Заявка | Карта
+        сейчас | Дата | действие (макет v5, экран 2): заголовок «Карта сейчас»
+        есть, «Статус» как заголовок заявки заменён на «Заявка»; под таблицей
+        — подсказка search-hint о значении колонки (как в макете)."""
+        await _login(req_client)
+        await self._seed_request(db, status="new")
+        r = await req_client.get("/requests/my")
+        assert r.status_code == 200
+        assert "<th>Карта</th>" in r.text
+        assert "<th>Заявка</th>" in r.text
+        assert "<th>Карта сейчас</th>" in r.text
+        assert "<th>Дата</th>" in r.text
+        assert "<th>Статус</th>" not in r.text
+        assert "текущее место карты" in r.text
+        assert "уже в филиале" in r.text
+
+    async def test_card_now_badge_shows_current_card_status(self, req_client, db):
+        """Задача 4: «Карта сейчас» — бейдж ТЕКУЩЕГО статуса карты по
+        CARD_STATUS_LABELS (raw cards.status через JOIN cards в get_my_requests):
+        карта in_transit → «В пути» (badge-in_transit), in_branch → «В филиале»,
+        placed → «Размещена». Сырые значения статуса карты в ячейках не
+        показываются; статус заявки (badge-<request>) не сломан."""
+        await _login(req_client)
+        # три карты с разными статусами + заявки branch1 на каждую
+        await db.execute("INSERT INTO cards (id, full_name, status) VALUES (2, 'Петрова А.С.', 'in_branch')")
+        await db.execute("INSERT INTO cards (id, full_name, status) VALUES (3, 'Сидоров С.С.', 'in_transit')")
+        await self._seed_request(db, status="completed", card_id=1, created_at="2026-09-05 16:30:00")  # placed
+        await self._seed_request(db, status="completed", card_id=2, created_at="2026-09-05 16:00:00")  # in_branch
+        await self._seed_request(db, status="completed", card_id=3, created_at="2026-09-05 15:30:00")  # in_transit
+        r = await req_client.get("/requests/my")
+        assert r.status_code == 200
+        assert '<span class="badge badge-in_transit">В пути</span>' in r.text
+        assert '<span class="badge badge-in_branch">В филиале</span>' in r.text
+        assert '<span class="badge badge-placed">Размещена</span>' in r.text
+        assert "<td>in_transit</td>" not in r.text
+        assert "<td>in_branch</td>" not in r.text
+        # статус заявки (Заявка) — по-прежнему русский бейдж REQUEST_STATUS_LABELS
+        assert r.text.count('<span class="badge badge-completed">Выполнена</span>') == 3
+
+    async def test_card_now_reflects_status_change(self, req_client, db):
+        """Задача 4: колонка показывает АКТУАЛЬНОЕ место карты, а не состояние
+        на момент заявки: у выполненной заявки карта placed → бейдж «Размещена»;
+        после возврата (карта in_branch) тот же ряд показывает «В филиале»."""
+        await _login(req_client)
+        await self._seed_request(db, status="completed", created_at="2026-09-05 16:30:00")
+        r1 = await req_client.get("/requests/my")
+        assert '<span class="badge badge-placed">Размещена</span>' in r1.text
+        await db.execute("UPDATE cards SET status = 'in_branch' WHERE id = 1")
+        await db.conn.commit()
+        r2 = await req_client.get("/requests/my")
+        assert '<span class="badge badge-in_branch">В филиале</span>' in r2.text
+        assert '<span class="badge badge-placed">Размещена</span>' not in r2.text
+
 
 class TestRequestQueue:
     async def test_queue_page_renders(self, req_client):
@@ -434,6 +491,19 @@ class TestRequestQueueRedesign:
         assert r.status_code == 200
         assert "Нет активных заявок" in r.text
 
+    async def test_queue_has_no_fulfill_hint(self, req_client, db):
+        """Задача 4: подсказка про «Выполнить» («карта изымается со стеллажа…»)
+        удалена — в макете v5 (экран 3) её нет; колонки/бейджи строк не сломаны."""
+        await _login(req_client, "arch1")
+        await self._seed_request(db, status="new")
+        r = await req_client.get("/requests")
+        assert r.status_code == 200
+        assert "изымается со стеллажа" not in r.text
+        assert "статус «Возврат»" not in r.text
+        # строка очереди цела: русский статус-бейдж и кнопка «Выполнить» на месте
+        assert '<span class="badge badge-new">Новая</span>' in r.text
+        assert ">Выполнить</button>" in r.text
+
     async def test_fulfill_success_303_flash_once(self, req_client, db):
         """Выполнение заявки без курьера (courier_id=0) end-to-end: 303 на
         /requests + флеш «Заявка выполнена» (cookie одноразовый — первый GET
@@ -480,6 +550,16 @@ class TestRequestQueueRedesign:
         assert card["status"] == "in_transit"
         g1 = await req_client.get("/requests")
         assert "передана курьеру" in g1.text
+
+    async def test_queue_row_no_card_status_cells(self, req_client, db):
+        """Задача 4: очередь не получает колонку «Карта сейчас» — карточные
+        поля (card_status_label/badge) в строках очереди пустые, таблица
+        остаётся Карта | Филиал | Статус | Дата | действие."""
+        await _login(req_client, "arch1")
+        await self._seed_request(db, status="new")
+        r = await req_client.get("/requests")
+        assert r.status_code == 200
+        assert "Карта сейчас" not in r.text
 
     async def test_fulfill_missing_request_error_flash(self, req_client):
         """Невалидный request_id — не 500: 303 + флеш-error «Заявка не найдена»."""
