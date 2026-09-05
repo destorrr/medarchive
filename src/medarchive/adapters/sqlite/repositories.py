@@ -271,10 +271,17 @@ class UserRepositoryImpl:
             return None
         return User.from_row(row)
 
-    async def create(self, username: str, password_hash: str, role: str, branch_id: int | None) -> User:
+    async def create(
+        self,
+        username: str,
+        password_hash: str,
+        role: str,
+        branch_id: int | None,
+        full_name: str = "",
+    ) -> User:
         cursor = await self.db.execute(
-            "INSERT INTO users (username, password_hash, role, branch_id) VALUES (?, ?, ?, ?)",
-            (username, password_hash, role, branch_id),
+            "INSERT INTO users (username, password_hash, role, branch_id, full_name) VALUES (?, ?, ?, ?, ?)",
+            (username, password_hash, role, branch_id, full_name),
         )
         await self.db.conn.commit()
         return User.from_row({
@@ -284,6 +291,7 @@ class UserRepositoryImpl:
             "role": role,
             "branch_id": branch_id,
             "active_box_id": None,
+            "full_name": full_name,
         })
 
     async def list_all(self) -> list[User]:
@@ -297,12 +305,16 @@ class UserRepositoryImpl:
         password_hash: str | None = None,
         role: str | None = None,
         branch_id: int | None = None,
+        full_name: str | None = None,
     ) -> None:
         fields = []
         params: list = []
         if username is not None:
             fields.append("username = ?")
             params.append(username)
+        if full_name is not None:
+            fields.append("full_name = ?")
+            params.append(full_name)
         if password_hash is not None:
             fields.append("password_hash = ?")
             params.append(password_hash)

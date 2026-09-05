@@ -201,6 +201,33 @@ class TestUserRepository:
         users = await user_repo.list_all()
         assert any(u.id == 1 and u.active_box_id is not None for u in users)
 
+    async def test_user_create_with_full_name_round_trip(self, user_repo):
+        """create с full_name возвращает User с ФИО; round-trip через get_by_username."""
+        user = await user_repo.create("u_fn", "h", "branch", None, full_name="Иванов Иван Иванович")
+        assert user.full_name == "Иванов Иван Иванович"
+        got = await user_repo.get_by_username("u_fn")
+        assert got is not None
+        assert got.full_name == "Иванов Иван Иванович"
+
+    async def test_user_create_without_full_name_defaults_empty(self, user_repo):
+        """create без full_name (старые вызовы) даёт пустую строку."""
+        user = await user_repo.create("u_fn_empty", "h", "branch", None)
+        assert user.full_name == ""
+
+    async def test_user_update_full_name(self, user_repo):
+        """update с full_name сохраняет ФИО; None не трогает колонку."""
+        user = await user_repo.create("u_fn_upd", "h", "branch", None)
+        assert user.full_name == ""
+        await user_repo.update(user.id, full_name="Петров Пётр")
+        got = await user_repo.get_by_id(user.id)
+        assert got is not None
+        assert got.full_name == "Петров Пётр"
+        # None (не передаём) → колонка не меняется
+        await user_repo.update(user.id, role="admin")
+        got2 = await user_repo.get_by_id(user.id)
+        assert got2 is not None
+        assert got2.full_name == "Петров Пётр"
+
 
 class TestCourierRepository:
     async def test_create_and_list_couriers(self, courier_repo):

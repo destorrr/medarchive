@@ -46,9 +46,13 @@ class User:
     role: UserRole
     branch_id: int | None = None
     active_box_id: int | None = None
+    full_name: str = ""
 
     @classmethod
     def from_row(cls, row) -> "User":
+        # full_name может отсутствовать в старых dict-строках (вызовы до миграции) —
+        # безопасно читаем только при наличии ключа.
+        full_name = row["full_name"] if "full_name" in row.keys() else ""
         return cls(
             id=row["id"],
             username=row["username"],
@@ -56,4 +60,5 @@ class User:
             role=UserRole(row["role"]),
             branch_id=row["branch_id"],
             active_box_id=row["active_box_id"],
+            full_name=full_name,
         )

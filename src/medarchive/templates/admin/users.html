@@ -5,6 +5,7 @@
     <h2 style="font-size:16px; margin-bottom:12px;">Создать пользователя</h2>
     <form method="post" action="/admin/users">
         <input type="text" name="username" placeholder="Логин" required>
+        <input type="text" name="full_name" placeholder="ФИО (необязательно)">
         <input type="password" name="password" placeholder="Пароль" required>
         <select name="role">
             {% for r in roles %}
@@ -22,12 +23,15 @@
 </div>
 <div class="card">
     <table>
-        <thead><tr><th>ID</th><th>Логин</th><th>Роль</th><th>Филиал</th><th>Действия</th></tr></thead>
+        <thead><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Роль</th><th>Филиал</th><th>Действия</th></tr></thead>
         <tbody>
         {% for u in users %}
         <tr>
             <td>{{ u.id }}</td>
             <td>{{ u.username }}</td>
+            <td>
+                <input type="text" name="full_name" value="{{ u.full_name }}" placeholder="—" form="edit-user-{{ u.id }}">
+            </td>
             <td>
                 <select name="role" form="edit-user-{{ u.id }}">
                     {% for r in roles %}

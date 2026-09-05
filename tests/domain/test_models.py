@@ -37,6 +37,41 @@ class TestUser:
         user = User(id=2, username="admin", password_hash="hash", role=UserRole.admin)
         assert user.branch_id is None
 
+    def test_create_user_full_name_default(self):
+        """full_name по умолчанию — пустая строка (совместимость со старыми вызовами)."""
+        user = User(id=3, username="op", password_hash="hash", role=UserRole.branch)
+        assert user.full_name == ""
+
+    def test_create_user_explicit_full_name(self):
+        user = User(id=4, username="op", password_hash="hash", role=UserRole.branch, full_name="Иванов Иван")
+        assert user.full_name == "Иванов Иван"
+
+    def test_user_from_row_without_full_name(self):
+        """from_row с dict без ключа full_name не падает и даёт full_name="" (старые вызовы)."""
+        user = User.from_row({
+            "id": 5,
+            "username": "legacy",
+            "password_hash": "h",
+            "role": "branch",
+            "branch_id": None,
+            "active_box_id": None,
+        })
+        assert user.username == "legacy"
+        assert user.full_name == ""
+
+    def test_user_from_row_with_full_name(self):
+        """from_row читает full_name из строки БД."""
+        user = User.from_row({
+            "id": 6,
+            "username": "modern",
+            "password_hash": "h",
+            "role": "branch",
+            "branch_id": None,
+            "active_box_id": None,
+            "full_name": "Петров Пётр",
+        })
+        assert user.full_name == "Петров Пётр"
+
 
 class TestBranch:
     def test_create_branch(self):

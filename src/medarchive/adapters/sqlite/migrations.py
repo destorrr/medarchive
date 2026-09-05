@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS branches (
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL DEFAULT '',
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('branch','archive','viewer','admin')),
     branch_id INTEGER REFERENCES branches(id),
@@ -115,4 +116,9 @@ async def run_migrations(conn: aiosqlite.Connection) -> None:
     cols = await conn.execute_fetchall("PRAGMA table_info(users)")
     if not any(row[1] == "active_box_id" for row in cols):
         await conn.execute("ALTER TABLE users ADD COLUMN active_box_id INTEGER REFERENCES boxes(id)")
+    # Инкрементальная миграция: users.full_name (ФИО пользователя, раунд 2 редизайна
+    # контура возврата) для БД, созданных до добавления колонки.
+    cols = await conn.execute_fetchall("PRAGMA table_info(users)")
+    if not any(row[1] == "full_name" for row in cols):
+        await conn.execute("ALTER TABLE users ADD COLUMN full_name TEXT NOT NULL DEFAULT ''")
     await conn.commit()

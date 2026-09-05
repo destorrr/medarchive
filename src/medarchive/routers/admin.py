@@ -169,6 +169,7 @@ async def users_create(
     password: str = Form(...),
     role: str = Form(...),
     branch_id: str = Form(""),
+    full_name: str = Form(""),
     user: User = Depends(require_role(UserRole.admin)),
     db: Database = Depends(get_db),
     auth: AuthService = Depends(get_auth),
@@ -180,6 +181,7 @@ async def users_create(
             password_hash=auth.hash_password(password),
             role=role,
             branch_id=int(branch_id) if branch_id else None,
+            full_name=full_name.strip(),
         )
     except Exception:
         pass  # дубликат логина и т.п. — остаёмся на странице
@@ -193,6 +195,7 @@ async def users_edit(
     role: str = Form(...),
     branch_id: str = Form(""),
     password: str = Form(""),
+    full_name: str = Form(""),
     user: User = Depends(require_role(UserRole.admin)),
     db: Database = Depends(get_db),
     auth: AuthService = Depends(get_auth),
@@ -201,6 +204,7 @@ async def users_edit(
     kwargs: dict = {
         "role": role,
         "branch_id": int(branch_id) if branch_id else None,
+        "full_name": full_name.strip(),
     }
     if password:
         kwargs["password_hash"] = auth.hash_password(password)
