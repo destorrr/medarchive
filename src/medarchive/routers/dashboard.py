@@ -1,9 +1,17 @@
 """Роутер дашборда и общих страниц."""
+from urllib.parse import quote
+
 from fastapi import APIRouter, Request, HTTPException, Depends, Form
 from fastapi.responses import RedirectResponse
+from markupsafe import Markup, escape
 from medarchive.dependencies import get_current_user, get_db, require_role
 from medarchive.domain.models import User
-from medarchive.domain.statuses import UserRole, BoxStatus
+from medarchive.domain.statuses import (
+    UserRole,
+    BoxStatus,
+    CARD_STATUS_LABELS,
+    BOX_STATUS_LABELS,
+)
 from medarchive.adapters.sqlite.database import Database
 from medarchive.adapters.sqlite.repositories import (
     CardRepositoryImpl,
@@ -61,6 +69,89 @@ def _menu_context(user: User) -> dict:
     }
 
 
+# Статусы (сырые значения из БД) → русские подписи и классы бейджей base.html.
+_CARD_STATUS_LABELS_BY_VALUE: dict[str, str] = {
+    s.value: label for s, label in CARD_STATUS_LABELS.items()
+}
+_BOX_STATUS_LABELS_BY_VALUE: dict[str, str] = {
+    s.value: label for s, label in BOX_STATUS_LABELS.items()
+}
+
+
+def highlight_match(text: str, query: str) -> Markup:
+    """Экранированная серверная подсветка <mark> первого вхождения query.
+
+    Поиск — регистронезависимый через .lower() (кириллица; дизайн /search,
+    п.2). Все сегменты экранируются markupsafe.escape — никаких f-string
+    конкатенаций неэкранированных данных в HTML (дизайн /search, п.5).
+    """
+    hay = str(text)
+    needle = (query or "").strip().lower()
+    if not needle:
+        return Markup(escape(hay))
+    idx = hay.lower().find(needle)
+    if idx < 0:
+        return Markup(escape(hay))
+    end = idx + len(query)
+    # Все части — Markup (escape() уже возвращает Markup, теги оборачиваем
+    # отдельно): Markup + str экранировал бы литеральные <mark>-теги.
+    return (
+        escape(hay[:idx])
+        + Markup("<mark>")
+        + escape(hay[idx:end])
+        + Markup("</mark>")
+        + escape(hay[end:])
+    )
+
+
+def _prepare_search_rows(cards: list[dict], boxes: list[dict], query: str):
+    """Обогащение строк результата для шаблонов: русская подпись статуса
+    (карты — CARD_STATUS_LABELS, коробки — BOX_STATUS_LABELS), класс бейджа
+    badge-<status> и экранированная подсветка <mark> совпадения."""
+    prepared_cards: list[dict] = []
+    for card in cards:
+        row = dict(card)
+        status = row.get("status") or ""
+        row["status_label"] = _CARD_STATUS_LABELS_BY_VALUE.get(status, status)
+        row["status_badge"] = f"badge-{status}"
+        row["full_name"] = highlight_match(row["full_name"], query)
+        prepared_cards.append(row)
+    prepared_boxes: list[dict] = []
+    for box in boxes:
+        row = dict(box)
+        status = row.get("status") or ""
+        row["status_label"] = _BOX_STATUS_LABELS_BY_VALUE.get(status, status)
+        row["status_badge"] = f"badge-{status}"
+        row["box_number"] = highlight_match(row["box_number"], query)
+        prepared_boxes.append(row)
+    return prepared_cards, prepared_boxes
+
+
+async def _search_context(
+    request: Request, user: User, query: str | None, db: Database
+) -> dict:
+    """Общий контекст поиска для страницы и htmx-фрагмента: query, cards, boxes."""
+    from medarchive.services.search_service import SearchService
+
+    query = (query or "").strip()
+    cards: list[dict] = []
+    boxes: list[dict] = []
+    if query:
+        svc = SearchService(db)
+        cards = await svc.search_cards(query)
+        boxes = await svc.search_boxes(query)
+    cards, boxes = _prepare_search_rows(cards, boxes, query)
+    ctx = _menu_context(user)
+    ctx.update({
+        "request": request,
+        "username": user.username,
+        "query": query,
+        "cards": cards,
+        "boxes": boxes,
+    })
+    return ctx
+
+
 @router.get("/dashboard")
 async def dashboard(request: Request):
     try:
@@ -99,23 +190,42 @@ async def dashboard(request: Request):
 
 
 @router.get("/search")
-async def search_page(request: Request, user: User = Depends(require_role(UserRole.archive, UserRole.viewer, UserRole.admin))):
-    ctx = _menu_context(user)
-    ctx.update({"request": request, "username": user.username, "results": False, "cards_found": [], "boxes_found": [], "query": ""})
-    return request.app.state.templates.TemplateResponse(request=request, name="search.html", context=ctx)
+async def search_page(
+    request: Request,
+    query: str | None = None,
+    user: User = Depends(require_role(UserRole.archive, UserRole.viewer, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """Страница поиска: GET-параметр query (нет-JS фолбэк и прямые ссылки),
+    результаты рендерит search.html (включает search_fragment.html)."""
+    ctx = await _search_context(request, user, query, db)
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="search.html", context=ctx
+    )
+
+
+@router.get("/search/results")
+async def search_results_fragment(
+    request: Request,
+    query: str | None = None,
+    user: User = Depends(require_role(UserRole.archive, UserRole.viewer, UserRole.admin)),
+    db: Database = Depends(get_db),
+):
+    """htmx-фрагмент живого поиска: только блок результатов (#search-results),
+    без полной страницы."""
+    ctx = await _search_context(request, user, query, db)
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="search_fragment.html", context=ctx
+    )
 
 
 @router.post("/search")
-async def search_execute(request: Request, query: str = Form(...),
-                         user: User = Depends(require_role(UserRole.archive, UserRole.viewer, UserRole.admin)),
-                         db: Database = Depends(get_db)):
-    from medarchive.services.search_service import SearchService
-    svc = SearchService(db)
-    cards = await svc.search_cards(query)
-    boxes = await svc.search_boxes(query)
-    ctx = _menu_context(user)
-    ctx.update({"request": request, "username": user.username, "results": True, "cards_found": cards, "boxes_found": boxes, "query": query})
-    return request.app.state.templates.TemplateResponse(request=request, name="search.html", context=ctx)
+async def search_submit_legacy(
+    query: str = Form(...),
+    user: User = Depends(require_role(UserRole.archive, UserRole.viewer, UserRole.admin)),
+):
+    """Legacy POST-форма: 303-редирект на GET /search?query=… (совместимость)."""
+    return RedirectResponse(url=f"/search?query={quote(query)}", status_code=303)
 
 
 @router.get("/my-shipments")

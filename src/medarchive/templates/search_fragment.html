@@ -1,0 +1,45 @@
+{# Заглушка Задачи 2: htmx-фрагмент результатов (полный макет .ci*/.bi* — Задача 3). #}
+{% if query %}
+{% if cards %}
+<section class="search-section">
+    <h2>Карты ({{ cards|length }})</h2>
+    {% for c in cards %}
+    <div class="ci">
+        <div class="ci-fio">{{ c.full_name }}</div>
+        <span class="badge {{ c.status_badge }}">{{ c.status_label }}</span>
+        <div class="ci-place">
+        {%- if c.box_number -%}
+            {%- if c.place -%}
+                {{ c.place }}
+            {%- else -%}
+                в коробке {{ c.box_number }}
+            {%- endif -%}
+        {%- else -%}
+            нет активной коробки
+        {%- endif -%}
+        </div>
+        {% if c.stale %}
+        <div class="ci-stale">не выписана из коробок: {{ c.stale|join(", ") }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
+
+{% if boxes %}
+<section class="search-section">
+    <h2>Коробки ({{ boxes|length }})</h2>
+    {% for b in boxes %}
+    <div class="bi">
+        <span class="bi-number">{{ b.box_number }}</span>
+        <span class="badge {{ b.status_badge }}">{{ b.status_label }}</span>
+        <span class="bi-meta">{{ b.place or "—" }} · {{ b.card_count }} карт</span>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
+
+{% if not cards and not boxes %}
+<p class="search-empty">ничего не найдено</p>
+{% endif %}
+{% endif %}
