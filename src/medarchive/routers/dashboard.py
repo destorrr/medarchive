@@ -162,6 +162,39 @@ def highlight_match(text: str, query: str) -> Markup:
     )
 
 
+def _request_new_context(
+    request: Request, user: User, *, results, search_name: str
+) -> dict:
+    """Контекст страницы /requests/new: базовый + результаты поиска.
+
+    has_branch — реально ли к учётной записи привязан филиал: подсказку
+    про авто-филиал показываем только тогда (у роли branch там имя филиала,
+    у пользователя без филиала — подпись роли, подсказка не нужна).
+    """
+    ctx = _menu_context(user)
+    ctx.update({
+        "request": request,
+        "username": user.username,
+        "results": results,
+        "search_name": search_name,
+        "has_branch": user.branch_id is not None,
+    })
+    return ctx
+
+
+def _card_result_row(card) -> dict:
+    """Строка результата поиска карты: сырой статус + русская подпись
+    (CARD_STATUS_LABELS) и класс бейджа badge-<status> для шаблона."""
+    status = card.status.value
+    return {
+        "id": card.id,
+        "full_name": card.full_name,
+        "status": status,
+        "status_label": _CARD_STATUS_LABELS_BY_VALUE.get(status, status),
+        "status_badge": f"badge-{status}",
+    }
+
+
 def _prepare_search_rows(cards: list[dict], boxes: list[dict], query: str):
     """Обогащение строк результата для шаблонов: русская подпись статуса
     (карты — CARD_STATUS_LABELS, коробки — BOX_STATUS_LABELS), класс бейджа
@@ -313,9 +346,10 @@ async def my_shipments(
 
 @router.get("/requests/new")
 async def request_new_page(request: Request, user: User = Depends(require_role(UserRole.branch, UserRole.admin))):
-    ctx = _menu_context(user)
-    ctx.update({"request": request, "username": user.username, "results": None, "search_name": ""})
-    return request.app.state.templates.TemplateResponse(request=request, name="request_new.html", context=ctx)
+    """Страница новой заявки: форма поиска карты + подсказка про авто-филиал.
+    Селект филиала убран — филиал возврата берётся из учётной записи."""
+    ctx = _request_new_context(request, user, results=None, search_name="")
+    return _render_page(request, "request_new.html", ctx)
 
 
 @router.post("/requests/new")
@@ -323,43 +357,72 @@ async def request_new_search_or_create(
     request: Request,
     search_name: str | None = Form(None),
     card_id: int | None = Form(None),
-    target_branch_id: int | None = Form(None),
-    target_department: int = Form(0),
     user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
     db: Database = Depends(get_db),
 ):
+    """POST /requests/new: поиск карты по ФИО или создание заявки.
+
+    Создание — с авто-филиалом: target_branch_id берётся из user.branch_id,
+    форма его больше не шлёт (селект убран). Если к учётной записи филиал
+    не привязан — 400 с флеш-ошибкой вместо 500.
+    """
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     req_service = RequestService(db, card_repo, box_repo)
 
-    # Phase 1: search
+    # Phase 1: поиск карты — строки с русской подписью статуса и бейджем.
     if search_name:
         cards = await card_repo.find_by_name(search_name)
-        # Also get available branches as targets
-        branches = await db.fetch_all("SELECT * FROM branches WHERE id != ?", (user.branch_id or 1,))
-        ctx = _menu_context(user)
-        ctx.update({"request": request, "username": user.username, "results": [{"id": c.id, "full_name": c.full_name, "status": c.status.value} for c in cards], "branches": [dict(b) for b in branches], "search_name": search_name})
-        return request.app.state.templates.TemplateResponse(request=request, name="request_new.html", context=ctx)
+        results = [_card_result_row(c) for c in cards]
+        ctx = _request_new_context(request, user, results=results, search_name=search_name)
+        return _render_page(request, "request_new.html", ctx)
 
-    # Phase 2: create
+    # Phase 2: создание заявки с авто-филиалом из учётной записи.
     if card_id:
-        await req_service.create_request(card_id=card_id, requested_by=user.id, target_branch_id=target_branch_id, target_department=bool(target_department))
-        return RedirectResponse(url="/requests/my", status_code=303)
+        target_branch_id = user.branch_id
+        if target_branch_id is None:
+            ctx = _request_new_context(request, user, results=None, search_name="")
+            ctx["flash"] = {"type": "error", "text": "К вашей учётной записи не привязан филиал"}
+            response = request.app.state.templates.TemplateResponse(
+                request=request, name="request_new.html", context=ctx, status_code=400
+            )
+            # старый flash-cookie (если был) не должен всплыть на странице ошибки
+            response.delete_cookie("ma_flash", path="/")
+            return response
+        branch_name = getattr(user, "branch_name", None) or ""
+        if not branch_name:
+            row = await db.fetch_one(
+                "SELECT name FROM branches WHERE id = ?", (target_branch_id,)
+            )
+            branch_name = row["name"] if row else ""
+        await req_service.create_request(
+            card_id=card_id,
+            requested_by=user.id,
+            target_branch_id=target_branch_id,
+            target_department=False,
+        )
+        return _flash_redirect(
+            "/requests/my",
+            "success",
+            f"Заявка на возврат создана. Карта будет доставлена в «{branch_name}».",
+        )
 
-    ctx = _menu_context(user)
-    ctx.update({"request": request, "username": user.username, "results": None, "search_name": ""})
-    return request.app.state.templates.TemplateResponse(request=request, name="request_new.html", context=ctx)
+    # Ни поиск, ни создание (пустой POST) — просто страница.
+    ctx = _request_new_context(request, user, results=None, search_name="")
+    return _render_page(request, "request_new.html", ctx)
 
 
 @router.get("/requests/my")
 async def requests_my_page(request: Request, user: User = Depends(require_role(UserRole.branch, UserRole.admin)), db: Database = Depends(get_db)):
+    """Мои заявки: читает одноразовый flash-cookie (создание/отмена заявки)
+    через _render_page — флеш показывает base.html и удаляет cookie."""
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     req_service = RequestService(db, card_repo, box_repo)
     my_requests = await req_service.get_my_requests(user.id)
     ctx = _menu_context(user)
     ctx.update({"request": request, "username": user.username, "my_requests": my_requests})
-    return request.app.state.templates.TemplateResponse(request=request, name="requests_my.html", context=ctx)
+    return _render_page(request, "requests_my.html", ctx)
 
 
 @router.get("/requests")

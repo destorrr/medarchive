@@ -40,10 +40,12 @@ class TestStage2E2E:
         client = e2e_client
 
         # === BRANCH1: Создаёт заявку на возврат карты ===
+        # Авто-филиал: target_branch_id больше не передаётся формой —
+        # берётся из user.branch_id (= 1 у branch1).
         await client.post("/login", data={"username": "branch1", "password": "test123"})
         r = await client.post(
             "/requests/new",
-            data={"card_id": "1", "target_branch_id": "1", "target_department": "0"},
+            data={"card_id": "1"},
             follow_redirects=False,
         )
         assert r.status_code == 303
@@ -51,6 +53,7 @@ class TestStage2E2E:
             "SELECT * FROM requests WHERE card_id = 1 ORDER BY id DESC LIMIT 1"
         )
         assert req["status"] == "new"
+        assert req["target_branch_id"] == 1  # филиал из учётной записи branch1
 
         # Сменить пользователя: архив
         await client.get("/logout")

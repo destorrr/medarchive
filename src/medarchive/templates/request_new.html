@@ -1,46 +1,71 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>📝 Новая заявка на возврат</h1>
+<style>
+    /* Страница /requests/new — редизайн контура возврата (макет v3, экран 1).
+       Базовые стили (таблицы .data, .badge-*, .btn, .card, флеш) — в base.html;
+       здесь только локальные для страницы. */
+    .search-box { display: flex; gap: 8px; align-items: center; }
+    .search-box input {
+        flex: 1; padding: 12px 14px; border: 2px solid #ddd; border-radius: 8px;
+        font: inherit; font-size: 16px; outline: none; background: #fff; color: #1a1a2e;
+    }
+    .search-box input:focus { border-color: #e94560; }
+    .search-box input::placeholder { color: #aaa; }
+    .card h3 { font-size: 15px; margin-bottom: 10px; color: #1a1a2e; }
+    .card h3 .muted { font-weight: 400; }
+    .search-hint { margin-top: 12px; font-size: 12.5px; color: #888; }
+    .search-hint b { color: #1a1a2e; }
+    td.act form { display: inline; }
+    .empty-state { text-align: center; padding: 24px 16px; }
+    .empty-state .icon { font-size: 30px; margin-bottom: 8px; }
+    .empty-state p { color: #666; }
+</style>
 
 <div class="card">
     <form method="post" action="/requests/new">
         <div class="form-group">
-            <label for="search_name">Поиск карты (ФИО):</label>
-            <input type="text" id="search_name" name="search_name" autofocus
-                   value="{{ search_name }}"
-                   placeholder="Введите фамилию или ФИО...">
+            <label for="search_name">Поиск карты (ФИО)</label>
+            <div class="search-box">
+                <input type="text" id="search_name" name="search_name" autofocus
+                       value="{{ search_name }}"
+                       placeholder="Фамилия или ФИО…" autocomplete="off">
+                <button type="submit" class="btn btn-primary">Найти</button>
+            </div>
         </div>
-        <button type="submit" class="btn btn-primary">🔍 Найти</button>
     </form>
+    {% if has_branch %}
+    <div class="search-hint">Филиал возврата — <b>{{ user_branch }}</b> (ваш, из учётной записи). Поле выбора филиала убрано.</div>
+    {% endif %}
 </div>
 
 {% if results is not none %}
 <div class="card">
     {% if results %}
-    <h3>Найдено карт:</h3>
-    <table><thead><tr><th>ФИО</th><th>Статус</th><th></th></tr></thead>
-    <tbody>
-    {% for c in results %}
-    <tr>
-        <td>{{ c.full_name }}</td>
-        <td>{{ c.status }}</td>
-        <td>
-            <form method="post" action="/requests/new" style="display:inline">
-                <input type="hidden" name="card_id" value="{{ c.id }}">
-                <select name="target_branch_id">
-                    <option value="">— Куда —</option>
-                    {% for b in branches %}
-                    <option value="{{ b.id }}">{{ b.name }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-primary">Запросить</button>
-            </form>
-        </td>
-    </tr>
-    {% endfor %}
-    </tbody></table>
+    <h3>Найдено карт <span class="muted">({{ results|length }})</span></h3>
+    <table class="data">
+        <colgroup><col><col style="width:140px"><col style="width:150px"></colgroup>
+        <thead><tr><th>ФИО</th><th>Статус</th><th></th></tr></thead>
+        <tbody>
+        {% for c in results %}
+        <tr>
+            <td class="fio">{{ c.full_name }}</td>
+            <td><span class="badge {{ c.status_badge }}">{{ c.status_label }}</span></td>
+            <td class="act">
+                <form method="post" action="/requests/new">
+                    <input type="hidden" name="card_id" value="{{ c.id }}">
+                    <button type="submit" class="btn btn-primary">Запросить</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
     {% else %}
-    <p>Карта "{{ search_name }}" не найдена.</p>
+    <div class="empty-state">
+        <div class="icon">🔍</div>
+        <p>По запросу «{{ search_name }}» карт не найдено.</p>
+    </div>
     {% endif %}
 </div>
 {% endif %}
