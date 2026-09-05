@@ -102,6 +102,132 @@ class TestRequestNew:
         assert r.status_code == 200
 
 
+class TestRequestsMy:
+    """Задача 3 редизайна контура возврата: /requests/my — русские статусы-бейджи,
+    формат даты «ДД.ММ.ГГГГ ЧЧ:ММ», кнопка «Отменить» только для активных,
+    одноразовые флеши отмены, пустое состояние."""
+
+    @staticmethod
+    async def _seed_request(db, *, status="new", requested_by=1, created_at="2026-09-05 16:48:13"):
+        """Прямой посев заявки с фиксированным created_at (сервис пишет только
+        'new' и текущее время — для проверки рендера нужны разные статусы/даты)."""
+        await db.execute(
+            "INSERT INTO requests (card_id, requested_by, target_branch_id, "
+            "target_department, created_at, status) VALUES (1, ?, 1, 0, ?, ?)",
+            (requested_by, created_at, status),
+        )
+        await db.conn.commit()
+
+    async def test_status_shown_as_russian_label_not_raw(self, req_client, db):
+        """Статус заявки на странице — русская подпись «Новая» с бейджем
+        badge-new, а не сырое значение 'new' в ячейке статуса."""
+        await _login(req_client)
+        await self._seed_request(db, status="new")
+        r = await req_client.get("/requests/my")
+        assert r.status_code == 200
+        assert '<span class="badge badge-new">Новая</span>' in r.text
+        assert "<td>new</td>" not in r.text
+
+    async def test_created_at_formatted_dmy_hm(self, req_client, db):
+        """Дата создания — «ДД.ММ.ГГГГ ЧЧ:ММ»; сырой формат хранения
+        «YYYY-MM-DD HH:MM:SS» в таблице не показывается."""
+        await _login(req_client)
+        await self._seed_request(db, created_at="2026-09-05 16:48:13")
+        r = await req_client.get("/requests/my")
+        assert r.status_code == 200
+        assert '<td class="date muted">05.09.2026 16:48</td>' in r.text
+        assert "2026-09-05 16:48:13" not in r.text
+
+    async def test_cancel_button_only_for_active_statuses(self, req_client, db):
+        """Кнопка «Отменить» — только у строк new/in_progress; у completed
+        и cancelled ячейка действия пустая (кнопок ровно две из четырёх)."""
+        await _login(req_client)
+        await self._seed_request(db, status="new", created_at="2026-09-05 16:48:13")
+        await self._seed_request(db, status="in_progress", created_at="2026-09-05 16:30:00")
+        await self._seed_request(db, status="completed", created_at="2026-09-05 16:00:00")
+        await self._seed_request(db, status="cancelled", created_at="2026-09-05 15:30:00")
+        r = await req_client.get("/requests/my")
+        assert r.status_code == 200
+        # Кнопок отмены ровно две (new + in_progress); в CSS base.html класс
+        # .btn-danger-ghost встречается дважды (правило + :hover), поэтому
+        # считаем именно разметку кнопки.
+        assert r.text.count('btn-danger-ghost">Отменить') == 2
+        assert '<span class="badge badge-completed">Выполнена</span>' in r.text
+        assert '<span class="badge badge-cancelled">Отменена</span>' in r.text
+
+    async def test_cancel_success_redirects_with_flash_once(self, req_client, db):
+        """Отмена своей активной заявки end-to-end: 303 на /requests/my +
+        флеш «Заявка отменена.»; первый GET показывает флеш, повторный — нет
+        (cookie-флеш одноразовый). Статус в БД — cancelled."""
+        await _login(req_client)
+        await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
+        row = await db.fetch_one("SELECT id FROM requests ORDER BY id DESC LIMIT 1")
+        r = await req_client.post(
+            "/requests/cancel", data={"request_id": str(row["id"])}, follow_redirects=False
+        )
+        assert r.status_code == 303
+        assert "/requests/my" in r.headers["location"]
+        upd = await db.fetch_one("SELECT status FROM requests WHERE id = ?", (row["id"],))
+        assert upd["status"] == "cancelled"
+        g1 = await req_client.get("/requests/my")
+        assert "Заявка отменена." in g1.text
+        g2 = await req_client.get("/requests/my")
+        assert "Заявка отменена." not in g2.text
+
+    async def test_cancel_already_cancelled_error_flash(self, req_client, db):
+        """Повторная отмена (статус cancelled) — не 500: 303 + флеш-error
+        с текстом сервиса; флеш одноразовый."""
+        await _login(req_client)
+        await self._seed_request(db, status="cancelled")
+        row = await db.fetch_one("SELECT id FROM requests ORDER BY id DESC LIMIT 1")
+        r = await req_client.post(
+            "/requests/cancel", data={"request_id": str(row["id"])}, follow_redirects=False
+        )
+        assert r.status_code == 303
+        assert "/requests/my" in r.headers["location"]
+        g1 = await req_client.get("/requests/my")
+        assert "flash flash-error" in g1.text
+        assert "Нельзя отменить заявку в статусе" in g1.text
+        g2 = await req_client.get("/requests/my")
+        assert "Нельзя отменить заявку в статусе" not in g2.text
+
+    async def test_cancel_foreign_request_error_flash(self, req_client, db):
+        """Чужая заявка (requested_by != текущий пользователь) — не 500:
+        303 + флеш-error «Нельзя отменить чужую заявку»; статус не меняется."""
+        await _login(req_client)
+        await self._seed_request(db, status="new", requested_by=2)  # arch1, не владелец
+        row = await db.fetch_one("SELECT id FROM requests WHERE requested_by = 2 ORDER BY id DESC LIMIT 1")
+        r = await req_client.post(
+            "/requests/cancel", data={"request_id": str(row["id"])}, follow_redirects=False
+        )
+        assert r.status_code == 303
+        g1 = await req_client.get("/requests/my")
+        assert "flash flash-error" in g1.text
+        assert "Нельзя отменить чужую заявку" in g1.text
+        upd = await db.fetch_one("SELECT status FROM requests WHERE id = ?", (row["id"],))
+        assert upd["status"] == "new"
+
+    async def test_cancel_missing_request_error_flash(self, req_client):
+        """Невалидный id (заявки нет) — не 500: 303 + флеш-error «Заявка не найдена»."""
+        await _login(req_client)
+        r = await req_client.post(
+            "/requests/cancel", data={"request_id": "999999"}, follow_redirects=False
+        )
+        assert r.status_code == 303
+        g1 = await req_client.get("/requests/my")
+        assert "flash flash-error" in g1.text
+        assert "Заявка не найдена" in g1.text
+
+    async def test_my_requests_empty_state(self, req_client):
+        """Заявок нет — пустое состояние «Нет заявок» со ссылкой на создание."""
+        await _login(req_client)
+        r = await req_client.get("/requests/my")
+        assert r.status_code == 200
+        assert "Нет заявок" in r.text
+        assert "Создать новую" in r.text
+        assert 'href="/requests/new"' in r.text
+
+
 class TestRequestQueue:
     async def test_queue_page_renders(self, req_client):
         await _login(req_client, "arch1")

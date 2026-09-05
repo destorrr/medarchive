@@ -1,4 +1,5 @@
 """Роутер дашборда и общих страниц."""
+from datetime import datetime
 from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Form
@@ -11,6 +12,7 @@ from medarchive.domain.statuses import (
     BoxStatus,
     CARD_STATUS_LABELS,
     BOX_STATUS_LABELS,
+    REQUEST_STATUS_LABELS,
 )
 from medarchive.adapters.sqlite.database import Database
 from medarchive.adapters.sqlite.repositories import (
@@ -134,6 +136,42 @@ _CARD_STATUS_LABELS_BY_VALUE: dict[str, str] = {
 _BOX_STATUS_LABELS_BY_VALUE: dict[str, str] = {
     s.value: label for s, label in BOX_STATUS_LABELS.items()
 }
+_REQUEST_STATUS_LABELS_BY_VALUE: dict[str, str] = {
+    s.value: label for s, label in REQUEST_STATUS_LABELS.items()
+}
+
+
+def _format_created_at(value) -> str:
+    """Дата создания «YYYY-MM-DD HH:MM:SS» (локальное время в БД)
+    → «ДД.ММ.ГГГГ ЧЧ:ММ» для показа в таблицах контура.
+
+    Нераспознанное значение (None/другой формат) возвращается как есть —
+    страница не должна падать из-за нестандартной строки в данных.
+    """
+    if not value:
+        return ""
+    try:
+        return datetime.strptime(
+            str(value), "%Y-%m-%d %H:%M:%S"
+        ).strftime("%d.%m.%Y %H:%M")
+    except ValueError:
+        return str(value)
+
+
+def _prepare_request_rows(requests: list[dict]) -> list[dict]:
+    """Обогащение строк заявок для шаблона (по образцу _prepare_search_rows):
+    status_label — русская подпись (REQUEST_STATUS_LABELS), status_badge —
+    класс badge-<status>, created_at_display — дата «ДД.ММ.ГГГГ ЧЧ:ММ».
+    Используется /requests/my и /requests (очередь, задача 4)."""
+    prepared: list[dict] = []
+    for req in requests:
+        row = dict(req)
+        status = row.get("status") or ""
+        row["status_label"] = _REQUEST_STATUS_LABELS_BY_VALUE.get(status, status)
+        row["status_badge"] = f"badge-{status}"
+        row["created_at_display"] = _format_created_at(row.get("created_at"))
+        prepared.append(row)
+    return prepared
 
 
 def highlight_match(text: str, query: str) -> Markup:
@@ -414,12 +452,14 @@ async def request_new_search_or_create(
 
 @router.get("/requests/my")
 async def requests_my_page(request: Request, user: User = Depends(require_role(UserRole.branch, UserRole.admin)), db: Database = Depends(get_db)):
-    """Мои заявки: читает одноразовый flash-cookie (создание/отмена заявки)
-    через _render_page — флеш показывает base.html и удаляет cookie."""
+    """Мои заявки: строки с русскими статусами-бейджами и датой
+    «ДД.ММ.ГГГГ ЧЧ:ММ»; читает одноразовый flash-cookie (создание/отмена
+    заявки) через _render_page — флеш показывает base.html и удаляет cookie."""
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     req_service = RequestService(db, card_repo, box_repo)
     my_requests = await req_service.get_my_requests(user.id)
+    my_requests = _prepare_request_rows(my_requests)
     ctx = _menu_context(user)
     ctx.update({"request": request, "username": user.username, "my_requests": my_requests})
     return _render_page(request, "requests_my.html", ctx)
@@ -537,11 +577,23 @@ async def cancel_request_route(
     user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
     db: Database = Depends(get_db),
 ):
+    """Отмена заявки: только своей (requested_by == user.id) и только в статусе
+    new/in_progress (статус проверяет сервис). Результат — 303 на /requests/my
+    с одноразовым флешем: success «Заявка отменена.» или error с текстом
+    причины (вместо прежнего молчаливого except ValueError: pass).
+    Невалидный id/чужая заявка/повторная отмена не роняют 500."""
+    owner = await db.fetch_one(
+        "SELECT requested_by FROM requests WHERE id = ?", (request_id,)
+    )
+    if owner is None:
+        return _flash_redirect("/requests/my", "error", "Заявка не найдена")
+    if owner["requested_by"] != user.id:
+        return _flash_redirect("/requests/my", "error", "Нельзя отменить чужую заявку")
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     req_service = RequestService(db, card_repo, box_repo)
     try:
         await req_service.cancel_request(request_id)
-    except ValueError:
-        pass  # silently ignore invalid cancellations
-    return RedirectResponse(url="/requests/my", status_code=303)
+    except ValueError as e:
+        return _flash_redirect("/requests/my", "error", str(e))
+    return _flash_redirect("/requests/my", "success", "Заявка отменена.")

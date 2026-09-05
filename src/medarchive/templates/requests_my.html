@@ -1,28 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>📋 Мои заявки</h1>
+<style>
+    /* Страница /requests/my — редизайн контура возврата (макет v3, экран 2).
+       Базовые стили (таблицы .data, .badge-*, .btn, .card, флеш-блок) — в base.html;
+       здесь только локальные для страницы. */
+    td.act form { display: inline; }
+    .empty-state { text-align: center; padding: 24px 16px; }
+    .empty-state p { color: #666; }
+    .empty-state a { color: #1a1a2e; }
+</style>
 {% if my_requests %}
 <div class="card">
-    <table><thead><tr><th>Карта</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
-    <tbody>
-    {% for r in my_requests %}
-    <tr>
-        <td>{{ r.card_name }}</td>
-        <td>{{ r.status }}</td>
-        <td>{{ r.created_at }}</td>
-        <td>
-            {% if r.status in ('new', 'in_progress') %}
-            <form method="post" action="/requests/cancel" style="display:inline">
-                <input type="hidden" name="request_id" value="{{ r.id }}">
-                <button type="submit" class="btn" style="color:#e94560">Отменить</button>
-            </form>
-            {% endif %}
-        </td>
-    </tr>
-    {% endfor %}
-    </tbody></table>
+    <table class="data">
+        <colgroup><col><col style="width:118px"><col style="width:140px"><col style="width:125px"></colgroup>
+        <thead><tr><th>Карта</th><th>Статус</th><th>Дата</th><th></th></tr></thead>
+        <tbody>
+        {% for r in my_requests %}
+        <tr>
+            <td class="fio">{{ r.card_name }}</td>
+            <td><span class="badge {{ r.status_badge }}">{{ r.status_label }}</span></td>
+            <td class="date muted">{{ r.created_at_display }}</td>
+            <td class="act">
+                {% if r.status in ('new', 'in_progress') %}
+                <form method="post" action="/requests/cancel">
+                    <input type="hidden" name="request_id" value="{{ r.id }}">
+                    <button type="submit" class="btn btn-danger-ghost">Отменить</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% else %}
-<p>Нет заявок. <a href="/requests/new">Создать новую</a>.</p>
+<div class="card"><div class="empty-state"><p>Нет заявок. <a href="/requests/new">Создать новую</a>.</p></div></div>
 {% endif %}
 {% endblock %}
