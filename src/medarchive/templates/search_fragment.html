@@ -23,7 +23,7 @@
 {% else %}
 {% if cards %}
 <div class="card" id="card-sec">
-    <h3>🧑 Карты <span class="cnt">({{ cards|length }})</span></h3>
+    <h3>Карты <span class="cnt">({{ cards|length }})</span></h3>
     {% for c in cards %}
     <div class="ci">
         <div class="ci-top"><span class="ci-fio">{{ c.full_name }}</span><span class="badge {{ c.status_badge }}">{{ c.status_label }}</span></div>
@@ -39,7 +39,7 @@
 {% endif %}
 {% if boxes %}
 <div class="card" id="box-sec">
-    <h3>📦 Коробки <span class="cnt">({{ boxes|length }})</span></h3>
+    <h3>Коробки <span class="cnt">({{ boxes|length }})</span></h3>
     {% for b in boxes %}
     <div class="bi"><span class="bi-num">{{ b.box_number }}</span><span class="badge {{ b.status_badge }}">{{ b.status_label }}</span><span class="bi-meta">{% if b.place %}{{ b.place }} · {% endif %}{{ cards_plural(b.card_count) }}</span></div>
     {% endfor %}
