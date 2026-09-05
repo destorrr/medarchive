@@ -112,3 +112,57 @@ class TestSidebarWho:
         assert r.status_code == 200
         assert 'class="branch">Администратор</span>' in r.text
         assert 'class="role">admin_user</span>' in r.text
+
+
+class _FakeCookies:
+    def __init__(self, values):
+        self._values = values or {}
+
+    def get(self, key, default=None):
+        return self._values.get(key, default)
+
+
+class _FakeRequest:
+    def __init__(self, cookies):
+        self.cookies = _FakeCookies(cookies)
+
+
+class TestFlashHelpers:
+    """Флеш-хелперы: round-trip с кириллицей, whitelist kind, мусорный cookie."""
+
+    def test_flash_redirect_roundtrip_cyrillic(self):
+        """Русский текст флеша переживает запись в cookie и чтение.
+
+        RED-условие: в _flash_redirect сырая кириллица падала в set_cookie
+        с UnicodeEncodeError (latin-1); после quote() — round-trip чистый.
+        """
+        from medarchive.routers.dashboard import _flash_redirect, _pop_flash
+
+        text = "Заявка на возврат создана. Карта будет доставлена в «Филиал_2»."
+        resp = _flash_redirect("/requests/my", "success", text)
+        assert resp.status_code == 303
+        assert resp.headers["location"] == "/requests/my"
+        raw = resp.headers.get("set-cookie", "")
+        assert "ma_flash=" in raw
+        # значение cookie в заголовке — ASCII (иначе latin-1-кодирование уже упало бы)
+        value = raw.split("ma_flash=", 1)[1].split(";", 1)[0]
+        value.encode("latin-1")  # не должно бросить UnicodeEncodeError
+        flash = _pop_flash(_FakeRequest({"ma_flash": value}))
+        assert flash == {"type": "success", "text": text}
+
+    def test_pop_flash_whitelist_kind(self):
+        """kind вне whitelist (success|error) игнорируется — клиент не подставит класс."""
+        from urllib.parse import quote
+        from medarchive.routers.dashboard import _pop_flash
+
+        req = _FakeRequest({"ma_flash": quote("hack|<script>alert(1)</script>", safe="|")})
+        assert _pop_flash(req) is None
+
+    def test_pop_flash_garbage_cookie(self):
+        """Мусорный cookie без разделителя '|' → None (без падения)."""
+        from urllib.parse import quote
+        from medarchive.routers.dashboard import _pop_flash
+
+        req = _FakeRequest({"ma_flash": quote("no-separator-value")})
+        assert _pop_flash(req) is None
+        assert _pop_flash(_FakeRequest({})) is None

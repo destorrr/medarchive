@@ -1,5 +1,5 @@
 """Роутер дашборда и общих страниц."""
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Form
 from fastapi.responses import RedirectResponse
@@ -82,24 +82,31 @@ def _flash_redirect(url: str, kind: str, text: str) -> RedirectResponse:
     """303-редирект с одноразовым флеш-сообщением.
 
     Сообщение кладётся в cookie ma_flash значением f"{kind}|{text}"
-    (kind: success|error, path="/"). GET-страницы контура читают его
-    через _pop_flash при рендере и удаляют cookie в ответе — флеш
-    показывается ровно один раз.
+    (kind: success|error, path="/"). Значение квотируется urllib.parse.quote:
+    Starlette сериализует cookie в latin-1, и сырая кириллица упала бы
+    с UnicodeEncodeError. GET-страницы контура читают его через _pop_flash
+    при рендере и удаляют cookie в ответе — флеш показывается ровно один раз.
     """
     response = RedirectResponse(url=url, status_code=303)
-    response.set_cookie("ma_flash", f"{kind}|{text}", path="/", httponly=True)
+    response.set_cookie(
+        "ma_flash", quote(f"{kind}|{text}", safe="|"), path="/", httponly=True
+    )
     return response
 
 
 def _pop_flash(request: Request) -> dict | None:
-    """Прочитать флеш из cookie ma_flash: {"type": kind, "text": text} или None."""
+    """Прочитать флеш из cookie ma_flash: {"type": kind, "text": text} или None.
+
+    kind ограничен whitelist'ом success|error (значение cookie контролируется
+    клиентом — не даём подставить произвольный класс в flash-<type>).
+    """
     raw = request.cookies.get("ma_flash")
     if not raw:
         return None
-    kind, sep, text = raw.partition("|")
-    if not sep:
+    kind, sep, text = unquote(raw).partition("|")
+    if not sep or kind not in ("success", "error"):
         return None
-    return {"type": kind or "success", "text": text}
+    return {"type": kind, "text": text}
 
 
 def _render_page(request: Request, name: str, ctx: dict):
