@@ -9,9 +9,9 @@ from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import RedirectResponse
 from medarchive.dependencies import get_db, require_role
 from medarchive.domain.models import User
-from medarchive.domain.statuses import UserRole
+from medarchive.domain.statuses import UserRole, BOX_STATUS_LABELS
 from medarchive.adapters.sqlite.repositories import CardRepositoryImpl, BoxRepositoryImpl
-from medarchive.services.box_service import BoxService, DuplicateCardError
+from medarchive.services.box_service import BoxService, DuplicateCardError, CardInAnotherBoxError
 
 router = APIRouter()
 
@@ -26,8 +26,9 @@ async def _active_box(db, user: User):
     return box, cards
 
 
-async def _fragment_ctx(db, user, request, box, cards, error=None) -> dict:
-    """Общий контекст фрагмента: содержимое активной коробки + список открытых коробок."""
+async def _fragment_ctx(db, user, request, box, cards, error=None, transfer=None) -> dict:
+    """Общий контекст фрагмента: содержимое активной коробки + список открытых коробок.
+    transfer — блок «карта в другой коробке»: {card_id, card_name, boxes:[{box_number, status_label}]}."""
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     service = BoxService(db, card_repo, box_repo)
@@ -35,6 +36,7 @@ async def _fragment_ctx(db, user, request, box, cards, error=None) -> dict:
     return {
         "request": request,
         "error": error,
+        "transfer": transfer,
         "box": box,
         "cards": cards,
         "cards_count": len(cards),
@@ -86,6 +88,44 @@ async def scan_card(request: Request, full_name: str = Form(...), user: User = D
     try:
         await service.scan_card(box.id, full_name)
     except DuplicateCardError as exc:
+        cards = await service.get_box_contents(box.id)
+        ctx = await _fragment_ctx(db, user, request, box, cards, error=str(exc))
+        return request.app.state.templates.TemplateResponse(request=request, name="packing_fragment.html", context=ctx)
+    except CardInAnotherBoxError as exc:
+        # Карта числится в другой коробке: содержимое текущей не меняется,
+        # показываем блок с кнопкой «Перенести»
+        cards = await service.get_box_contents(box.id)
+        ctx = await _fragment_ctx(db, user, request, box, cards, transfer={
+            "card_id": exc.card.id,
+            "card_name": exc.card.full_name,
+            "boxes": [
+                {
+                    "box_number": b["box_number"],
+                    "status_label": BOX_STATUS_LABELS[b["status"]],
+                }
+                for b in exc.other_boxes
+            ],
+        })
+        return request.app.state.templates.TemplateResponse(request=request, name="packing_fragment.html", context=ctx)
+    cards = await service.get_box_contents(box.id)
+    ctx = await _fragment_ctx(db, user, request, box, cards)
+    return request.app.state.templates.TemplateResponse(request=request, name="packing_fragment.html", context=ctx)
+
+
+@router.post("/packing/transfer-card")
+async def transfer_card(request: Request, card_id: int = Form(...), user: User = Depends(require_role(UserRole.branch, UserRole.admin))):
+    """Перенести карту из других активных коробок в текущую (кнопка в блоке guard)."""
+    db = await get_db()
+    box, _ = await _active_box(db, user)
+    if box is None:
+        ctx = await _fragment_ctx(db, user, request, None, [], error="Сначала создайте коробку")
+        return request.app.state.templates.TemplateResponse(request=request, name="packing_fragment.html", context=ctx)
+    card_repo = CardRepositoryImpl(db)
+    box_repo = BoxRepositoryImpl(db)
+    service = BoxService(db, card_repo, box_repo)
+    try:
+        await service.transfer_card(box.id, card_id)
+    except ValueError as exc:
         cards = await service.get_box_contents(box.id)
         ctx = await _fragment_ctx(db, user, request, box, cards, error=str(exc))
         return request.app.state.templates.TemplateResponse(request=request, name="packing_fragment.html", context=ctx)

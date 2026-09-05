@@ -162,14 +162,36 @@ class BoxRepositoryImpl:
         await self.db.conn.commit()
         return cursor.rowcount > 0
 
-    async def card_in_other_boxes(self, card_id: int, exclude_box_id: int) -> bool:
-        """Есть ли карта в других (не удалённых) коробках, кроме указанной."""
+    async def card_in_box(self, box_id: int, card_id: int) -> bool:
+        """Есть ли карта в этой коробке (активная, не удалённая запись)."""
         row = await self.db.fetch_one(
-            "SELECT COUNT(*) AS cnt FROM box_cards "
-            "WHERE card_id = ? AND removed_at IS NULL AND box_id != ?",
+            "SELECT id FROM box_cards WHERE box_id = ? AND card_id = ? AND removed_at IS NULL",
+            (box_id, card_id),
+        )
+        return row is not None
+
+    async def card_other_boxes(self, card_id: int, exclude_box_id: int) -> list[dict]:
+        """Активные коробки карты кроме указанной: [{box_id, box_number, status}]."""
+        rows = await self.db.fetch_all(
+            """SELECT b.id AS box_id, b.box_number, b.status
+               FROM box_cards bc
+               JOIN boxes b ON b.id = bc.box_id
+               WHERE bc.card_id = ? AND bc.removed_at IS NULL AND bc.box_id != ?
+               ORDER BY b.id""",
             (card_id, exclude_box_id),
         )
-        return (row["cnt"] if row else 0) > 0
+        return [
+            {
+                "box_id": r["box_id"],
+                "box_number": r["box_number"],
+                "status": BoxStatus(r["status"]),
+            }
+            for r in rows
+        ]
+
+    async def card_in_other_boxes(self, card_id: int, exclude_box_id: int) -> bool:
+        """Есть ли карта в других (не удалённых) коробках, кроме указанной."""
+        return bool(await self.card_other_boxes(card_id, exclude_box_id))
 
     async def get_cards(self, box_id: int) -> list[Card]:
         rows = await self.db.fetch_all(

@@ -9,6 +9,17 @@ class DuplicateCardError(Exception):
     """Карта уже находится в этой коробке."""
 
 
+class CardInAnotherBoxError(Exception):
+    """Карта числится в другой активной коробке (остаток) — нужен перенос."""
+
+    def __init__(self, card, other_boxes):
+        self.card = card
+        self.other_boxes = other_boxes  # [{box_id, box_number, status}] — активные, кроме текущей
+        super().__init__(
+            f"Карта «{card.full_name}» уже числится в другой коробке"
+        )
+
+
 class BoxService:
     def __init__(self, db: Database, card_repo: CardRepositoryImpl, box_repo: BoxRepositoryImpl):
         self.db = db
@@ -41,21 +52,47 @@ class BoxService:
         else:
             card = await self.card_repo.create(full_name)
 
-        # Add to box (dedup handled by repository)
-        added = await self.box_repo.add_card(box_id, card.id)
-        if not added:
+        # Карта уже в ЭТОЙ коробке — дубль (приоритет, как раньше)
+        if await self.box_repo.card_in_box(box_id, card.id):
             raise DuplicateCardError("Карта уже в этой коробке")
 
-        # Update card status to in_box
-        await self.card_repo.update_status(card.id, CardStatus.in_box)
+        # Карта числится в ДРУГИХ активных коробках — остаток, не добавляем
+        other_boxes = await self.box_repo.card_other_boxes(card.id, box_id)
+        if other_boxes:
+            raise CardInAnotherBoxError(card, other_boxes)
+
+        await self.box_repo.add_card(box_id, card.id)
+        await self._mark_packed(card.id, box_id)
         card.status = CardStatus.in_box
+        return card
+
+    async def _mark_packed(self, card_id: int, box_id: int) -> None:
+        """Общий хвост scan/transfer: статус in_box + лог packed."""
+        await self.card_repo.update_status(card_id, CardStatus.in_box)
 
         from medarchive.services.movement_service import MovementService
         ms = MovementService(self.db)
         box = await self.box_repo.get_by_id(box_id)
         box_label = box.box_number if box else str(box_id)
-        await ms.log_movement(card.id, "packed", None, f"box {box_label}")
+        await ms.log_movement(card_id, "packed", None, f"box {box_label}")
 
+    async def transfer_card(self, box_id: int, card_id: int) -> Card:
+        """Перенести карту в текущую коробку: снять со всех остальных активных коробок,
+        добавить сюда (статус in_box, лог packed).
+        Guard: карта не числится в других коробках или уже в текущей — ValueError."""
+        other_boxes = await self.box_repo.card_other_boxes(card_id, box_id)
+        if not other_boxes:
+            raise ValueError("Карта не числится в других коробках — переносить нечего")
+        if await self.box_repo.card_in_box(box_id, card_id):
+            raise ValueError("Карта уже в этой коробке — перенос не нужен")
+
+        for other in other_boxes:
+            await self.remove_card(other["box_id"], card_id)
+
+        await self.box_repo.add_card(box_id, card_id)
+        await self._mark_packed(card_id, box_id)
+        card = await self.card_repo.get_by_id(card_id)
+        card.status = CardStatus.in_box
         return card
 
     async def remove_card(self, box_id: int, card_id: int) -> None:

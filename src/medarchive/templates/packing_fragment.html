@@ -1,4 +1,16 @@
 {% if error %}<div class="flash" style="margin-bottom:16px">{{ error }}</div>{% endif %}
+{% if transfer %}
+<div class="flash" style="margin-bottom:16px">
+    <div style="margin-bottom:8px">
+        ⚠️ Карта «{{ transfer.card_name }}» уже числится в
+        {%- for b in transfer.boxes %} {{ b.box_number }} ({{ b.status_label }}){% if not loop.last %},{% endif %}{% endfor %}.
+    </div>
+    <form hx-post="/packing/transfer-card" hx-target="#main-content" hx-swap="innerHTML" style="margin:0">
+        <input type="hidden" name="card_id" value="{{ transfer.card_id }}">
+        <button type="submit" class="btn btn-primary">Перенести в эту коробку</button>
+    </form>
+</div>
+{% endif %}
 <h1>📦 Упаковка коробки</h1>
 
 {% if box %}

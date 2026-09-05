@@ -207,3 +207,109 @@ class TestPackingRouter:
         assert r.status_code == 303  # редирект, не 500
         row = await db.fetch_one("SELECT status FROM boxes WHERE id = 500")
         assert row["status"] == "packing"  # не закрыта
+
+
+class TestCardInAnotherBoxGuard:
+    """Guard «карта в другой коробке»: предупреждение + кнопка «Перенести»."""
+
+    async def _db(self):
+        from medarchive.dependencies import get_db
+        return await get_db()
+
+    async def _card_id(self, full_name):
+        db = await self._db()
+        row = await db.fetch_one("SELECT id FROM cards WHERE full_name = ?", (full_name,))
+        return row["id"]
+
+    async def test_scan_busy_card_shows_warning_without_adding(self, packing_client):
+        """Скан карты, числящейся в другой коробке: предупреждение «уже числится» + кнопка «Перенести»,
+        в содержимое текущей коробки карта не попадает."""
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")  # B-0001
+        await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})
+        await packing_client.post("/packing/new-box")  # B-0002 — активная
+
+        r = await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})
+        assert r.status_code == 200
+        assert "уже числится" in r.text
+        assert "B-0001" in r.text and "Упаковывается" in r.text  # номер и статус старой коробки
+        assert "Перенести в эту коробку" in r.text
+        # в содержимом текущей коробки карты нет
+        db = await self._db()
+        card_id = await self._card_id("Иванов И.И.")
+        row = await db.fetch_one(
+            "SELECT COUNT(*) AS cnt FROM box_cards bc JOIN boxes b ON b.id = bc.box_id "
+            "WHERE bc.card_id = ? AND bc.removed_at IS NULL AND b.status = 'packing' "
+            "AND b.id != (SELECT id FROM boxes WHERE box_number = 'B-0001')",
+            (card_id,),
+        )
+        assert row["cnt"] == 0
+
+    async def test_transfer_card_moves_to_current_box(self, packing_client):
+        """POST /packing/transfer-card: карта появляется в текущей коробке и снята со старой (БД)."""
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")  # B-0001
+        await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})
+        await packing_client.post("/packing/new-box")  # B-0002 — активная
+        await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})  # guard
+
+        card_id = await self._card_id("Иванов И.И.")
+        r = await packing_client.post("/packing/transfer-card", data={"card_id": card_id})
+        assert r.status_code == 200
+        assert "Иванов" in r.text
+
+        db = await self._db()
+        # снята со старой B-0001
+        row = await db.fetch_one(
+            "SELECT bc.removed_at FROM box_cards bc JOIN boxes b ON b.id = bc.box_id "
+            "WHERE bc.card_id = ? AND b.box_number = 'B-0001'",
+            (card_id,),
+        )
+        assert row["removed_at"] is not None
+        # в текущей (последней packing-коробке пользователя) — активная запись
+        row = await db.fetch_one(
+            "SELECT COUNT(*) AS cnt FROM box_cards bc JOIN boxes b ON b.id = bc.box_id "
+            "WHERE bc.card_id = ? AND bc.removed_at IS NULL AND b.status = 'packing' ",
+            (card_id,),
+        )
+        assert row["cnt"] == 1
+        row = await db.fetch_one("SELECT status FROM cards WHERE id = ?", (card_id,))
+        assert row["status"] == "in_box"
+
+    async def test_transfer_card_without_other_boxes_shows_error(self, packing_client):
+        """Карта только в текущей коробке: transfer-card → флеш-ошибка, ничего не снимается."""
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")
+        await packing_client.post("/packing/scan-card", data={"full_name": "Иванов И.И."})
+
+        card_id = await self._card_id("Иванов И.И.")
+        r = await packing_client.post("/packing/transfer-card", data={"card_id": card_id})
+        assert r.status_code == 200
+        assert "не числится в других коробках" in r.text
+        db = await self._db()
+        row = await db.fetch_one(
+            "SELECT removed_at FROM box_cards WHERE card_id = ?", (card_id,)
+        )
+        assert row["removed_at"] is None
+
+    async def test_transfer_card_without_box_shows_error(self, packing_client):
+        """Нет активной коробки: transfer-card → «Сначала создайте коробку»."""
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        db = await self._db()
+        await db.execute("INSERT INTO cards (id, full_name) VALUES (777, 'Одинокая Карта')")
+        await db.conn.commit()
+        r = await packing_client.post("/packing/transfer-card", data={"card_id": 777})
+        assert r.status_code == 200
+        assert "Сначала создайте коробку" in r.text
+
+    async def test_regular_scan_and_duplicate_still_work(self, packing_client):
+        """Регресс: обычный скан и дубль-сообщение не сломаны."""
+        await packing_client.post("/login", data={"username": "branch1", "password": "test123"})
+        await packing_client.post("/packing/new-box")
+        r = await packing_client.post("/packing/scan-card", data={"full_name": "Петров П.П."})
+        assert r.status_code == 200
+        assert "Петров" in r.text and "уже числится" not in r.text
+        r = await packing_client.post("/packing/scan-card", data={"full_name": "Петров П.П."})
+        assert r.status_code == 200
+        assert "уже в этой коробке" in r.text
+        assert "уже числится" not in r.text
