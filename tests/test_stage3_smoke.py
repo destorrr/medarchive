@@ -70,10 +70,10 @@ class TestStage3E2E:
         assert r.status_code == 200
         assert "размещена на полке" in r.text
 
-        # 7. Search — find the card
+        # 7. Search — find the card (GET с query; POST /search больше не используется)
         r = await ac.get("/search")
         assert r.status_code == 200
-        r = await ac.post("/search", data={"query": "Петров"})
+        r = await ac.get("/search", params={"query": "Петров"})
         assert r.status_code == 200
         assert "Петров" in r.text
 
