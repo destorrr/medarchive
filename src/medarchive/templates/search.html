@@ -108,6 +108,35 @@
         clearSearch();
         q.focus();
     });
+
+    // Защита от устаревших ответов живого поиска.
+    // htmx сам откладывает debounce-запрос на 350 мс; Esc/«✕» в этом окне не
+    // отменяют его, поэтому:
+    // 1) отложенный запрос со старым query после очистки превращаем в idle;
+    // 2) если ответ пришёл после того, как поле уже изменили/очистили —
+    //    перезапрашиваем актуальное состояние.
+    var lastRequestedQuery = null;
+
+    document.body.addEventListener('htmx:configRequest', function (e) {
+        var elt = e.detail.elt;
+        var target = e.detail.target;
+        if (!elt || elt.id !== 'search-q') return;
+        if (!target || target.id !== 'search-results') return;
+        var current = q.value.trim();
+        var reqQ = String(e.detail.parameters.query || '').trim();
+        lastRequestedQuery = current;
+        if (reqQ && !current) e.detail.parameters.query = ''; // stale → idle
+    });
+
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+        var target = e.detail.target;
+        if (!target || target.id !== 'search-results') return;
+        if (lastRequestedQuery !== null) {
+            var current = q.value.trim();
+            if (current !== lastRequestedQuery) refreshResults();
+            lastRequestedQuery = null;
+        }
+    });
 })();
 </script>
 {% endblock %}
