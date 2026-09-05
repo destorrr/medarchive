@@ -498,12 +498,25 @@ async def fulfill_request(
     Успех → 303 на /requests с одноразовым флешем «Заявка выполнена»
     (при courier_id>0 — «…и передана курьеру»); ValueError (заявки нет,
     статус не new/in_progress) — тоже 303, но с флешем-error (текст ошибки
-    сервиса сохранён) вместо прежнего рендера 400. Бизнес-логика fulfill и
-    создание возвратной отправки (RB-коробка + transfer_box при курьере)
-    не менялись; courier_id=0 — выполнение без отправки."""
+    сервиса сохранён) вместо прежнего рендера 400. courier_id>0 валидируется
+    ДО выполнения заявки: несуществующий курьер не должен оставить заявку
+    выполненной без отправки (по review-gates Задачи 4, Minor-1);
+    courier_id=0 — выполнение без отправки."""
     card_repo = CardRepositoryImpl(db)
     box_repo = BoxRepositoryImpl(db)
     req_service = RequestService(db, card_repo, box_repo)
+
+    # Валидация курьера до изменения состояния: подделанный/устаревший
+    # courier_id (FK shipments.courier_id → couriers.id) иначе дал бы
+    # IntegrityError → 500 уже после коммита fulfill_request (заявка
+    # выполнена, возвратной отправки нет — несогласованные данные).
+    if action == "single" and courier_id > 0:
+        courier_repo = CourierRepositoryImpl(db)
+        courier = await courier_repo.get_by_id(courier_id)
+        if courier is None:
+            return _flash_redirect(
+                "/requests", "error", f"Курьер с id={courier_id} не найден."
+            )
 
     try:
         await req_service.fulfill_request(request_id, user.id)

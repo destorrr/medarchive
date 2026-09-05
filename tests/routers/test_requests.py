@@ -398,3 +398,33 @@ class TestRequestQueueRedesign:
         g1 = await req_client.get("/requests")
         assert "flash flash-error" in g1.text
         assert "Нельзя выполнить заявку в статусе" in g1.text
+
+    async def test_fulfill_with_unknown_courier_no_500(self, req_client, db):
+        """Несуществующий курьер (courier_id=999) — не 500 и без IntegrityError:
+        валидация до изменения состояния; 303 + флеш-error; заявка остаётся new,
+        карта не уходит in_transit (по review-gates Задачи 4, Minor-1)."""
+        await _login(req_client, "branch1")
+        await req_client.post("/requests/new", data={"card_id": 1}, follow_redirects=False)
+        req_row = await db.fetch_one(
+            "SELECT id, status FROM requests ORDER BY id DESC LIMIT 1"
+        )
+        await req_client.get("/logout")
+        await _login(req_client, "arch1")
+        r = await req_client.post(
+            "/requests/fulfill",
+            data={
+                "request_id": str(req_row["id"]),
+                "action": "single",
+                "courier_id": "999",
+            },
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        g1 = await req_client.get("/requests")
+        assert "flash flash-error" in g1.text
+        req_after = await db.fetch_one(
+            "SELECT status FROM requests WHERE id = ?", (req_row["id"],)
+        )
+        assert req_after["status"] == "new"  # состояние не изменилось
+        card = await db.fetch_one("SELECT status FROM cards WHERE id = 1")
+        assert card["status"] == "placed"  # карта не тронута
