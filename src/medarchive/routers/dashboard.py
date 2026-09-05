@@ -62,19 +62,49 @@ MENU_BY_ROLE = {
 }
 
 
+def _user_full_name(user: User) -> str:
+    """Имя для профиля сайдбара: users.full_name, при пустом — username."""
+    return user.full_name or user.username
+
+
+def _user_initials(user: User) -> str:
+    """Инициалы для аватара: первые буквы первого и второго слова full_name
+    (например «Иванова П.С.» → «ИП»); если full_name пусто/одно слово —
+    первая буква username в верхнем регистре."""
+    words = [w for w in (user.full_name or "").split() if w]
+    if len(words) >= 2:
+        return (words[0][0] + words[1][0]).upper()
+    username = user.username or "?"
+    return username[0].upper()
+
+
 def _menu_context(user: User) -> dict:
     """Общий контекст для шаблонов, расширяющих base.html.
 
-    user_branch — имя филиала пользователя (динамический атрибут branch_name,
-    заполняется в dependencies.get_current_user) или, если филиала нет,
-    русская подпись роли; user_login — логин (user.username).
-    role_label/menu_items сохранены для совместимости.
+    Сайдбар v5 (раунд 2): подпись-группа роли (role_label), пункты меню
+    (menu_items, у Архива на «Очередь заявок» — badge со счётчиком активных
+    заявок, если > 0), профиль внизу — user_full_name (ФИО или username),
+    user_initials (аватар), user_branch (имя филиала или подпись роли),
+    user_role_pill (пилюля роли). user_login оставлен для совместимости.
+    active_requests_count кладёт на user dependencies.get_current_user
+    (роль archive).
     """
+    role_label = ROLE_LABELS.get(user.role, "Неизвестно")
+    active_requests = getattr(user, "active_requests_count", 0) or 0
+    items = []
+    for it in MENU_BY_ROLE.get(user.role, []):
+        row = dict(it)
+        if user.role == UserRole.archive and row.get("url") == "/requests" and active_requests > 0:
+            row["badge"] = str(active_requests)
+        items.append(row)
     return {
-        "role_label": ROLE_LABELS.get(user.role, "Неизвестно"),
-        "user_branch": getattr(user, "branch_name", None) or ROLE_LABELS.get(user.role, "Неизвестно"),
+        "role_label": role_label,
+        "user_branch": getattr(user, "branch_name", None) or role_label,
         "user_login": user.username,
-        "menu_items": MENU_BY_ROLE.get(user.role, []),
+        "menu_items": items,
+        "user_full_name": _user_full_name(user),
+        "user_initials": _user_initials(user),
+        "user_role_pill": role_label,
     }
 
 

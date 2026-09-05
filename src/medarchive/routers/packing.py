@@ -48,16 +48,20 @@ async def _fragment_ctx(db, user, request, box, cards, error=None, transfer=None
 async def _page_ctx(db, user, request, box, cards) -> dict:
     """Полный контекст страницы /packing (шапка + фрагмент)."""
     # Ленивый импорт: dashboard в main.py подключается позже packing.
-    from medarchive.routers.dashboard import ROLE_LABELS
+    from medarchive.routers.dashboard import ROLE_LABELS, _user_full_name, _user_initials
 
     ctx = await _fragment_ctx(db, user, request, box, cards)
+    role_label = ROLE_LABELS.get(user.role, "Филиал")
     ctx.update({
         "username": user.username,
-        "role_label": "Филиал",
+        "role_label": role_label,
         # user_branch/user_login — как в _menu_context(dashboard): имя филиала
         # (динамический атрибут branch_name из get_current_user) или роль.
-        "user_branch": getattr(user, "branch_name", None) or ROLE_LABELS.get(user.role, "Филиал"),
+        "user_branch": getattr(user, "branch_name", None) or role_label,
         "user_login": user.username,
+        "user_full_name": _user_full_name(user),
+        "user_initials": _user_initials(user),
+        "user_role_pill": role_label,
         "menu_items": [],
     })
     return ctx

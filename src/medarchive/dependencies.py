@@ -56,6 +56,14 @@ async def get_current_user(request: Request) -> User:
     # Имя филиала из LEFT JOIN branches (None, если филиал не привязан).
     # Кладём динамическим атрибутом — dataclass User не меняем (совместимость).
     user.branch_name = row["branch_name"]
+    # Счётчик активных заявок для сайдбара (раунд 2): только роль Архив,
+    # пункт «Очередь заявок»; 0, если активных (new/in_progress) нет —
+    # бейдж в шаблоне тогда не выводится.
+    if user.role == UserRole.archive:
+        cnt = await db.fetch_one(
+            "SELECT COUNT(*) AS cnt FROM requests WHERE status IN ('new','in_progress')"
+        )
+        user.active_requests_count = cnt["cnt"] if cnt else 0
     return user
 
 

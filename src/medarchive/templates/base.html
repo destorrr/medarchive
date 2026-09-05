@@ -8,15 +8,30 @@
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; background: #f5f5f5; display: flex; min-height: 100vh; }
-        .sidebar { width: 240px; background: #1a1a2e; color: #eee; padding: 20px 0; flex-shrink: 0; }
-        .sidebar h2 { padding: 0 20px 16px; font-size: 18px; color: #e94560; border-bottom: 1px solid #333; margin-bottom: 8px; }
-        .sidebar nav a { display: block; padding: 10px 20px; color: #ccc; text-decoration: none; font-size: 14px; }
+        /* Сайдбар v5 (макет return_flow_redesign_mockup_v5.html, раунд 2):
+           логотип без иконки, подпись-группа роли, меню, профиль внизу.
+           ВАЖНО: в CSS-комментариях не писать звёздочку-слэш внутри текста
+           комментария — она преждевременно закроет блок. */
+        .sidebar { width: 232px; background: #1a1a2e; color: #eee; flex-shrink: 0; display: flex; flex-direction: column; }
+        .sidebar .brand { padding: 18px 16px 14px; border-bottom: 1px solid #2a2a40; line-height: 1.2; }
+        .sidebar .brand b { display: block; font-size: 16px; color: #fff; }
+        .sidebar .brand span { font-size: 10.5px; color: #8899aa; letter-spacing: .3px; }
+        .sidebar .group-label { padding: 12px 16px 4px; font-size: 10px; color: #667788; text-transform: uppercase; letter-spacing: .8px; }
+        .sidebar nav a { display: flex; align-items: center; gap: 8px; padding: 9px 16px; color: #bcc; text-decoration: none; font-size: 13.5px; }
         .sidebar nav a:hover { background: #16213e; color: #fff; }
-        .sidebar .who { padding: 2px 20px 12px; border-bottom: 1px solid #2a2a40; margin-bottom: 8px; }
-        .sidebar .who .branch { display: block; font-size: 15px; font-weight: 700; color: #fff; }
-        .sidebar .who .role { display: block; font-size: 12px; color: #8899aa; margin-top: 2px; }
-        .sidebar .logout { margin-top: 20px; padding: 0 20px; }
-        .sidebar .logout a { color: #e94560; text-decoration: none; font-size: 13px; }
+        .sidebar nav a.active { background: #16213e; color: #fff; border-left: 3px solid #e94560; }
+        .sidebar nav a .cnt { margin-left: auto; background: #e94560; color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 1px 8px; min-width: 20px; text-align: center; flex-shrink: 0; }
+        .sidebar .spacer { flex: 1; }
+        .sidebar .profile { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-top: 1px solid #2a2a40; background: #151528; }
+        .sidebar .profile .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #5a5ac0, #8b5ac0); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .sidebar .profile .who { min-width: 0; flex: 1; line-height: 1.25; }
+        .sidebar .profile .who .name { font-size: 13px; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
+        .sidebar .profile .who .branch { font-size: 11.5px; color: #8899aa; overflow-wrap: anywhere; }
+        .sidebar .profile .role-pill { background: #e94560; color: #fff; font-size: 10.5px; font-weight: 700; border-radius: 10px; padding: 2px 9px; flex-shrink: 0; white-space: nowrap; }
+        .sidebar .profile .role-pill.alt { background: #a4508b; }
+        .sidebar .logout { padding: 10px 16px 14px; }
+        .sidebar .logout a { color: #8899aa; text-decoration: none; font-size: 12px; }
+        .sidebar .logout a:hover { color: #e94560; }
         .main { flex: 1; padding: 24px; }
         .main h1 { font-size: 22px; margin-bottom: 16px; color: #1a1a2e; }
         .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
@@ -58,13 +73,24 @@
 </head>
 <body>
     <aside class="sidebar">
-        <h2>📦 МедАрхив</h2>
-        <div class="who"><span class="branch">{{ user_branch or role_label }}</span><span class="role">{{ user_login or '' }}</span></div>
+        <div class="brand"><b>МедАрхив</b><span>учёт медкарт</span></div>
+        {% if menu_items %}
+        <div class="group-label">{{ role_label }}</div>
         <nav>
             {% for item in menu_items %}
-            <a href="{{ item.url }}">{{ item.label }}</a>
+            <a href="{{ item.url }}" class="{% if request.url.path == item.url or (item.url == '/requests/new' and request.url.path.startswith('/requests/')) %}active{% endif %}">{{ item.label }}{% if item.badge is defined and item.badge %}<span class="cnt">{{ item.badge }}</span>{% endif %}</a>
             {% endfor %}
         </nav>
+        {% endif %}
+        <div class="spacer"></div>
+        <div class="profile">
+            <div class="avatar">{{ user_initials }}</div>
+            <div class="who">
+                <div class="name">{{ user_full_name }}</div>
+                <div class="branch">{{ user_branch }}</div>
+            </div>
+            <div class="role-pill{% if role_label == 'Архив' %} alt{% endif %}">{{ user_role_pill }}</div>
+        </div>
         <div class="logout"><a href="/logout">Выход</a></div>
     </aside>
     <div class="main" id="main-content">
