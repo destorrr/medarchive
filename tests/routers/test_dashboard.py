@@ -78,6 +78,7 @@ class TestDashboard:
         assert r.status_code == 200
         assert "Карт всего" in r.text
 
+
     async def test_dashboard_shows_recent_movements(self, client, db):
         # Seed system user for FK
         await db.execute("INSERT OR REPLACE INTO users (id, username, password_hash, role) VALUES (0, 'sys', 'h', 'admin')")
@@ -91,3 +92,23 @@ class TestDashboard:
         r = await client.get("/dashboard")
         assert r.status_code == 200
         assert "Пациент Дашборд" in r.text
+
+
+class TestSidebarWho:
+    """Блок .who в сайдбаре: имя филиала (или роль) + логин пользователя."""
+
+    async def test_branch_user_sees_branch_name_and_login(self, client):
+        """Роль branch с филиалом: в сайдбаре имя филиала (branch_name) и логин."""
+        await client.post("/login", data={"username": "branch_user", "password": "test123"})
+        r = await client.get("/dashboard")
+        assert r.status_code == 200
+        assert 'class="branch">Test Branch</span>' in r.text
+        assert 'class="role">branch_user</span>' in r.text
+
+    async def test_admin_without_branch_sees_role_label(self, client):
+        """Роль без филиала: первая строка — русская подпись роли."""
+        await client.post("/login", data={"username": "admin_user", "password": "test123"})
+        r = await client.get("/dashboard")
+        assert r.status_code == 200
+        assert 'class="branch">Администратор</span>' in r.text
+        assert 'class="role">admin_user</span>' in r.text

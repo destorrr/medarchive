@@ -75,6 +75,15 @@ class RequestStatus(str, Enum):
     not_found = "not_found"
 
 
+REQUEST_STATUS_LABELS: dict[RequestStatus, str] = {
+    RequestStatus.new: "Новая",
+    RequestStatus.in_progress: "В работе",
+    RequestStatus.completed: "Выполнена",
+    RequestStatus.cancelled: "Отменена",
+    RequestStatus.not_found: "Не найдена",
+}
+
+
 class UserRole(str, Enum):
     branch = "branch"
     archive = "archive"

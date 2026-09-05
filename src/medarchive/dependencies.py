@@ -42,11 +42,21 @@ async def get_current_user(request: Request) -> User:
         raise HTTPException(status_code=401, detail="Invalid session")
 
     db = await get_db()
-    row = await db.fetch_one("SELECT * FROM users WHERE id = ?", (payload["user_id"],))
+    row = await db.fetch_one(
+        """SELECT u.*, b.name AS branch_name
+           FROM users u
+           LEFT JOIN branches b ON b.id = u.branch_id
+           WHERE u.id = ?""",
+        (payload["user_id"],),
+    )
     if row is None:
         raise HTTPException(status_code=401, detail="User not found")
 
-    return User.from_row(row)
+    user = User.from_row(row)
+    # Имя филиала из LEFT JOIN branches (None, если филиал не привязан).
+    # Кладём динамическим атрибутом — dataclass User не меняем (совместимость).
+    user.branch_name = row["branch_name"]
+    return user
 
 
 def require_role(*roles: UserRole):

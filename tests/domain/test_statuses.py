@@ -10,6 +10,7 @@ from medarchive.domain.statuses import (
     BOX_STATUS_TRANSITIONS,
     CARD_STATUS_LABELS,
     BOX_STATUS_LABELS,
+    REQUEST_STATUS_LABELS,
 )
 
 
@@ -86,6 +87,19 @@ class TestRequestStatus:
     def test_all_statuses_defined(self):
         expected = {"new", "in_progress", "completed", "cancelled", "not_found"}
         assert {s.value for s in RequestStatus} == expected
+
+    def test_labels_cover_all_statuses(self):
+        """REQUEST_STATUS_LABELS покрывает каждый RequestStatus, значения непустые."""
+        expected = {
+            RequestStatus.new: "Новая",
+            RequestStatus.in_progress: "В работе",
+            RequestStatus.completed: "Выполнена",
+            RequestStatus.cancelled: "Отменена",
+            RequestStatus.not_found: "Не найдена",
+        }
+        assert REQUEST_STATUS_LABELS == expected
+        assert set(REQUEST_STATUS_LABELS) == set(RequestStatus)
+        assert all(REQUEST_STATUS_LABELS.values())
 
 
 class TestUserRole:

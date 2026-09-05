@@ -63,10 +63,61 @@ MENU_BY_ROLE = {
 
 
 def _menu_context(user: User) -> dict:
+    """Общий контекст для шаблонов, расширяющих base.html.
+
+    user_branch — имя филиала пользователя (динамический атрибут branch_name,
+    заполняется в dependencies.get_current_user) или, если филиала нет,
+    русская подпись роли; user_login — логин (user.username).
+    role_label/menu_items сохранены для совместимости.
+    """
     return {
         "role_label": ROLE_LABELS.get(user.role, "Неизвестно"),
+        "user_branch": getattr(user, "branch_name", None) or ROLE_LABELS.get(user.role, "Неизвестно"),
+        "user_login": user.username,
         "menu_items": MENU_BY_ROLE.get(user.role, []),
     }
+
+
+def _flash_redirect(url: str, kind: str, text: str) -> RedirectResponse:
+    """303-редирект с одноразовым флеш-сообщением.
+
+    Сообщение кладётся в cookie ma_flash значением f"{kind}|{text}"
+    (kind: success|error, path="/"). GET-страницы контура читают его
+    через _pop_flash при рендере и удаляют cookie в ответе — флеш
+    показывается ровно один раз.
+    """
+    response = RedirectResponse(url=url, status_code=303)
+    response.set_cookie("ma_flash", f"{kind}|{text}", path="/", httponly=True)
+    return response
+
+
+def _pop_flash(request: Request) -> dict | None:
+    """Прочитать флеш из cookie ma_flash: {"type": kind, "text": text} или None."""
+    raw = request.cookies.get("ma_flash")
+    if not raw:
+        return None
+    kind, sep, text = raw.partition("|")
+    if not sep:
+        return None
+    return {"type": kind or "success", "text": text}
+
+
+def _render_page(request: Request, name: str, ctx: dict):
+    """Рендер GET-страницы с одноразовым флешем (удобный паттерн).
+
+    Если в запросе есть cookie ma_flash — кладём его в ctx["flash"]
+    (base.html рисует блок .flash.flash-<type>) и удаляем cookie
+    в ответе: флеш не повторится при следующем GET.
+    """
+    flash = _pop_flash(request)
+    if flash is not None:
+        ctx["flash"] = flash
+    response = request.app.state.templates.TemplateResponse(
+        request=request, name=name, context=ctx
+    )
+    if flash is not None:
+        response.delete_cookie("ma_flash", path="/")
+    return response
 
 
 # Статусы (сырые значения из БД) → русские подписи и классы бейджей base.html.

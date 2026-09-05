@@ -12,7 +12,9 @@
         .sidebar h2 { padding: 0 20px 16px; font-size: 18px; color: #e94560; border-bottom: 1px solid #333; margin-bottom: 8px; }
         .sidebar nav a { display: block; padding: 10px 20px; color: #ccc; text-decoration: none; font-size: 14px; }
         .sidebar nav a:hover { background: #16213e; color: #fff; }
-        .sidebar .role-badge { padding: 4px 20px 12px; font-size: 12px; color: #888; }
+        .sidebar .who { padding: 2px 20px 12px; border-bottom: 1px solid #2a2a40; margin-bottom: 8px; }
+        .sidebar .who .branch { display: block; font-size: 15px; font-weight: 700; color: #fff; }
+        .sidebar .who .role { display: block; font-size: 12px; color: #8899aa; margin-top: 2px; }
         .sidebar .logout { margin-top: 20px; padding: 0 20px; }
         .sidebar .logout a { color: #e94560; text-decoration: none; font-size: 13px; }
         .main { flex: 1; padding: 24px; }
@@ -34,12 +36,28 @@
         .badge-in_transit { background: #fff3cd; color: #8a6d1a; }
         .badge-in_archive, .badge-placed { background: #e8f5e9; color: #2e7d32; }
         .badge-pending_return { background: #fdecea; color: #c0392b; }
+        /* бейджи статусов заявок на возврат (контур возврата) */
+        .badge-new { background: #e3f2fd; color: #1565c0; }
+        .badge-in_progress { background: #fff3cd; color: #8a6d1a; }
+        .badge-completed { background: #e8f5e9; color: #2e7d32; }
+        .badge-cancelled, .badge-not_found { background: #eceff1; color: #607d8b; }
+        /* единый табличный стиль контура возврата */
+        table.data { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        table.data th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #eee; font-weight: 600; color: #1a1a2e; font-size: 13px; white-space: nowrap; }
+        table.data td { padding: 9px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+        table.data tr:last-child td { border-bottom: none; }
+        .fio { font-weight: 600; color: #1a1a2e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .date { white-space: nowrap; }
+        .act { text-align: right; white-space: nowrap; }
+        .muted { color: #888; font-size: 12.5px; }
+        .table-footer { margin-top: 14px; text-align: right; }
+        select.row-sel { padding: 7px 10px; border: 1px solid #ccd; border-radius: 7px; font: inherit; font-size: 13px; background: #fff; color: #1a1a2e; max-width: 150px; }
     </style>
 </head>
 <body>
     <aside class="sidebar">
         <h2>📦 МедАрхив</h2>
-        <div class="role-badge">{{ role_label }}</div>
+        <div class="who"><span class="branch">{{ user_branch or role_label }}</span><span class="role">{{ user_login or '' }}</span></div>
         <nav>
             {% for item in menu_items %}
             <a href="{{ item.url }}">{{ item.label }}</a>
@@ -49,6 +67,7 @@
     </aside>
     <div class="main" id="main-content">
         {% if error %}<div class="flash">{{ error }}</div>{% endif %}
+        {% if flash %}<div class="flash flash-{{ flash.type }}">{{ flash.text }}</div>{% endif %}
         {% block content %}{% endblock %}
     </div>
     {% block scripts %}{% endblock %}
