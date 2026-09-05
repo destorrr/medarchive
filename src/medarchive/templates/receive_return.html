@@ -2,38 +2,49 @@
 {% block content %}
 <h1>📥 Приём возврата</h1>
 <style>
-    /* Страница /receive-return — редизайн контура возврата (макет v3, экран 4).
-       Двухшаговый приём: сканер → превью во фрагменте #scan-result (стили
-       таблиц .data/.badge-*/.table-footer — в base.html, h3 карточки — в
-       receive_return_result.html). */
-    .search-box { display: flex; gap: 8px; align-items: center; }
+    /* Страница /receive-return — живой поиск по ФИО (макет v5, экран 4;
+       задача 5 раунда 2): кнопка «Проверить» и POST /receive-return/check
+       удалены — инпут на всю ширину шлёт GET /receive-return/search во
+       фрагмент #scan-result по мере ввода (как /requests/new и /search).
+       Базовые стили (.card, table.data, .badge-*, .btn, .act, .flash) —
+       в base.html; здесь локальные для страницы и фрагмента. */
     .search-box input {
-        flex: 1; padding: 12px 14px; border: 2px solid #ddd; border-radius: 8px;
+        width: 100%; padding: 12px 14px; border: 2px solid #ddd; border-radius: 8px;
         font: inherit; font-size: 16px; outline: none; background: #fff; color: #1a1a2e;
     }
     .search-box input:focus { border-color: #e94560; }
     .search-box input::placeholder { color: #aaa; }
+    .search-hint { margin-top: 8px; font-size: 12px; color: #888; }
+    .card h3 { font-size: 15px; margin-bottom: 10px; color: #1a1a2e; }
+
+    /* Пустые состояния (idle / ничего не найдено) */
+    .empty-state { text-align: center; padding: 24px 16px; }
+    .empty-state .icon { font-size: 30px; margin-bottom: 8px; }
+    .empty-state p { color: #666; }
+    .empty-state .hint { margin-top: 6px; font-size: 12px; color: #999; }
 </style>
 
 <div class="card">
-    <form hx-post="/receive-return/check" hx-target="#scan-result">
-        <div class="form-group">
-            <label for="card_id">Сканер (QR-код или ID карты)</label>
-            <div class="search-box">
-                <input type="text" id="card_id" name="card_id" autofocus autocomplete="off"
-                       placeholder="Отсканируйте QR или введите ID карты…"
-                       hx-on::after-request="this.value='';this.focus()">
-                <button type="submit" class="btn btn-primary">Проверить</button>
-            </div>
+    <div class="form-group">
+        <label for="receive-q">Поиск карты (ФИО)</label>
+        <div class="search-box">
+            <input type="text" id="receive-q" name="query"
+                   placeholder="Фамилия или ФИО…" autocomplete="off" autofocus
+                   hx-get="/receive-return/search"
+                   hx-trigger="input changed delay:350ms, search"
+                   hx-target="#scan-result" hx-swap="innerHTML">
         </div>
-    </form>
+        <div class="search-hint">Результаты обновляются по мере ввода · поиск без учёта регистра</div>
+    </div>
 </div>
-<div id="scan-result"></div>
+<div id="scan-result">
+    {% include "receive_return_result.html" %}
+</div>
 {% endblock %}
 {% block scripts %}
 <script>
-    // Возврат фокуса в поле сканера при загрузке страницы (после флеш-ошибки)
-    var input = document.querySelector('input[autofocus]');
+    // Возврат фокуса в поле поиска при загрузке страницы (после флеш-ошибки)
+    var input = document.getElementById('receive-q');
     if (input) { input.focus(); }
 </script>
 {% endblock %}

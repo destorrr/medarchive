@@ -632,56 +632,103 @@ async def receive_return_page(
     request: Request,
     user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
 ):
-    """Страница приёма возврата (редизайн контура возврата, задача 5).
+    """Страница приёма возврата (задача 5 раунда 2 редизайна контура возврата).
 
-    Двухшаговый паттерн /receive: карточка сканера (input card_id + кнопка
-    «Проверить») с htmx-формой на /receive-return/check (target #scan-result),
-    результат проверки приходит фрагментом в #scan-result. Рендер через
-    _render_page — одноразовый флеш (ошибка подтверждения) показывается
-    вверху страницы и удаляется из cookie.
+    Живой htmx-поиск карт по ФИО (макет v5, экран 4): инпут на всю ширину
+    шлёт GET /receive-return/search во фрагмент #scan-result по мере ввода;
+    кнопка «Проверить» и POST /receive-return/check удалены (int card_id —
+    источник «тихого 422» при вводе ФИО). Рендер через _render_page —
+    одноразовый флеш (ошибка подтверждения) показывается вверху страницы
+    и удаляется из cookie.
     """
     ctx = _menu_context(user)
     ctx.update({"request": request, "username": user.username})
     return _render_page(request, "receive_return.html", ctx)
 
 
-@router.post("/receive-return/check")
-async def receive_return_check(
+@router.get("/receive-return/search")
+async def receive_return_search_fragment(
     request: Request,
-    card_id: int = Form(...),
+    query: str | None = None,
     user: User = Depends(require_role(UserRole.branch, UserRole.admin)),
     db: Database = Depends(get_db),
 ):
-    """Проверка карты для приёма возврата (htmx-фрагмент в #scan-result).
+    """htmx-фрагмент живого поиска карт для /receive-return (задача 5 раунда 2).
 
-    Состояние НЕ меняется — только превью (return_service.get_receivable_card_info:
-    карта есть, статус in_transit, есть активная возвратная отправка).
-    Успех — карточка «Карта к приёму» (таблица Карта | Статус | Назначение)
-    с ОБЫЧНОЙ формой подтверждения (POST /receive-return/confirm, не htmx):
-    успех подтверждения — 303-редирект на /my-shipments, и 303 браузер
-    выполняет штатно только для обычной навигации. Ошибки — фрагмент
-    с div.flash.flash-error и текстом сервиса; статус 200 (htmx не подменяет
-    контент на 4xx/5xx по умолчанию).
+    Замена POST /receive-return/check. Поиск по ФИО — подстрока в Python
+    c .lower() (кириллица регистронезависимо; фаза 1 как у SearchService и
+    /requests/new/search). Активные возвратные отправки для найденных карт
+    подтягиваются батчем — два запроса IN (...): kind='card' по card_id и
+    kind='box' через box_cards (removed_at IS NULL) — семантика та же, что у
+    ReturnService._find_active_return_shipment, но по-карточный вызов сервиса
+    дал бы N+1 запросов. receivable — карта in_transit И есть активная
+    отправка (приём возможен, как для kind='card', так и для kind='box');
+    назначение — имя филиала to_branch_id только для одиночной card-отправки;
+    для kind='box' получатель в данных не закодирован → «—» (решение раунда 1).
+    В строки кладутся русская подпись статуса (CARD_STATUS_LABELS) и класс
+    бейджа; шаблон receive_return_result рисует receivable-строки с ОБЫЧНОЙ
+    формой POST /receive-return/confirm (не htmx: успех — 303 на /my-shipments,
+    браузер выполняет редирект штатно), остальные — статус без кнопки.
     """
-    card_repo = CardRepositoryImpl(db)
-    box_repo = BoxRepositoryImpl(db)
-    courier_repo = CourierRepositoryImpl(db)
-    return_service = ReturnService(db, card_repo, box_repo, courier_repo)
-
-    ctx = {"request": request, "info": None, "error": None}
-    try:
-        info = await return_service.get_receivable_card_info(card_id)
-    except ValueError as e:
-        ctx["error"] = str(e)
-        return request.app.state.templates.TemplateResponse(
-            request=request, name="receive_return_result.html", context=ctx
+    query = (query or "").strip()
+    cards: list[dict] = []
+    if query:
+        needle = query.lower()
+        rows = await db.fetch_all(
+            "SELECT id, full_name, status FROM cards ORDER BY full_name"
         )
-    # Обогащение строки для шаблона (как _card_result_row): русская подпись
-    # статуса и класс бейджа badge-<status>.
-    status = info["status"]
-    info["status_label"] = _CARD_STATUS_LABELS_BY_VALUE.get(status, status)
-    info["status_badge"] = f"badge-{status}"
-    ctx["info"] = info
+        cards = [
+            {"id": r["id"], "full_name": r["full_name"], "status": r["status"]}
+            for r in rows
+            if needle in r["full_name"].lower()
+        ]
+        if cards:
+            ids = [c["id"] for c in cards]
+            placeholders = ",".join("?" for _ in ids)
+            # 1) одиночные возвратные отправки: kind='card' по card_id
+            single = await db.fetch_all(
+                f"""SELECT card_id, to_branch_id FROM shipments
+                    WHERE card_id IN ({placeholders}) AND status = 'issued'
+                      AND kind = 'card'""",
+                ids,
+            )
+            by_card = {s["card_id"]: s for s in single}
+            # 2) карты в коробках возврата: kind='box' через box_cards
+            box_rows = await db.fetch_all(
+                f"""SELECT bc.card_id AS card_id
+                    FROM box_cards bc
+                    JOIN shipments s ON s.box_id = bc.box_id
+                    WHERE bc.card_id IN ({placeholders})
+                      AND bc.removed_at IS NULL AND s.status = 'issued'
+                      AND s.kind = 'box'""",
+                ids,
+            )
+            in_boxes = {r["card_id"] for r in box_rows}
+            # имена филиалов-получателей (назначение kind='card') — батчем
+            branch_names: dict[int, str] = {}
+            to_ids = {
+                s["to_branch_id"] for s in single if s["to_branch_id"] is not None
+            }
+            if to_ids:
+                b_placeholders = ",".join("?" for _ in to_ids)
+                b_rows = await db.fetch_all(
+                    "SELECT id, name FROM branches WHERE id IN (" + b_placeholders + ")",
+                    tuple(to_ids),
+                )
+                branch_names = {r["id"]: r["name"] for r in b_rows}
+            for c in cards:
+                cid = c["id"]
+                status = c["status"]
+                c["status_label"] = _CARD_STATUS_LABELS_BY_VALUE.get(status, status)
+                c["status_badge"] = f"badge-{status}"
+                shipment = by_card.get(cid)
+                c["receivable"] = bool(
+                    status == "in_transit" and (shipment is not None or cid in in_boxes)
+                )
+                c["destination"] = None
+                if shipment is not None and shipment["to_branch_id"] is not None:
+                    c["destination"] = branch_names.get(shipment["to_branch_id"])
+    ctx = {"request": request, "query": query, "cards": cards}
     return request.app.state.templates.TemplateResponse(
         request=request, name="receive_return_result.html", context=ctx
     )

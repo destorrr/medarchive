@@ -1,4 +1,12 @@
-"""Тесты экрана «Приём возврата» (роль: Филиал)."""
+"""Тесты экрана «Приём возврата» (роль: Филиал) — живой поиск по ФИО.
+
+Задача 5 раунда 2 редизайна контура возврата: POST /receive-return/check
+(принимал int card_id — источник «тихого 422» при вводе ФИО) заменён на
+GET /receive-return/search — живой htmx-поиск карт по ФИО (подстрока
+.lower(), кириллица регистронезависимо, паттерн /requests/new/search).
+POST /receive-return/confirm не менялся (обратная совместимость: smoke-E2E
+шлёт card_id и ждёт 303 на /my-shipments).
+"""
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -45,11 +53,11 @@ async def _login(client, role="branch1"):
 
 class TestReceiveReturn:
     async def test_page_renders(self, receive_client):
-        """GET /receive-return отдаёт страницу с полем сканера."""
+        """GET /receive-return отдаёт страницу живого поиска."""
         await _login(receive_client)
         r = await receive_client.get("/receive-return")
         assert r.status_code == 200
-        assert "приём" in r.text.lower() or "сканер" in r.text.lower()
+        assert "приём" in r.text.lower() or "поиск карты" in r.text.lower()
 
     async def test_confirm_receive_return(self, receive_client, db):
         """POST /receive-return/confirm переводит карту в in_branch."""
@@ -69,49 +77,68 @@ class TestReceiveReturn:
         assert shipment["status"] == "received"
 
 
-class TestReceiveReturnCheck:
-    """Задача 5 редизайна контура возврата: /receive-return — двухшаговый приём.
+class TestReceiveReturnPage:
+    """Задача 5 раунда 2: GET /receive-return — живой поиск по ФИО.
 
-    GET-страница — карточка сканера (htmx POST /receive-return/check в
-    #scan-result); check — превью карты БЕЗ изменения состояния (таблица
-    Карта | Статус | Назначение + кнопка «Подтвердить получение» в обычной
-    форме на /receive-return/confirm), ошибки — фрагмент с flash-error.
+    Кнопка «Проверить» и htmx-форма POST /receive-return/check удалены
+    (int card_id давал «тихий 422» при вводе ФИО); вместо них — инпут на
+    всю ширину hx-get=/receive-return/search (debounce 350ms) в контейнер
+    #scan-result; страница рендерит фрагмент с idle-состоянием.
+    """
+
+    async def test_page_has_live_search_no_check_form(self, receive_client):
+        """GET /receive-return: label «Поиск карты (ФИО)», инпут живого
+        поиска (hx-get=/receive-return/search, hx-trigger c debounce 350ms,
+        hx-target=#scan-result), hint; кнопки «Проверить», htmx-формы
+        /receive-return/check и форм confirm (name=card_id) на странице
+        нет — подтверждение появляется только в строке результата."""
+        await _login(receive_client)
+        r = await receive_client.get("/receive-return")
+        assert r.status_code == 200
+        assert "Поиск карты (ФИО)" in r.text
+        assert "Результаты обновляются по мере ввода" in r.text
+        assert 'hx-get="/receive-return/search"' in r.text
+        assert 'hx-trigger="input changed delay:350ms, search"' in r.text
+        assert 'hx-target="#scan-result"' in r.text
+        assert 'id="scan-result"' in r.text
+        # старого сканера с кнопкой и int-поля card_id нет
+        assert "Сканер (QR-код или ID карты)" not in r.text
+        assert ">Проверить</button>" not in r.text
+        assert 'name="card_id"' not in r.text
+        assert 'hx-post="/receive-return/check"' not in r.text
+        # формы подтверждения на GET-странице нет (только во фрагменте)
+        assert 'action="/receive-return/confirm"' not in r.text
+
+
+class TestReceiveReturnSearch:
+    """Задача 5 раунда 2: GET /receive-return/search — живой поиск по ФИО.
+
+    Подстрока .lower() (кириллица, регистронезависимо), как
+    /requests/new/search; для найденных карт: статус-бейдж (CARD_STATUS_LABELS),
+    назначение (филиал to_branch_id для in_transit с одиночной card-отправкой;
+    «—» для box-отправки и карт без активной отправки), receivable (in_transit
+    + активная возвратная отправка kind='card'|'box') — для receivable-строк
+    обычная форма POST /receive-return/confirm с hidden card_id, остальные —
+    статус без кнопки.
     """
 
     @staticmethod
     async def _seed_card(db, card_id, full_name, status):
-        """Прямой посев карты для сценариев ошибок check."""
+        """Прямой посев карты (без активной возвратной отправки)."""
         await db.execute(
             "INSERT OR REPLACE INTO cards (id, full_name, status) VALUES (?, ?, ?)",
             (card_id, full_name, status),
         )
         await db.conn.commit()
 
-    async def test_page_has_scanner_card_and_htmx_target(self, receive_client):
-        """GET /receive-return: карточка сканера — label «Сканер (QR-код или
-        ID карты)», input name=card_id, кнопка «Проверить» btn-primary, форма
-        htmx (hx-post=/receive-return/check, hx-target=#scan-result), контейнер
-        #scan-result под формой; формы confirm на странице нет (она появляется
-        только во фрагменте после проверки)."""
+    async def test_search_finds_receivable_card_with_button(self, receive_client, db):
+        """Поиск по «иванов»: карта в пути с активной card-отправкой → строка
+        с ФИО, бейджем «В пути», именем филиала назначения (B1,
+        to_branch_id=1) и кнопкой «Подтвердить получение» в ОБЫЧНОЙ форме
+        POST /receive-return/confirm (hidden card_id); состояние НЕ меняется
+        (превью не двигает статусы)."""
         await _login(receive_client)
-        r = await receive_client.get("/receive-return")
-        assert r.status_code == 200
-        assert "Сканер (QR-код или ID карты)" in r.text
-        assert 'name="card_id"' in r.text
-        assert "Проверить" in r.text
-        assert 'hx-post="/receive-return/check"' in r.text
-        assert 'hx-target="#scan-result"' in r.text
-        assert '<div id="scan-result"></div>' in r.text
-        assert 'action="/receive-return/confirm"' not in r.text
-
-    async def test_check_ok_preview_card(self, receive_client, db):
-        """check для in_transit карты с активной card-отправкой (to_branch_id=1):
-        200-фрагмент с ФИО, бейджем «В пути», именем филиала назначения (B1),
-        формой на /receive-return/confirm и кнопкой «Подтвердить получение»;
-        состояние НЕ меняется (карта in_transit, отправка issued) — превью
-        не двигает статусы."""
-        await _login(receive_client)
-        r = await receive_client.post("/receive-return/check", data={"card_id": "1"})
+        r = await receive_client.get("/receive-return/search", params={"query": "иванов"})
         assert r.status_code == 200
         assert "Карта к приёму" in r.text
         assert "Иванов И.И." in r.text
@@ -126,48 +153,48 @@ class TestReceiveReturnCheck:
         sh = await db.fetch_one("SELECT status FROM shipments WHERE id = 1")
         assert sh["status"] == "issued"
 
-    async def test_check_no_active_shipment_error(self, receive_client, db):
-        """check для карты in_transit БЕЗ активной отправки → 200-фрагмент
-        с flash-error и текстом сервиса, без таблицы/кнопки подтверждения."""
+    async def test_search_case_insensitive(self, receive_client):
+        """Регистронезависимость кириллицы: «ИВАНОВ» и «иванов» находят
+        карту «Иванов И.И.» (python-фильтр .lower(), как /requests/new)."""
+        await _login(receive_client)
+        for q in ("ИВАНОВ", "иванов"):
+            r = await receive_client.get("/receive-return/search", params={"query": q})
+            assert r.status_code == 200
+            assert "Иванов И.И." in r.text
+            assert "Подтвердить получение" in r.text
+
+    async def test_search_in_transit_without_shipment_no_button(self, receive_client, db):
+        """Карта в пути БЕЗ активной возвратной отправки: строка со статусом
+        «В пути» и назначением «—», кнопки подтверждения нет (guard)."""
         await _login(receive_client)
         await self._seed_card(db, 2, "Петров П.П.", "in_transit")
-        r = await receive_client.post("/receive-return/check", data={"card_id": "2"})
+        r = await receive_client.get("/receive-return/search", params={"query": "петров"})
         assert r.status_code == 200
-        assert "flash flash-error" in r.text
-        assert "Не найдена активная отправка" in r.text
-        assert "Карта к приёму" not in r.text
+        assert "Петров П.П." in r.text
+        assert '<span class="badge badge-in_transit">В пути</span>' in r.text
+        assert "<td>—</td>" in r.text
         assert "Подтвердить получение" not in r.text
 
-    async def test_check_not_in_transit_error(self, receive_client, db):
-        """check для карты не в in_transit (placed) → flash-error с текущим
-        статусом (текст как в сервисе receive_return); карта не меняется."""
+    async def test_search_not_in_transit_shows_status_no_button(self, receive_client, db):
+        """Карта не в пути (placed): строка со статусом «Размещена» и
+        назначением «—», без кнопки — состояние показывается строкой
+        таблицы, а не флешем-ошибкой (как было в /check)."""
         await _login(receive_client)
         await self._seed_card(db, 3, "Сидоров С.С.", "placed")
-        r = await receive_client.post("/receive-return/check", data={"card_id": "3"})
+        r = await receive_client.get("/receive-return/search", params={"query": "сидоров"})
         assert r.status_code == 200
-        assert "flash flash-error" in r.text
-        # кавычки статуса Jinja экранирует в HTML (&#39;) — проверяем сегменты
-        assert "должна быть в статусе" in r.text
-        assert "&#39;in_transit&#39;, сейчас &#39;placed&#39;" in r.text
+        assert "Сидоров С.С." in r.text
+        assert '<span class="badge badge-placed">Размещена</span>' in r.text
+        assert "<td>—</td>" in r.text
         assert "Подтвердить получение" not in r.text
-        card = await db.fetch_one("SELECT status FROM cards WHERE id = 3")
-        assert card["status"] == "placed"
+        assert "flash flash-error" not in r.text
 
-    async def test_check_unknown_card_not_found(self, receive_client):
-        """check для несуществующей карты → «Карта не найдена», без кнопки."""
-        await _login(receive_client)
-        r = await receive_client.post("/receive-return/check", data={"card_id": "9999"})
-        assert r.status_code == 200
-        assert "flash flash-error" in r.text
-        assert "Карта не найдена" in r.text
-        assert "Подтвердить получение" not in r.text
-
-    async def test_check_box_shipment_destination_dash(self, receive_client, db):
-        """check для карты в активной box-отправке (kind='box' через box_cards):
-        превью валидно (карта в пути, кнопка подтверждения есть), но
-        «Назначение» = «—»: в box-отправке to_branch_id нет (в shipments только
+    async def test_search_box_shipment_receivable_destination_dash(self, receive_client, db):
+        """Карта в активной box-отправке (kind='box' через box_cards):
+        приём возможен (карта in_transit — кнопка есть), но «Назначение» =
+        «—»: в box-отправке to_branch_id нет (в shipments только
         from_branch_id — отправитель коробки), показывать отправителя как
-        назначение — врать."""
+        назначение — врать (решение раунда 1)."""
         await _login(receive_client)
         await self._seed_card(db, 4, "Николаев Н.Н.", "in_transit")
         await db.execute(
@@ -182,7 +209,7 @@ class TestReceiveReturnCheck:
             "courier_id, issued_by, status) VALUES (20, 'box', 20, 1, 1, 2, 'issued')"
         )
         await db.conn.commit()
-        r = await receive_client.post("/receive-return/check", data={"card_id": "4"})
+        r = await receive_client.get("/receive-return/search", params={"query": "николаев"})
         assert r.status_code == 200
         assert "Николаев Н.Н." in r.text
         assert '<span class="badge badge-in_transit">В пути</span>' in r.text
@@ -190,11 +217,43 @@ class TestReceiveReturnCheck:
         assert "<td>—</td>" in r.text  # получатель в box-отправке не закодирован
         assert "<td>B1</td>" not in r.text  # from_branch_id не врём как назначение
 
+    async def test_search_mixed_rows_only_receivable_gets_button(self, receive_client, db):
+        """Смешанная выдача по подстроке «ов» (Иванов с активной отправкой +
+        Петров без): кнопка «Подтвердить получение» ровно одна — только у
+        receivable-строки; остальные — статус без кнопки."""
+        await _login(receive_client)
+        await self._seed_card(db, 2, "Петров П.П.", "in_transit")
+        r = await receive_client.get("/receive-return/search", params={"query": "ов"})
+        assert r.status_code == 200
+        assert "Иванов И.И." in r.text
+        assert "Петров П.П." in r.text
+        assert r.text.count("Подтвердить получение") == 1
+
+    async def test_search_empty_query_idle_state(self, receive_client):
+        """Пустой query: пустое состояние-подсказка, без таблицы и кнопок."""
+        await _login(receive_client)
+        r = await receive_client.get("/receive-return/search")
+        assert r.status_code == 200
+        assert "Карта к приёму" not in r.text
+        assert "Подтвердить получение" not in r.text
+
+    async def test_search_no_results_empty_state(self, receive_client):
+        """Поиск без совпадений: пустое состояние «не найдено», а не голая
+        таблица с кнопками."""
+        await _login(receive_client)
+        r = await receive_client.get(
+            "/receive-return/search", params={"query": "Неизвестный Пациент"}
+        )
+        assert r.status_code == 200
+        assert "не найдено" in r.text
+        assert "Карта к приёму" not in r.text
+        assert "Подтвердить получение" not in r.text
+
     async def test_confirm_error_redirects_with_flash(self, receive_client, db):
         """Ошибка подтверждения (карта не в in_transit) — не 400-страница:
         303 на /receive-return + одноразовый флеш-error на GET (единый
-        флеш-паттерн контура); валидный confirm (303 на /my-shipments,
-        smoke-E2E) не задет."""
+        флеш-паттерн контура через _render_page сохранён); валидный confirm
+        (303 на /my-shipments, smoke-E2E) не задет."""
         await _login(receive_client)
         await self._seed_card(db, 3, "Сидоров С.С.", "placed")
         r = await receive_client.post(
