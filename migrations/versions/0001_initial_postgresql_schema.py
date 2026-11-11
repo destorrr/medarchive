@@ -15,7 +15,7 @@ def upgrade() -> None:
     source = source.replace("BEGIN;", "").replace("COMMIT;", "")
     # Remove whole-line SQL comments before splitting, otherwise a comment
     # preceding CREATE TABLE would cause that first statement to be skipped.
-    source = "\\n".join(line for line in source.splitlines() if not line.lstrip().startswith("--"))
+    source = chr(10).join(line for line in source.splitlines() if not line.lstrip().startswith("--"))
     for statement in source.split(";"):
         statement = statement.strip()
         if statement:
