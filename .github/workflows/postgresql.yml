@@ -40,6 +40,6 @@ jobs:
         run: alembic current
       - name: Verify core tables exist
         run: |
-          psql "postgresql://medarchive:medarchive@localhost:5432/medarchive" -v ON_ERROR_STOP=1 -c "SELECT to_regclass('public.cards') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL AND to_regclass('public.domain_events') IS NOT NULL AS schema_ready" | grep -qx t
+          psql "postgresql://medarchive:medarchive@localhost:5432/medarchive" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.cards') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL AND to_regclass('public.domain_events') IS NOT NULL AS schema_ready" | grep -qx t
       - name: Run application tests
         run: pytest -q
