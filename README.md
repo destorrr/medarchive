@@ -137,7 +137,8 @@ sudo systemctl start medarchive
 ```
 medarchive/
 ├── src/medarchive/
-│   ├── adapters/sqlite/    # временный адаптер исходного прототипа
+│   ├── adapters/
+│   │   ├── sqlite/         # временный адаптер исходного прототипа
 │   │   └── postgresql/     # целевой async SQLAlchemy-адаптер
 │   ├── domain/             # Чистые модели и статусы
 │   ├── repositories/       # Интерфейсы репозиториев
