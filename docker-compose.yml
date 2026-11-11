@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: medarchive
+      POSTGRES_USER: medarchive
+      POSTGRES_PASSWORD: medarchive
+    ports:
+      - "5432:5432"
+    volumes:
+      - medarchive_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medarchive -d medarchive"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  medarchive_pgdata:
