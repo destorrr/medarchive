@@ -10,6 +10,8 @@ class TestConfig:
         cfg = Config()
         assert cfg.db_path == "medarchive.db"
         assert cfg.secret_key is None
+        assert cfg.database_url.startswith("postgresql+asyncpg://")
+        assert cfg.effective_database_url == cfg.database_url
 
     def test_from_env(self):
         """Переменные окружения переопределяют дефолты."""
@@ -18,10 +20,13 @@ class TestConfig:
         try:
             os.environ["MEDARCHIVE_DB_PATH"] = db_path
             os.environ["MEDARCHIVE_SECRET_KEY"] = "test-secret-42"
+            os.environ["MEDARCHIVE_DATABASE_URL"] = "postgresql+asyncpg://test:test@localhost/test"
             cfg = Config()
             assert cfg.db_path == db_path
             assert cfg.secret_key == "test-secret-42"
+            assert cfg.effective_database_url == "postgresql+asyncpg://test:test@localhost/test"
         finally:
             os.unlink(db_path)
             os.environ.pop("MEDARCHIVE_DB_PATH", None)
             os.environ.pop("MEDARCHIVE_SECRET_KEY", None)
+            os.environ.pop("MEDARCHIVE_DATABASE_URL", None)
