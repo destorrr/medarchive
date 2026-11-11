@@ -135,8 +135,8 @@ CREATE TABLE shipments (
     cancelled_at timestamptz,
     CONSTRAINT ck_shipment_distinct_locations CHECK (from_location_id <> to_location_id),
     CONSTRAINT ck_shipment_handover_time CHECK (
-        (status = 'draft' AND handed_over_at IS NULL) OR
-        (status <> 'draft' AND handed_over_at IS NOT NULL)
+        (status IN ('draft', 'cancelled') AND handed_over_at IS NULL) OR
+        (status IN ('in_transit', 'received', 'exception') AND handed_over_at IS NOT NULL)
     ),
     CONSTRAINT ck_shipment_received_fields CHECK (
         (status = 'received' AND received_by IS NOT NULL AND received_at IS NOT NULL) OR
@@ -161,8 +161,20 @@ CREATE UNIQUE INDEX uq_card_one_active_shipment
 CREATE TABLE shipment_boxes (
     shipment_id uuid NOT NULL REFERENCES shipments(id) ON DELETE RESTRICT,
     box_id uuid NOT NULL REFERENCES boxes(id) ON DELETE RESTRICT,
-    PRIMARY KEY (shipment_id, box_id)
+    PRIMARY KEY (shipment_id, box_id),
+    UNIQUE (box_id, shipment_id)
 );
+
+-- A non-NULL current_shipment_id must point to a manifest row for that exact object.
+-- MATCH SIMPLE means the composite FK is not checked while the object is stationary.
+ALTER TABLE cards ADD CONSTRAINT fk_card_shipment_manifest
+    FOREIGN KEY (id, current_shipment_id)
+    REFERENCES shipment_cards(card_id, shipment_id)
+    DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE boxes ADD CONSTRAINT fk_box_shipment_manifest
+    FOREIGN KEY (id, current_shipment_id)
+    REFERENCES shipment_boxes(box_id, shipment_id)
+    DEFERRABLE INITIALLY DEFERRED;
 CREATE UNIQUE INDEX uq_box_one_active_shipment
     ON boxes(current_shipment_id, id) WHERE current_shipment_id IS NOT NULL;
 
@@ -234,5 +246,7 @@ COMMIT;
 --    transactional service logic and/or deferred constraint triggers.
 -- 2. A card transported inside a box must be represented consistently: the service
 --    must move the box and all active member cards to the same shipment atomically.
--- 3. Do not enable direct UPDATE/DELETE on domain_events for the application role.
--- 4. Add PostgreSQL integration tests before using this schema for production.
+-- 3. The composite manifest FKs ensure that a non-NULL current_shipment_id matches
+--    an explicit shipment_cards/shipment_boxes row.
+-- 4. Do not enable direct UPDATE/DELETE on domain_events for the application role.
+-- 5. Add PostgreSQL integration tests before using this schema for production.
