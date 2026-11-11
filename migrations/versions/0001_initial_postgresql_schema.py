@@ -1,6 +1,5 @@
 """Create the initial PostgreSQL schema from the reviewed SQL source."""
 from pathlib import Path
-import re
 from alembic import op
 
 revision = "0001_initial"
@@ -16,7 +15,7 @@ def upgrade() -> None:
     source = source.replace("BEGIN;", "").replace("COMMIT;", "")
     # Remove whole-line SQL comments before splitting, otherwise a comment
     # preceding CREATE TABLE would cause that first statement to be skipped.
-    source = re.sub(r"(?m)^\\s*--.*$", "", source)
+    source = "\\n".join(line for line in source.splitlines() if not line.lstrip().startswith("--"))
     for statement in source.split(";"):
         statement = statement.strip()
         if statement:
