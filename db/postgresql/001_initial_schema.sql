@@ -141,6 +141,16 @@ CREATE TABLE shipments (
     CONSTRAINT ck_shipment_received_fields CHECK (
         (status = 'received' AND received_by IS NOT NULL AND received_at IS NOT NULL) OR
         (status <> 'received' AND received_by IS NULL AND received_at IS NULL)
+    ),
+    CONSTRAINT ck_shipment_exception_fields CHECK (
+        (status = 'exception' AND exception_by IS NOT NULL AND exception_at IS NOT NULL
+            AND NULLIF(btrim(exception_note), '') IS NOT NULL) OR
+        (status <> 'exception' AND exception_by IS NULL AND exception_at IS NULL
+            AND exception_note IS NULL)
+    ),
+    CONSTRAINT ck_shipment_cancelled_fields CHECK (
+        (status = 'cancelled' AND cancelled_by IS NOT NULL AND cancelled_at IS NOT NULL) OR
+        (status <> 'cancelled' AND cancelled_by IS NULL AND cancelled_at IS NULL)
     )
 );
 
@@ -149,11 +159,20 @@ ALTER TABLE cards ADD CONSTRAINT fk_card_current_shipment
 ALTER TABLE boxes ADD CONSTRAINT fk_box_current_shipment
     FOREIGN KEY (current_shipment_id) REFERENCES shipments(id) DEFERRABLE INITIALLY DEFERRED;
 
+-- Every transported card has a manifest row. box_id IS NULL means the card
+-- travels as a standalone item; non-NULL means it travels inside that shipment's box.
+-- This preserves an explicit in-transit location for cards inside boxes without
+-- treating them as a second, independent cargo item.
 CREATE TABLE shipment_cards (
     shipment_id uuid NOT NULL REFERENCES shipments(id) ON DELETE RESTRICT,
     card_id uuid NOT NULL REFERENCES cards(id) ON DELETE RESTRICT,
+    box_id uuid,
     PRIMARY KEY (shipment_id, card_id),
-    UNIQUE (card_id, shipment_id)
+    UNIQUE (card_id, shipment_id),
+    CONSTRAINT fk_shipment_card_containing_box
+        FOREIGN KEY (shipment_id, box_id)
+        REFERENCES shipment_boxes(shipment_id, box_id)
+        ON DELETE RESTRICT
 );
 CREATE UNIQUE INDEX uq_card_one_active_shipment
     ON cards(current_shipment_id, id) WHERE current_shipment_id IS NOT NULL;
@@ -165,8 +184,12 @@ CREATE TABLE shipment_boxes (
     UNIQUE (box_id, shipment_id)
 );
 
+-- shipment_cards is created below; cards inside a transported box also receive
+-- a row there with box_id set to the containing shipment_boxes.box_id.
+
 -- A non-NULL current_shipment_id must point to a manifest row for that exact object.
--- MATCH SIMPLE means the composite FK is not checked while the object is stationary.
+-- Cards inside a transported box have their own shipment_cards row, linked to the
+-- shipment_boxes row by box_id. MATCH SIMPLE skips the FK while an object is stationary.
 ALTER TABLE cards ADD CONSTRAINT fk_card_shipment_manifest
     FOREIGN KEY (id, current_shipment_id)
     REFERENCES shipment_cards(card_id, shipment_id)
@@ -241,12 +264,27 @@ CREATE INDEX ix_box_memberships_cycle ON box_card_memberships(box_cycle_id, adde
 COMMIT;
 
 -- IMPORTANT IMPLEMENTATION NOTES:
--- 1. Route authorization, actor/location matching, Archive -> Central Office request
---    validation, manifest immutability, and whole-shipment acceptance require
---    transactional service logic and/or deferred constraint triggers.
--- 2. A card transported inside a box must be represented consistently: the service
---    must move the box and all active member cards to the same shipment atomically.
--- 3. The composite manifest FKs ensure that a non-NULL current_shipment_id matches
---    an explicit shipment_cards/shipment_boxes row.
--- 4. Do not enable direct UPDATE/DELETE on domain_events for the application role.
--- 5. Add PostgreSQL integration tests before using this schema for production.
+-- 1. A card inside a transported box MUST get a shipment_cards row with box_id set
+--    to that shipment's box. Its current_shipment_id is updated in the same transaction.
+--    Standalone cards use box_id NULL. This avoids both missing transit location and
+--    double-counting a contained card as independent cargo.
+-- 2. Before handover, the service/constraint-trigger layer must verify:
+--    * manifest is non-empty;
+--    * each standalone card is not in an active box;
+--    * each card with box_id has an active membership in that exact box;
+--    * every active member card of every shipped box has a matching shipment_cards row;
+--    * all objects are at from_location_id and none is already in transit.
+-- 3. Manifest rows and shipment route/courier become immutable after handover.
+--    Enforce with triggers and service authorization, not UI-only checks.
+-- 4. domain_events must be append-only: revoke UPDATE/DELETE from app role and add
+--    defensive triggers. Corrections are new events referencing correction_of_event_id.
+-- 5. Route authorization, actor/location matching, Archive -> Central Office request
+--    validation, archive placement, and whole-shipment acceptance need transactional
+--    service logic and/or constraint triggers.
+-- 6. Singleton central_office/archive locations are provisioned by deterministic
+--    bootstrap data and checked by startup/health validation; partial unique indexes
+--    alone do not guarantee that both rows exist.
+-- 7. Box-cycle openness, card/box same-location checks, archive-only shelf placement,
+--    and card membership consistency need deferred triggers or transactional services.
+-- 8. This DDL is still a review draft. Add Alembic migrations and PostgreSQL
+--    integration tests before treating it as the executable application schema.
