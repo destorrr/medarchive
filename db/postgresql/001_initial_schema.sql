@@ -159,6 +159,13 @@ ALTER TABLE cards ADD CONSTRAINT fk_card_current_shipment
 ALTER TABLE boxes ADD CONSTRAINT fk_box_current_shipment
     FOREIGN KEY (current_shipment_id) REFERENCES shipments(id) DEFERRABLE INITIALLY DEFERRED;
 
+CREATE TABLE shipment_boxes (
+    shipment_id uuid NOT NULL REFERENCES shipments(id) ON DELETE RESTRICT,
+    box_id uuid NOT NULL REFERENCES boxes(id) ON DELETE RESTRICT,
+    PRIMARY KEY (shipment_id, box_id),
+    UNIQUE (box_id, shipment_id)
+);
+
 -- Every transported card has a manifest row. box_id IS NULL means the card
 -- travels as a standalone item; non-NULL means it travels inside that shipment's box.
 -- This preserves an explicit in-transit location for cards inside boxes without
@@ -174,18 +181,6 @@ CREATE TABLE shipment_cards (
         REFERENCES shipment_boxes(shipment_id, box_id)
         ON DELETE RESTRICT
 );
-CREATE UNIQUE INDEX uq_card_one_active_shipment
-    ON cards(current_shipment_id, id) WHERE current_shipment_id IS NOT NULL;
-
-CREATE TABLE shipment_boxes (
-    shipment_id uuid NOT NULL REFERENCES shipments(id) ON DELETE RESTRICT,
-    box_id uuid NOT NULL REFERENCES boxes(id) ON DELETE RESTRICT,
-    PRIMARY KEY (shipment_id, box_id),
-    UNIQUE (box_id, shipment_id)
-);
-
--- shipment_cards is created below; cards inside a transported box also receive
--- a row there with box_id set to the containing shipment_boxes.box_id.
 
 -- A non-NULL current_shipment_id must point to a manifest row for that exact object.
 -- Cards inside a transported box have their own shipment_cards row, linked to the
