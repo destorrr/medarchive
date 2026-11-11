@@ -25,7 +25,7 @@ pip install -e '.[dev]'
 alembic upgrade head
 ```
 
-Alembic owns schema transactions. The initial revision executes `db/postgresql/001_initial_schema.sql` one statement at a time. Keep the SQL source and revision in sync; subsequent schema changes must be added as new Alembic revisions.
+Alembic owns schema transactions. The initial revision contains a frozen copy of the initial DDL and executes it one statement at a time. Do not edit historical Alembic revisions. The SQL file in `db/postgresql/` is the reviewable initial-schema reference; subsequent schema changes must be added as new Alembic revisions.
 
 ## Application adapter
 
