@@ -319,6 +319,8 @@ async def test_workflow_guard_triggers_and_request_fulfillment_link_exist():
             "trg_archive_request_transition_metadata_immutable",
             "trg_cards_previous_shipment_pointer",
             "trg_boxes_previous_shipment_pointer",
+            "trg_cards_movement_guard",
+            "trg_boxes_movement_guard",
         } <= trigger_names
         assert "fulfillment_shipment_id" in archive_request_columns
         assert "ck_archive_request_fulfillment" in constraint_names
@@ -486,6 +488,95 @@ async def test_postgresql_rejects_reassigning_card_from_an_unreceived_shipment()
                 )
                 with pytest.raises(IntegrityError):
                     await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+            finally:
+                await transaction.rollback()
+    finally:
+        await engine.dispose()
+
+
+
+@pytest.mark.asyncio
+async def test_postgresql_rejects_changing_card_location_without_a_shipment():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                card_id, shipment_id = await _seed_transit_card(connection)
+                target_location_id = (
+                    await connection.execute(
+                        text("SELECT to_location_id FROM shipments WHERE id = :id"),
+                        {"id": shipment_id},
+                    )
+                ).scalar_one()
+                with pytest.raises(IntegrityError):
+                    await connection.execute(
+                        text("""
+                            UPDATE cards SET current_location_id = :target_id
+                            WHERE id = :card_id
+                        """),
+                        {"target_id": target_location_id, "card_id": card_id},
+                    )
+            finally:
+                await transaction.rollback()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_postgresql_rejects_handover_from_a_location_other_than_the_object_location():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                card_id, existing_shipment_id = await _seed_transit_card(connection)
+                existing = (
+                    await connection.execute(
+                        text("""
+                            SELECT from_location_id, to_location_id, courier_id, issued_by
+                            FROM shipments WHERE id = :id
+                        """),
+                        {"id": existing_shipment_id},
+                    )
+                ).one()
+                wrong_route_shipment_id = uuid.uuid4()
+                await connection.execute(
+                    text("""
+                        INSERT INTO shipments
+                            (id, from_location_id, to_location_id, courier_id, issued_by)
+                        VALUES (:id, :source, :target, :courier, :actor)
+                    """),
+                    {
+                        "id": wrong_route_shipment_id,
+                        "source": existing.to_location_id,
+                        "target": existing.from_location_id,
+                        "courier": existing.courier_id,
+                        "actor": existing.issued_by,
+                    },
+                )
+                await connection.execute(
+                    text("""
+                        INSERT INTO shipment_cards (shipment_id, card_id, box_id)
+                        VALUES (:shipment_id, :card_id, NULL)
+                    """),
+                    {"shipment_id": wrong_route_shipment_id, "card_id": card_id},
+                )
+                with pytest.raises(IntegrityError):
+                    await connection.execute(
+                        text("""
+                            UPDATE cards
+                            SET current_location_id = NULL, current_shipment_id = :shipment_id
+                            WHERE id = :card_id
+                        """),
+                        {"shipment_id": wrong_route_shipment_id, "card_id": card_id},
+                    )
             finally:
                 await transaction.rollback()
     finally:
