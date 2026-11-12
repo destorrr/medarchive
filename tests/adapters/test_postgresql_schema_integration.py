@@ -315,6 +315,8 @@ async def test_workflow_guard_triggers_and_request_fulfillment_link_exist():
             "trg_shipment_cards_received_manifest",
             "trg_cards_received_manifest",
             "trg_boxes_received_manifest",
+            "trg_shipment_transition_metadata_immutable",
+            "trg_archive_request_transition_metadata_immutable",
         } <= trigger_names
         assert "fulfillment_shipment_id" in archive_request_columns
         assert "ck_archive_request_fulfillment" in constraint_names
