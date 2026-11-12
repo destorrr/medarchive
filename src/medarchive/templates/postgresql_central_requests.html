@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📋 Запросить карты из архива</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<div class="card">
+    <form method="get" action="/requests/new">
+        <div class="form-group">
+            <label for="query">Номер карты или ФИО пациента</label>
+            <input id="query" name="query" value="{{ query }}" placeholder="Введите номер карты или ФИО">
+        </div>
+        <button class="btn btn-primary" type="submit">Найти карты в архиве</button>
+    </form>
+</div>
+{% if query %}
+<div class="card">
+    <h3>Карты, доступные для запроса</h3>
+    {% if cards %}
+    <form method="post" action="/requests/create">
+        <table class="data">
+            <thead><tr><th>Выбрать</th><th>Номер карты</th><th>ФИО пациента</th><th>Дата рождения</th></tr></thead>
+            <tbody>
+            {% for card in cards %}
+            <tr>
+                <td><input type="checkbox" name="card_ids" value="{{ card.id }}" required></td>
+                <td>{{ card.card_number }}</td>
+                <td>{{ card.full_name }}</td>
+                <td>{{ card.date_of_birth }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <button class="btn btn-primary" type="submit">Создать заявки на выбранные карты</button>
+    </form>
+    {% else %}
+    <p class="muted">В архиве не найдено доступных карт по этому запросу. Возможно, на карту уже создана активная заявка.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
