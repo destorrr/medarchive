@@ -149,9 +149,11 @@ async def create_box(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await _render_packing(request, user, session, error=str(exc))
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         return await _render_packing(
             request, user, session,
             error="Не удалось создать коробку из-за конфликта данных. Повторите попытку.",
@@ -201,11 +203,13 @@ async def scan_card(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await _render_packing(
             request, user, session, box_id=box_id, error=str(exc)
         )
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         return await _render_packing(
             request, user, session, box_id=box_id,
             error="Карта уже обрабатывается или нарушено ограничение БД.",
@@ -234,11 +238,13 @@ async def confirm_card_registration(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await _render_packing(
             request, user, session, box_id=box_id, error=str(exc)
         )
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         return await _render_packing(
             request, user, session, box_id=box_id,
             error="Карта уже зарегистрирована или нарушено ограничение БД.",
@@ -264,6 +270,7 @@ async def remove_card(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await _render_packing(
             request, user, session, box_id=box_id, error=str(exc)
         )
