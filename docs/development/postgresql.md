@@ -36,3 +36,13 @@ The adapter is deliberately not wired into FastAPI dependencies yet: current rou
 ## Status
 
 This is the first infrastructure step, not a completed application migration. Before switching the app, add PostgreSQL integration tests for the schema and transaction invariants, replace SQLite repositories and integer domain IDs, and run the full router/service suite against PostgreSQL.
+
+## ORM and repository foundation
+
+`medarchive.adapters.postgresql.models` now maps the target tables to SQLAlchemy 2.x declarative models, including UUID identifiers, location references, box-cycle history, archive requests, and shipment manifests. `CardRepository`, `UserRepository`, and `LocationRepository` use the caller-provided `AsyncSession`; they flush when generated values are needed but never commit.
+
+The ORM metadata is not yet connected to Alembic autogenerate. The initial SQL revision is the schema authority until the mappings have been checked column-by-column against that frozen DDL. This avoids autogenerate proposing destructive changes because of a partial or mismatched metadata model.
+
+The composite manifest foreign keys encode an important invariant: an object's `current_shipment_id` must refer to a manifest row for that exact card or box; a card transported inside a box must reference a `shipment_boxes` row for the same shipment. The partial unique index on active box membership prevents one card from being active in two boxes.
+
+These relational constraints do **not** yet enforce all workflow rules. Before enabling shipment operations, PostgreSQL integration tests and deferred/guard triggers are still required for complete box manifests, location consistency of box contents, non-empty manifests, and immutability of shipment route/courier/manifest after handover. Whole-shipment acceptance and role/route authorization remain service-layer responsibilities.
