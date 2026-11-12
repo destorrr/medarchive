@@ -772,6 +772,8 @@ async def receive_resolve(
 ):
     if not confirmed:
         return await receive_page(request, error="Подтвердите проверку полного состава отправления.", user=user, session=session)
+    if not resolution_note.strip():
+        return await receive_page(request, error="Укажите результат проверки отправления", user=user, session=session)
     user_id = user.id
     try:
         shipment = await PostgreSQLShipmentWorkflow(session).resolve_exception(
