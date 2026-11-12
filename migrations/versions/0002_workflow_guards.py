@@ -69,7 +69,7 @@ def upgrade() -> None:
         IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
         RETURN NEW;
     END;
-    $;
+    $$;
     """)
     for table in ("shipment_boxes", "shipment_cards"):
         op.execute(f"""
@@ -105,7 +105,7 @@ def upgrade() -> None:
         IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
         RETURN NEW;
     END;
-    $;
+    $$;
     """)
     op.execute("""
     CREATE TRIGGER trg_box_membership_mutation_guard
