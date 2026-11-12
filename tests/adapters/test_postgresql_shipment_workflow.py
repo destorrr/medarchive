@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
@@ -261,32 +262,21 @@ async def test_admin_cannot_perform_ordinary_logistics(pg_session):
 
 
 @pytest.mark.asyncio
-async def test_receipt_is_blocked_without_changing_transit_state_when_box_manifest_differs(pg_session):
+async def test_database_freezes_box_membership_after_handover(pg_session):
     (
         branch, branch_loc, archive_loc, _central_loc,
         branch_user, archive_user, _central_user, courier,
     ) = await seed_locations(pg_session)
     card = Card(
-        card_number=f"C-{uuid.uuid4().hex}", full_name="Mismatch patient",
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Transit patient",
         date_of_birth=__import__("datetime").date(1988, 6, 7),
         origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active",
     )
-    box = Box(
-        box_number=f"BX-{uuid.uuid4().hex[:16]}",
-        current_location_id=branch_loc.id, status="active", created_by=branch_user.id,
-    )
-    pg_session.add_all([card, box])
+    pg_session.add(card)
     await pg_session.flush()
-    cycle = BoxCycle(box_id=box.id, cycle_number=1, started_by=branch_user.id)
-    pg_session.add(cycle)
-    await pg_session.flush()
-    membership = BoxCardMembership(
-        box_cycle_id=cycle.id, card_id=card.id, added_by=branch_user.id,
-    )
-    pg_session.add(membership)
-    await pg_session.flush()
-
     workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=branch_loc.id, actor_id=branch_user.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=branch_user.id)
     shipment = await workflow.create_draft(
         from_location_id=branch_loc.id, to_location_id=archive_loc.id,
         courier_id=courier.id, issued_by=branch_user.id,
@@ -294,17 +284,20 @@ async def test_receipt_is_blocked_without_changing_transit_state_when_box_manife
     await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=branch_user.id)
     await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
 
-    # Simulate an inconsistent membership record; ordinary receipt must stop.
-    membership.removed_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
-    await pg_session.flush()
-    with pytest.raises(ShipmentWorkflowError, match="Состав"):
-        await workflow.receive(shipment_id=shipment.id, actor_id=archive_user.id)
+    membership = await pg_session.scalar(
+        select(BoxCardMembership).where(BoxCardMembership.card_id == card.id)
+    )
+    with pytest.raises(DBAPIError):
+        async with pg_session.begin_nested():
+            membership.removed_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+            membership.removed_by = archive_user.id
+            await pg_session.flush()
 
     await pg_session.refresh(shipment)
     await pg_session.refresh(box)
     await pg_session.refresh(card)
+    await pg_session.refresh(membership)
     assert shipment.status == "in_transit"
+    assert membership.removed_at is None
     assert box.current_shipment_id == shipment.id
     assert card.current_shipment_id == shipment.id
-    assert box.current_location_id is None
-    assert card.current_location_id is None
