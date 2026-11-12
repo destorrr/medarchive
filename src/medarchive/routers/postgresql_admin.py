@@ -5,6 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.dependencies import get_auth, get_pg_session, require_pg_role
@@ -125,6 +126,9 @@ async def deactivate_branch(
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Изменение конфликтует с ограничениями БД") from exc
 
 
 @router.post("/branches/{branch_id}/activate")
@@ -167,6 +171,9 @@ async def create_user(
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Логин уже используется или нарушено ограничение БД") from exc
 
 
 @router.put("/users/{user_id}")
