@@ -263,6 +263,11 @@ class ArchiveRequest(Base):
     __tablename__ = "archive_requests"
     __table_args__ = (
         CheckConstraint("status IN ('new', 'in_progress', 'completed', 'not_found', 'cancelled')", name="archive_requests_status_check"),
+        CheckConstraint(
+            "(status IN ('new', 'not_found', 'cancelled') AND fulfillment_shipment_id IS NULL) OR "
+            "(status IN ('in_progress', 'completed') AND fulfillment_shipment_id IS NOT NULL)",
+            name="ck_archive_request_fulfillment",
+        ),
         Index("uq_card_one_active_archive_request", "card_id", unique=True, postgresql_where=text("status IN ('new', 'in_progress')")),
         Index("ix_archive_requests_status_created", "status", "created_at"),
     )
