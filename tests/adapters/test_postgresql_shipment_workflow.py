@@ -498,11 +498,11 @@ async def test_individual_archive_card_can_be_placed_retrieved_issued_and_return
     await shipping.receive(shipment_id=outbound_id, actor_id=central_user_id)
     await pg_session.refresh(request)
     assert request.status == "completed"
-    assert request.fulfillment_shipment_id == outbound.id
+    assert request.fulfillment_shipment_id == outbound_id
 
     return_shipment = await shipping.create_draft(
-        from_location_id=central_loc.id, to_location_id=archive_loc.id,
-        courier_id=courier.id, issued_by=central_user.id,
+        from_location_id=central_location_id, to_location_id=archive_location_id,
+        courier_id=courier_id, issued_by=central_user_id,
     )
     await shipping.add_standalone_card(
         shipment_id=return_shipment.id, card_id=card_id, actor_id=central_user_id,
@@ -517,4 +517,4 @@ async def test_individual_archive_card_can_be_placed_retrieved_issued_and_return
     assert first_placement.removed_at is not None
     assert returned_placement.removed_at is None
     assert returned_placement.id != first_placement.id
-    assert returned_placement.card_id == card.id
+    assert returned_placement.card_id == card_id
