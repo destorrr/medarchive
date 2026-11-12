@@ -86,7 +86,9 @@ async def test_postgresql_central_office_creates_archive_card_request():
     )
     try:
         async with session.begin():
-            session.add_all([branch, archive, central_location, actor, card])
+            session.add_all([branch, archive, central_location, actor])
+            await session.flush()
+            session.add(card)
 
         token = get_auth().create_session_token(actor)
         transport = httpx.ASGITransport(app=app)
