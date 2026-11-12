@@ -65,12 +65,17 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
             username=f"incident-viewer-{suffix}", password_hash="test-hash",
             full_name="Incident Viewer", role="viewer", is_active=True,
         )
+        branch_user = User(
+            username=f"incident-branch-{suffix}", password_hash="test-hash",
+            full_name="Incident Branch User", role="branch", branch_id=branch_id,
+            is_active=True,
+        )
         archive_user = User(
             username=f"incident-archive-{suffix}", password_hash="test-hash",
             full_name="Incident Reporter", role="archive", is_active=True,
         )
         courier = Courier(full_name=f"Incident Courier {suffix}", is_active=True)
-        session.add_all([branch, branch_location, admin, viewer, archive_user, courier])
+        session.add_all([branch, branch_location, admin, viewer, branch_user, archive_user, courier])
         await session.flush()
 
         card = Card(
@@ -83,18 +88,18 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
 
         workflow = PostgreSQLShipmentWorkflow(session)
         box = await workflow.create_box(
-            location_id=branch_location.id, actor_id=admin.id, card_ids=[card.id],
+            location_id=branch_location.id, actor_id=branch_user.id, card_ids=[card.id],
         )
         shipment = await workflow.create_draft(
             from_location_id=branch_location.id,
             to_location_id=archive_location.id,
             courier_id=courier.id,
-            issued_by=admin.id,
+            issued_by=branch_user.id,
         )
         await workflow.add_box(
-            shipment_id=shipment.id, box_id=box.id, actor_id=admin.id,
+            shipment_id=shipment.id, box_id=box.id, actor_id=branch_user.id,
         )
-        await workflow.hand_over(shipment_id=shipment.id, actor_id=admin.id)
+        await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
         await workflow.register_exception(
             shipment_id=shipment.id, actor_id=archive_user.id,
             note="Интеграционная проверка инцидента",
