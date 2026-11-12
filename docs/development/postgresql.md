@@ -59,3 +59,22 @@ The CI suite now includes read-only checks against the schema actually installed
 These tests roll back their fixture data and do not depend on SQLite. The additional shipment workflow tests exercise branch box creation and packing, whole-box branch-to-archive movement, archive box creation and archive-to-central fulfillment for individually requested cards and cards packed into a new archive box, plus the direct central-office-to-archive return and rejection of inconsistent manifests. They validate service-level transitions and atomic state updates, but do not replace database guard triggers: direct-SQL protection for post-handover manifest/route immutability and all cross-row membership invariants remains outstanding.
 
 Alembic `target_metadata` remains intentionally disconnected until the complete metadata/DDL parity check is demonstrated. Do not enable autogenerate based only on these focused checks.
+
+## Workflow guard migration (0002)
+
+The next Alembic revision adds database-enforced workflow protections:
+
+- shipment route, courier and issuer are immutable after handover;
+- shipment box/card manifests can only be changed while the shipment is a draft;
+- active box membership cannot be edited while a box is assigned to a draft/in-transit shipment or placed on an archive shelf;
+- deferred constraint triggers validate that every active card in a box has the same physical location or transit shipment as its box;
+- deferred shipment checks validate non-empty manifests, exact box membership snapshots, object transit locations, complete receipt, and request-backed archive-to-central fulfillment;
+- archive requests are tied to one fulfillment shipment and must complete with that shipment's receipt;
+- archive shelf placement is restricted to active, non-empty boxes physically located in the archive;
+- domain events reject UPDATE and DELETE; corrections must be appended as new events.
+
+The PostgreSQLArchiveWorkflow provides transaction-scoped use cases for bulk requests created only by central-office users, archive 'not found' outcomes with a reason, and box placement/removal on archive shelves. PostgreSQLShipmentWorkflow.remove_card_from_box() closes the active membership row rather than deleting history, allowing the archive to take requested cards out of an old stored box and repack them into a new outbound box.
+
+Use one Database.transaction() around each service operation. These services do not commit independently. Database triggers are defensive integrity guards; role/location authorization remains in the application service and must be retained when the FastAPI dependencies and routers are migrated.
+
+The guard migration is intentionally irreversible in the same way as the initial schema revision. For local development, recreate the disposable PostgreSQL database if you need to reset the complete schema.
