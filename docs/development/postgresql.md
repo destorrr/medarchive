@@ -31,11 +31,11 @@ Alembic owns schema transactions. The initial revision contains a frozen copy of
 
 `medarchive.adapters.postgresql.database.Database` owns an async SQLAlchemy engine, bounded connection pool, and async session factory. Use one session/transaction per application use case. Repositories must not commit; transaction ownership belongs to the service layer.
 
-The adapter is deliberately not wired into FastAPI dependencies yet: current routers, repositories, and services still issue SQLite SQL and use integer identifiers. Wiring the new engine before replacing those components would make the app fail at runtime.
+The adapter is now available through an opt-in FastAPI dependency and is managed by the application startup/shutdown lifecycle. Set `MEDARCHIVE_POSTGRES_ENABLED=true` to create the PostgreSQL pool and run a startup health check; `get_pg_session` provides an `AsyncSession` to PostgreSQL routes and leaves transaction ownership to the service layer. The existing routers still use SQLite during this staged migration, so the flag enables the PostgreSQL connection but does not switch legacy routes to PostgreSQL. Do not enable it in an environment without a reachable PostgreSQL database.
 
 ## Status
 
-This is still an infrastructure and service-layer milestone, not a completed application migration. Schema contract tests and the first shipment workflow integration tests are in place. Before switching the app, complete the remaining database guards and logistics workflows, replace SQLite repositories and integer domain IDs, and run the full router/service suite against PostgreSQL.
+This is still an infrastructure and service-layer milestone, not a completed application migration. The FastAPI process can now optionally own a PostgreSQL pool alongside the legacy SQLite adapter. The PostgreSQL session dependency and feature-flag behavior have unit coverage. Existing routers and authentication still use SQLite; migrate them incrementally before changing the default backend.
 
 ## ORM and repository foundation
 
