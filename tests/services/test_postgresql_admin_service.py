@@ -57,6 +57,8 @@ def test_postgresql_admin_routes_are_registered():
     assert "/admin" in paths
     assert "/admin/branches" in paths
     assert "/admin/users" in paths
+    assert "/admin/couriers" in paths
+    assert "/admin/sections" in paths
 
 
 def test_user_update_preserves_active_status_when_omitted():
