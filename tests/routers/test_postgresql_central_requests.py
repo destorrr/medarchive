@@ -60,6 +60,10 @@ async def test_postgresql_central_office_creates_archive_card_request():
         id=uuid.uuid4(), kind="archive", branch_id=None,
         name="Request Archive", is_active=True,
     )
+    central_location = Location(
+        id=uuid.uuid4(), kind="central_office", branch_id=None,
+        name="Central UI", is_active=True,
+    )
     actor = User(
         id=uuid.uuid4(),
         username=f"central-request-{uuid.uuid4().hex[:10]}",
@@ -82,7 +86,7 @@ async def test_postgresql_central_office_creates_archive_card_request():
     )
     try:
         async with session.begin():
-            session.add_all([branch, archive, actor, card])
+            session.add_all([branch, archive, central_location, actor, card])
 
         token = get_auth().create_session_token(actor)
         transport = httpx.ASGITransport(app=app)
@@ -101,6 +105,19 @@ async def test_postgresql_central_office_creates_archive_card_request():
                 cookies={"session": token},
             )
             assert created.status_code == 303
+
+            central_receive = await client.get("/central/receive", cookies={"session": token})
+            central_packing = await client.get("/central/packing", cookies={"session": token})
+            central_transfer = await client.get("/central/transfer", cookies={"session": token})
+            central_custody = await client.get("/central/custody", cookies={"session": token})
+            assert central_receive.status_code == 200
+            assert "Приёмка отправлений в ЦО" in central_receive.text
+            assert central_packing.status_code == 200
+            assert "Упаковка в центральном офисе" in central_packing.text
+            assert central_transfer.status_code == 200
+            assert "Отправка из центрального офиса" in central_transfer.text
+            assert central_custody.status_code == 200
+            assert "Внешнее хранение карт" in central_custody.text
 
         request_row = await session.scalar(
             select(ArchiveRequest).where(ArchiveRequest.card_id == card.id)
