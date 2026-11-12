@@ -524,11 +524,36 @@ class PostgreSQLShipmentWorkflow:
         return shipment
 
     async def receive(self, *, shipment_id: uuid.UUID, actor_id: uuid.UUID) -> Shipment:
+        """Receive an ordinary in-transit shipment after full manifest validation."""
+        return await self._receive(
+            shipment_id=shipment_id, actor_id=actor_id, expected_status="in_transit",
+        )
+
+    async def resolve_exception(
+        self, *, shipment_id: uuid.UUID, actor_id: uuid.UUID, resolution_note: str
+    ) -> Shipment:
+        """Resolve an incident only by receiving the complete, verified shipment."""
+        normalized_note = (resolution_note or "").strip()
+        if not normalized_note:
+            raise ShipmentWorkflowError("Укажите результат проверки отправления")
+        if len(normalized_note) > 2000:
+            raise ShipmentWorkflowError("Результат проверки не должен превышать 2000 символов")
+        return await self._receive(
+            shipment_id=shipment_id, actor_id=actor_id, expected_status="exception",
+            exception_resolution_note=normalized_note,
+        )
+
+    async def _receive(
+        self, *, shipment_id: uuid.UUID, actor_id: uuid.UUID,
+        expected_status: str, exception_resolution_note: str | None = None,
+    ) -> Shipment:
         actor = await self._active_user(actor_id)
         shipment = await self.session.scalar(
             select(Shipment).where(Shipment.id == shipment_id).with_for_update()
         )
-        if shipment is None or shipment.status != "in_transit":
+        if shipment is None or shipment.status != expected_status:
+            if expected_status == "exception":
+                raise ShipmentWorkflowError("Инцидент не найден или уже разрешён")
             raise ShipmentWorkflowError("Отправление не найдено или уже не находится в пути")
         source, target = await self._locations(
             shipment.from_location_id, shipment.to_location_id
@@ -627,11 +652,26 @@ class PostgreSQLShipmentWorkflow:
                 request.fulfilled_by = actor.id
 
         await self.session.flush()
-        await self._event("shipment.received", "shipment", shipment.id, actor.id, {
-            "to_location_id": str(target.id),
-            "boxes": [str(box.id) for box in boxes],
-            "cards": [str(card.id) for card in cards],
-        })
+        if exception_resolution_note is None:
+            event_type = "shipment.received"
+            event_payload = {
+                "to_location_id": str(target.id),
+                "boxes": [str(box.id) for box in boxes],
+                "cards": [str(card.id) for card in cards],
+            }
+        else:
+            event_type = "shipment.exception_resolved"
+            event_payload = {
+                "resolution": "complete_manifest_verified",
+                "resolution_note": exception_resolution_note,
+                "original_exception_by": str(shipment.exception_by),
+                "original_exception_at": shipment.exception_at.isoformat(),
+                "original_exception_note": shipment.exception_note,
+                "to_location_id": str(target.id),
+                "boxes": [str(box.id) for box in boxes],
+                "cards": [str(card.id) for card in cards],
+            }
+        await self._event(event_type, "shipment", shipment.id, actor.id, event_payload)
         for box in boxes:
             await self._event("box.shipment_received", "box", box.id, actor.id, {
                 "shipment_id": str(shipment.id), "to_location_id": str(target.id),
