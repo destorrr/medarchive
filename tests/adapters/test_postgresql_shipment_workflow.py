@@ -842,3 +842,108 @@ async def test_multiple_location_locks_are_acquired_in_stable_order():
     assert acquired == [second_id, first_id]
     assert first.id == first_id
     assert second.id == second_id
+
+
+@pytest.mark.asyncio
+async def test_register_shipment_exception_preserves_cargo_and_manifest(pg_session):
+    (
+        branch, branch_loc, archive_loc, _central_loc,
+        branch_user, archive_user, _central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Incident patient",
+        date_of_birth=__import__("datetime").date(1985, 3, 4),
+        origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    shipment = await workflow.create_draft(
+        from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=branch_user.id,
+    )
+    await workflow.add_standalone_card(
+        shipment_id=shipment.id, card_id=card.id, actor_id=branch_user.id,
+    )
+    await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
+
+    await workflow.register_exception(
+        shipment_id=shipment.id, actor_id=archive_user.id,
+        note="Повреждена транспортная упаковка",
+    )
+    await pg_session.refresh(shipment)
+    await pg_session.refresh(card)
+    manifest_row = await pg_session.scalar(
+        select(ShipmentCard).where(
+            ShipmentCard.shipment_id == shipment.id,
+            ShipmentCard.card_id == card.id,
+        )
+    )
+    event = await pg_session.scalar(
+        select(DomainEvent).where(
+            DomainEvent.event_type == "shipment.exception_registered",
+            DomainEvent.aggregate_id == shipment.id,
+        )
+    )
+    assert shipment.status == "exception"
+    assert shipment.exception_by == archive_user.id
+    assert shipment.exception_at is not None
+    assert shipment.exception_note == "Повреждена транспортная упаковка"
+    assert card.current_location_id is None
+    assert card.current_shipment_id == shipment.id
+    assert manifest_row is not None and manifest_row.box_id is None
+    assert event is not None
+    assert event.payload["note"] == "Повреждена транспортная упаковка"
+
+
+@pytest.mark.asyncio
+async def test_register_shipment_exception_rejects_blank_note_wrong_actor_and_wrong_status(pg_session):
+    (
+        branch, branch_loc, archive_loc, _central_loc,
+        branch_user, _archive_user, _central_user, courier,
+    ) = await seed_locations(pg_session)
+    admin = User(
+        username=f"admin-{uuid.uuid4().hex}", password_hash="x",
+        full_name="Administrator", role="admin", branch_id=None, is_active=True,
+    )
+    pg_session.add(admin)
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    draft = await workflow.create_draft(
+        from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=branch_user.id,
+    )
+    with pytest.raises(ShipmentWorkflowError, match="в пути"):
+        await workflow.register_exception(
+            shipment_id=draft.id, actor_id=branch_user.id, note="Проверка",
+        )
+
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Incident guard patient",
+        date_of_birth=__import__("datetime").date(1986, 4, 5),
+        origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+    transit = await workflow.create_draft(
+        from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=branch_user.id,
+    )
+    await workflow.add_standalone_card(
+        shipment_id=transit.id, card_id=card.id, actor_id=branch_user.id,
+    )
+    await workflow.hand_over(shipment_id=transit.id, actor_id=branch_user.id)
+
+    with pytest.raises(ShipmentWorkflowError, match="причину"):
+        await workflow.register_exception(
+            shipment_id=transit.id, actor_id=branch_user.id, note="   ",
+        )
+    with pytest.raises(ShipmentWorkflowError, match="сотрудник места"):
+        await workflow.register_exception(
+            shipment_id=transit.id, actor_id=admin.id, note="Нет доступа",
+        )
+    await pg_session.refresh(transit)
+    await pg_session.refresh(card)
+    assert transit.status == "in_transit"
+    assert transit.exception_by is None
+    assert card.current_shipment_id == transit.id
