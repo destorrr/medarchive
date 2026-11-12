@@ -41,7 +41,7 @@ class UserUpdateInput(BaseModel):
     role: str
     branch_id: uuid.UUID | None = None
     password: str | None = Field(default=None, min_length=12)
-    is_active: bool = True
+    is_active: bool | None = None
 
 
 def _branch_json(branch):
@@ -175,7 +175,7 @@ async def update_user(
     actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
-    if actor.id == user_id and (not data.is_active or data.role != "admin"):
+    if actor.id == user_id and (data.is_active is False or data.role != "admin"):
         raise HTTPException(status_code=409, detail="Нельзя отключить себя или снять с себя роль администратора")
     auth = get_auth()
     try:
