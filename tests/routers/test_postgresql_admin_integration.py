@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from medarchive.adapters.postgresql.models import Branch, Courier, Location, User
+from medarchive.adapters.postgresql.models import ArchiveShelf, Branch, Courier, Location, User
 from medarchive.config import Config
 from medarchive.dependencies import get_pg_database
 from medarchive.main import create_app
@@ -442,4 +442,143 @@ async def test_courier_with_draft_shipment_cannot_be_deactivated():
         await session.close()
         await outer_transaction.rollback()
         await connection.close()
+        await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_admin_html_courier_shelf_forms_and_validation_on_postgresql():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    app = create_app(
+        Config(
+            database_url=DATABASE_URL,
+            postgres_enabled=True,
+            auth_backend="postgresql",
+            secret_key="integration-test-secret",
+        )
+    )
+    database = await get_pg_database()
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"admin-{uuid.uuid4().hex[:12]}",
+        password_hash="test-only-hash",
+        full_name="Integration Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    from medarchive.dependencies import get_pg_session
+    app.dependency_overrides[admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+
+    courier_name = f"HTML Courier {uuid.uuid4().hex[:8]}"
+    section_name = f"HTML Section {uuid.uuid4().hex[:8]}"
+    shelf_name = f"Shelf {uuid.uuid4().hex[:8]}"
+    courier_id = None
+    shelf_id = None
+
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            # Verify that all administrative list pages render for an administrator.
+            for path in (
+                "/admin/branches", "/admin/users",
+                "/admin/couriers", "/admin/sections",
+            ):
+                response = await client.get(path)
+                assert response.status_code == 200
+                assert "text/html" in response.headers["content-type"]
+
+            # A branch-scoped account cannot be created without selecting a branch.
+            response = await client.post(
+                "/admin/users",
+                data={
+                    "username": f"invalid-{uuid.uuid4().hex[:10]}",
+                    "full_name": "Invalid Branch User",
+                    "password": "Integration-Password-2026",
+                    "role": "branch",
+                    "branch_id": "",
+                },
+            )
+            assert response.status_code == 422
+
+            response = await client.post(
+                "/admin/couriers",
+                data={"full_name": courier_name, "phone": "+7 900 000-00-00"},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                courier = await session.scalar(
+                    select(Courier).where(Courier.full_name == courier_name)
+                )
+                assert courier is not None
+                courier_id = courier.id
+                assert courier.phone == "+7 900 000-00-00"
+                assert courier.is_active is True
+
+            response = await client.post(
+                f"/admin/couriers/{courier_id}/status",
+                data={"is_active": "false"},
+            )
+            assert response.status_code == 303
+            response = await client.post(
+                f"/admin/couriers/{courier_id}/status",
+                data={"is_active": "true"},
+            )
+            assert response.status_code == 303
+
+            response = await client.post(
+                "/admin/sections",
+                data={"section_name": section_name, "shelf_name": shelf_name},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                shelf = await session.scalar(
+                    select(ArchiveShelf).where(
+                        ArchiveShelf.section_name == section_name,
+                        ArchiveShelf.shelf_name == shelf_name,
+                    )
+                )
+                assert shelf is not None
+                shelf_id = shelf.id
+                assert shelf.is_active is True
+
+            response = await client.post(
+                f"/admin/sections/{shelf_id}/status",
+                data={"is_active": "false"},
+            )
+            assert response.status_code == 303
+            response = await client.post(
+                f"/admin/sections/{shelf_id}/status",
+                data={"is_active": "true"},
+            )
+            assert response.status_code == 303
+
+            async with database.session_factory() as session:
+                courier = await session.get(Courier, courier_id)
+                shelf = await session.get(ArchiveShelf, shelf_id)
+                assert courier is not None and courier.is_active is True
+                assert shelf is not None and shelf.is_active is True
+    finally:
+        async with database.session_factory() as session:
+            if courier_id is not None:
+                courier = await session.get(Courier, courier_id)
+                if courier is not None:
+                    await session.delete(courier)
+                    await session.flush()
+            if shelf_id is not None:
+                shelf = await session.get(ArchiveShelf, shelf_id)
+                if shelf is not None:
+                    await session.delete(shelf)
+            await session.commit()
+        app.dependency_overrides.clear()
         await database.close()
