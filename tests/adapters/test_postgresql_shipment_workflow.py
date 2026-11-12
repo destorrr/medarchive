@@ -251,3 +251,24 @@ async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_
         await pg_session.refresh(card)
         assert card.current_location_id == archive_loc.id
         assert card.current_shipment_id is None
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_perform_ordinary_logistics(pg_session):
+    (
+        _branch, branch_loc, archive_loc, _central_loc,
+        _branch_user, _archive_user, _central_user, courier,
+    ) = await seed_locations(pg_session)
+    admin = User(
+        username=f"admin-{uuid.uuid4().hex}", password_hash="x",
+        full_name="Administrator", role="admin", branch_id=None,
+    )
+    pg_session.add(admin)
+    await pg_session.flush()
+
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    with pytest.raises(ShipmentWorkflowError, match="Недостаточно прав"):
+        await workflow.create_draft(
+            from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+            courier_id=courier.id, issued_by=admin.id,
+        )
