@@ -3,14 +3,16 @@
 <h1>🚚 Отправка из центрального офиса</h1>
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 {% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+{% if ready_boxes or cards %}
 <div class="card">
-    {% if ready_boxes %}
-    <form method="post" action="/central/transfer/confirm">
-        <div class="form-group"><label for="box_id">Коробка</label>
-            <select id="box_id" name="box_id" required><option value="">— Выберите коробку —</option>
+    <h3>Состав отправления</h3>
+    <form id="central-transfer-form" method="post" action="/central/transfer/confirm">
+        <div class="form-group"><label for="box_id">Коробка (необязательно)</label>
+            <select id="box_id" name="box_id"><option value="">— Без коробки —</option>
                 {% for box in ready_boxes %}<option value="{{ box.id }}">{{ box.box_number }} · {{ box.card_count }} карт</option>{% endfor %}
             </select>
         </div>
+        <p class="muted">Можно отправить одну коробку, отдельные карты или совместить коробку с отдельными картами. Архив → ЦО всегда оформляется только отдельными картами.</p>
         <div class="form-group"><label for="to_location_id">Получатель</label>
             <select id="to_location_id" name="to_location_id" required><option value="">— Выберите филиал или архив —</option>
                 {% for location in destinations %}<option value="{{ location.id }}">{{ location.name }}</option>{% endfor %}
@@ -21,8 +23,21 @@
                 {% for courier in couriers %}<option value="{{ courier.id }}">{{ courier.full_name }}{% if courier.phone %} · {{ courier.phone }}{% endif %}</option>{% endfor %}
             </select>
         </div>
-        <button class="btn btn-primary" type="submit">Передать коробку курьеру</button>
+        <button class="btn btn-primary" type="submit">Передать выбранный состав курьеру</button>
     </form>
-    {% else %}<p class="muted">Нет непустых коробок, готовых к отправке.</p>{% endif %}
 </div>
+<div class="card">
+    <h3>Отдельные карты на балансе ЦО</h3>
+    {% if cards %}
+    <table class="data"><thead><tr><th>Выбрать</th><th>Номер</th><th>ФИО</th></tr></thead><tbody>
+    {% for card in cards %}<tr>
+        <td><input type="checkbox" name="card_ids" value="{{ card.id }}" form="central-transfer-form"></td>
+        <td>{{ card.card_number }}</td><td>{{ card.full_name }}</td>
+    </tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Отдельных карт, доступных для отправки, нет.</p>{% endif %}
+</div>
+{% else %}
+<div class="card"><p class="muted">Нет коробок или отдельных карт, готовых к отправке.</p></div>
+{% endif %}
 {% endblock %}
