@@ -129,6 +129,10 @@ class Box(Base):
             name="fk_box_shipment_manifest", deferrable=True, initially="DEFERRED",
         ),
         Index("ix_boxes_current_location", "current_location_id"),
+        Index(
+            "uq_box_one_active_shipment", "current_shipment_id", "id",
+            unique=True, postgresql_where=text("current_shipment_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
