@@ -569,6 +569,7 @@ async def central_receive_resolve(
 ):
     if not confirmed:
         return await central_receive_page(request, error="Подтвердите проверку полного состава отправления.", user=user, session=session)
+    user_id = user.id
     try:
         shipment = await PostgreSQLShipmentWorkflow(session).resolve_exception(
             shipment_id=shipment_id, actor_id=user.id, resolution_note=resolution_note,
@@ -577,11 +578,11 @@ async def central_receive_resolve(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
-        await session.refresh(user)
+        user = await session.get(User, user_id)
         return await central_receive_page(request, error=str(exc), user=user, session=session)
     except IntegrityError:
         await session.rollback()
-        await session.refresh(user)
+        user = await session.get(User, user_id)
         return await central_receive_page(request, error="Разрешение инцидента заблокировано: проверьте манифест и состав отправления.", user=user, session=session)
     message = f"Инцидент по отправлению № {number} разрешён, отправление принято полностью."
     return RedirectResponse(url=f"/central/receive?message={quote(message, safe='')}", status_code=303)
