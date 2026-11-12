@@ -3,7 +3,7 @@ import os
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -645,3 +645,69 @@ async def test_central_office_external_custody_uses_at_other_and_returns_to_bala
     assert card.current_location_id == central_loc.id
     assert card.external_organization is None
     assert card.external_since is None
+
+
+@pytest.mark.asyncio
+async def test_archive_cannot_mark_not_found_or_place_card_reserved_in_draft_shipment(pg_session):
+    (
+        branch, _branch_loc, archive_loc, central_loc,
+        _branch_user, archive_user, central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}",
+        full_name="Reserved archive patient",
+        date_of_birth=__import__("datetime").date(1986, 4, 12),
+        origin_branch_id=branch.id,
+        current_location_id=archive_loc.id,
+        status="active",
+    )
+    shelf = ArchiveShelf(
+        section_name="C", shelf_name=f"S-{uuid.uuid4().hex[:8]}", is_active=True,
+    )
+    pg_session.add_all([card, shelf])
+    await pg_session.flush()
+
+    archive = PostgreSQLArchiveWorkflow(pg_session)
+    request = (await archive.create_requests(
+        card_ids=[card.id], actor_id=central_user.id,
+    ))[0]
+    shipping = PostgreSQLShipmentWorkflow(pg_session)
+    shipment = await shipping.create_draft(
+        from_location_id=archive_loc.id,
+        to_location_id=central_loc.id,
+        courier_id=courier.id,
+        issued_by=archive_user.id,
+    )
+    await shipping.add_standalone_card(
+        shipment_id=shipment.id, card_id=card.id, actor_id=archive_user.id,
+    )
+
+    with pytest.raises(ArchiveWorkflowError, match="активное отправление"):
+        await archive.mark_not_found(
+            request_id=request.id,
+            actor_id=archive_user.id,
+            note="Карта не найдена",
+        )
+    with pytest.raises(ArchiveWorkflowError, match="активное отправление"):
+        await archive.place_card(
+            card_id=card.id, shelf_id=shelf.id, actor_id=archive_user.id,
+        )
+
+    placement_count = await pg_session.scalar(
+        select(func.count()).select_from(CardPlacement).where(
+            CardPlacement.card_id == card.id,
+            CardPlacement.removed_at.is_(None),
+        )
+    )
+    assert placement_count == 0
+    await pg_session.refresh(request)
+    assert request.status == "new"
+    assert request.fulfillment_shipment_id is None
+
+    await shipping.hand_over(shipment_id=shipment.id, actor_id=archive_user.id)
+    await shipping.receive(shipment_id=shipment.id, actor_id=central_user.id)
+    await pg_session.refresh(request)
+    await pg_session.refresh(card)
+    assert request.status == "completed"
+    assert card.current_location_id == central_loc.id
+    assert card.current_shipment_id is None
