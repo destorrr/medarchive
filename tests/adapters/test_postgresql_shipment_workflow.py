@@ -17,6 +17,9 @@ from medarchive.services.postgresql_archive_workflow import (
 from medarchive.services.postgresql_shipment_workflow import (
     PostgreSQLShipmentWorkflow, ShipmentWorkflowError,
 )
+from medarchive.services.postgresql_card_custody import (
+    CardCustodyWorkflowError, PostgreSQLCardCustodyWorkflow,
+)
 
 
 DATABASE_URL = os.getenv("MEDARCHIVE_DATABASE_URL")
@@ -531,3 +534,69 @@ async def test_individual_archive_card_can_be_placed_retrieved_issued_and_return
     assert returned_placement.removed_at is None
     assert returned_placement.id != first_placement.id
     assert returned_placement.card_id == card_id
+
+
+@pytest.mark.asyncio
+async def test_central_office_external_custody_keeps_card_on_balance_and_blocks_internal_moves(pg_session):
+    (
+        branch, _branch_loc, archive_loc, central_loc,
+        _branch_user, archive_user, central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="External custody patient",
+        date_of_birth=__import__("datetime").date(1982, 3, 4),
+        origin_branch_id=branch.id, current_location_id=central_loc.id, status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+
+    custody = PostgreSQLCardCustodyWorkflow(pg_session)
+    await custody.mark_external(
+        card_id=card.id, actor_id=central_user.id,
+        custody_status="at_court", organization="Районный суд",
+        comment="Дело № 123/2026",
+    )
+    await pg_session.refresh(card)
+    assert card.current_location_id == central_loc.id
+    assert card.current_shipment_id is None
+    assert card.custody_status == "at_court"
+    assert card.external_organization == "Районный суд"
+
+    shipping = PostgreSQLShipmentWorkflow(pg_session)
+    with pytest.raises(ShipmentWorkflowError, match="внешнюю организацию"):
+        await shipping.create_box(
+            location_id=central_loc.id, actor_id=central_user.id,
+            card_ids=[card.id],
+        )
+    draft = await shipping.create_draft(
+        from_location_id=central_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=central_user.id,
+    )
+    with pytest.raises(ShipmentWorkflowError, match="внешнюю организацию"):
+        await shipping.add_standalone_card(
+            shipment_id=draft.id, card_id=card.id, actor_id=central_user.id,
+        )
+
+    await custody.return_to_central_office(
+        card_id=card.id, actor_id=central_user.id,
+        comment="Оригинал возвращён в ЦО",
+    )
+    await pg_session.refresh(card)
+    assert card.current_location_id == central_loc.id
+    assert card.custody_status == "available"
+    assert card.external_organization is None
+    assert card.external_since is None
+    assert card.external_comment == "Оригинал возвращён в ЦО"
+
+    events = list((await pg_session.scalars(
+        select(DomainEvent).where(
+            DomainEvent.aggregate_type == "card",
+            DomainEvent.aggregate_id == card.id,
+        ).order_by(DomainEvent.id)
+    )).all())
+    assert [event.event_type for event in events] == [
+        "card.external_custody_started",
+        "card.external_custody_returned",
+    ]
+    assert events[0].payload["organization"] == "Районный суд"
+    assert events[1].payload["previous_external_custody"]["comment"] == "Дело № 123/2026"
