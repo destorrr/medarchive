@@ -256,7 +256,7 @@ async def placement_page(
     placed_boxes = []
     placed_cards = []
     if archive is not None:
-        placed_boxes = list((
+        placed_boxes = (
             await session.execute(
                 select(Box, BoxPlacement, ArchiveShelf)
                 .join(BoxPlacement, BoxPlacement.box_id == Box.id)
@@ -266,8 +266,8 @@ async def placement_page(
                     BoxPlacement.removed_at.is_(None),
                 ).order_by(Box.box_number)
             )
-        )).all()
-        placed_cards = list((
+        ).all()
+        placed_cards = (
             await session.execute(
                 select(Card, CardPlacement, ArchiveShelf)
                 .join(CardPlacement, CardPlacement.card_id == Card.id)
@@ -277,7 +277,7 @@ async def placement_page(
                     CardPlacement.removed_at.is_(None),
                 ).order_by(Card.card_number)
             )
-        )).all()
+        ).all()
     return await _render_page(
         request, user, session, "postgresql_placement.html",
         boxes=boxes, cards=cards, shelves=shelves,
