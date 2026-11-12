@@ -91,7 +91,19 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
                 data={"box_id": str(box_id), "qr_payload": json.dumps(qr, ensure_ascii=False)},
                 cookies={"session": token},
             )
-            assert scanned.status_code == 303
+            assert scanned.status_code == 200
+            assert "Новая карта ещё не зарегистрирована" in scanned.text
+            async with database.session_factory() as session:
+                assert await session.scalar(
+                    select(Card.id).where(Card.card_number == qr["card_number"])
+                ) is None
+
+            confirmed = await client.post(
+                "/packing/confirm-card",
+                data={"box_id": str(box_id), "qr_payload": json.dumps(qr, ensure_ascii=False)},
+                cookies={"session": token},
+            )
+            assert confirmed.status_code == 303
 
             async with database.session_factory() as session:
                 card = await session.scalar(
