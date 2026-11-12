@@ -118,7 +118,10 @@ def upgrade() -> None:
             NEW.card_id IS DISTINCT FROM OLD.card_id OR
             NEW.added_at IS DISTINCT FROM OLD.added_at OR
             NEW.added_by IS DISTINCT FROM OLD.added_by OR
-            (OLD.removed_at IS NOT NULL AND NEW.removed_at IS DISTINCT FROM OLD.removed_at) OR
+            (OLD.removed_at IS NOT NULL AND (
+                NEW.removed_at IS DISTINCT FROM OLD.removed_at
+                OR NEW.removed_by IS DISTINCT FROM OLD.removed_by
+            )) OR
             (NEW.removed_at IS NULL AND NEW.removed_by IS DISTINCT FROM OLD.removed_by)
         ) THEN
             RAISE EXCEPTION 'Исторические данные членства коробки неизменяемы'
@@ -460,7 +463,10 @@ def upgrade() -> None:
         IF TG_OP = 'UPDATE' AND (
             NEW.box_id IS DISTINCT FROM OLD.box_id OR NEW.shelf_id IS DISTINCT FROM OLD.shelf_id
             OR NEW.placed_at IS DISTINCT FROM OLD.placed_at OR NEW.placed_by IS DISTINCT FROM OLD.placed_by
-            OR (OLD.removed_at IS NOT NULL AND NEW.removed_at IS DISTINCT FROM OLD.removed_at)
+            OR (OLD.removed_at IS NOT NULL AND (
+                NEW.removed_at IS DISTINCT FROM OLD.removed_at
+                OR NEW.removed_by IS DISTINCT FROM OLD.removed_by
+            ))
         ) THEN
             RAISE EXCEPTION 'Нельзя изменять исходные данные или повторно открывать размещение коробки'
                 USING ERRCODE = '23514';
