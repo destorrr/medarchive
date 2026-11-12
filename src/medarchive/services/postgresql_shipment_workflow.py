@@ -77,6 +77,7 @@ class PostgreSQLShipmentWorkflow:
                         ArchiveRequest.card_id == card.id,
                         ArchiveRequest.status.in_(("new", "in_progress")),
                         User.role == "central_office",
+                        ArchiveRequest.fulfillment_shipment_id.is_(None),
                     )
                     .with_for_update()
                 )
@@ -143,6 +144,7 @@ class PostgreSQLShipmentWorkflow:
                     ArchiveRequest.card_id == card.id,
                     ArchiveRequest.status.in_(("new", "in_progress")),
                     User.role == "central_office",
+                    ArchiveRequest.fulfillment_shipment_id.is_(None),
                 )
                 .with_for_update()
             )
@@ -342,19 +344,24 @@ class PostgreSQLShipmentWorkflow:
         target = await self._location(shipment.to_location_id)
         if source.kind == "archive" and target.kind == "central_office":
             card_ids = [card.id for card, _ in boxed_cards] + [row.card_id for row in standalone_rows]
+            now = datetime.now(timezone.utc)
             for card_id in card_ids:
                 request = await self.session.scalar(
                     select(ArchiveRequest)
                     .join(User, User.id == ArchiveRequest.requested_by)
                     .where(
                         ArchiveRequest.card_id == card_id,
-                        ArchiveRequest.status.in_(("new", "in_progress")),
+                        ArchiveRequest.status == "new",
+                        ArchiveRequest.fulfillment_shipment_id.is_(None),
                         User.role == "central_office",
                     )
                     .with_for_update()
                 )
                 if request is None:
-                    raise ShipmentWorkflowError("Для каждой выдаваемой карты нужна активная заявка ЦО")
+                    raise ShipmentWorkflowError("Для каждой выдаваемой карты нужна свободная активная заявка ЦО")
+                request.status = "in_progress"
+                request.fulfillment_shipment_id = shipment.id
+                request.updated_at = now
 
         # Ensure each transported card has exactly one manifest row and that its
         # containing box is explicit. A duplicate is rejected by the PK as well.
@@ -492,7 +499,8 @@ class PostgreSQLShipmentWorkflow:
                 request = await self.session.scalar(
                     select(ArchiveRequest).where(
                         ArchiveRequest.card_id == card.id,
-                        ArchiveRequest.status.in_(("new", "in_progress")),
+                        ArchiveRequest.status == "in_progress",
+                        ArchiveRequest.fulfillment_shipment_id == shipment.id,
                     ).with_for_update()
                 )
                 if request is not None:
