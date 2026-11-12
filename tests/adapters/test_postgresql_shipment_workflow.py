@@ -398,6 +398,18 @@ async def test_central_office_can_request_archive_cards_and_archive_can_repack_t
     await shipping.remove_card_from_box(
         box_id=original_box.id, card_id=card.id, actor_id=archive_user.id,
     )
+    await shipping.add_card_to_box(
+        box_id=original_box.id, card_id=card.id, actor_id=archive_user.id,
+    )
+    await shipping.remove_card_from_box(
+        box_id=original_box.id, card_id=card.id, actor_id=archive_user.id,
+    )
+    cycles = list((await pg_session.scalars(
+        select(BoxCycle).where(BoxCycle.box_id == original_box.id).order_by(BoxCycle.cycle_number)
+    )).all())
+    assert [cycle.cycle_number for cycle in cycles] == [1, 2]
+    assert all(cycle.ended_at is not None for cycle in cycles)
+
     new_box = await shipping.create_box(
         location_id=archive_loc.id, actor_id=archive_user.id,
         card_ids=[card.id],
