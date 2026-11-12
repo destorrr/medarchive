@@ -857,3 +857,117 @@ async def test_admin_service_rejects_deactivating_branch_with_remaining_card_inv
         await outer_transaction.rollback()
         await connection.close()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_qr_intake_waits_for_branch_deactivation_location_lock():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    import asyncio
+    import json
+    from sqlalchemy import text
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.services.postgresql_card_intake import (
+        CardIntakeError, PostgreSQLCardIntakeService,
+    )
+
+    database = Database(DATABASE_URL)
+    branch_id = None
+    user_id = None
+    intake_task = None
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                branch = await PostgreSQLAdminService(session).create_branch(
+                    code=f"RACE-{uuid.uuid4().hex[:10]}", name="QR race branch"
+                )
+                branch_id = branch.id
+                employee = await PostgreSQLAdminService(session).create_user(
+                    username=f"qr-race-{uuid.uuid4().hex[:12]}",
+                    full_name="QR Race Employee",
+                    password_hash="test-hash",
+                    role="branch",
+                    branch_id=branch.id,
+                )
+                user_id = employee.id
+
+        # Keep the deactivation transaction open after it has locked and
+        # marked the branch location inactive. A concurrent QR intake must wait.
+        async with database.session_factory() as admin_session:
+            await admin_session.begin()
+            employee = await admin_session.get(User, user_id)
+            employee.is_active = False
+            await admin_session.flush()
+            await PostgreSQLAdminService(admin_session).set_branch_active(
+                branch_id, False
+            )
+
+            intake_started = asyncio.Event()
+            intake_pid = {}
+
+            async def register_card():
+                async with database.session_factory() as intake_session:
+                    async with intake_session.begin():
+                        intake_pid["pid"] = await intake_session.scalar(
+                            text("SELECT pg_backend_pid()")
+                        )
+                        intake_started.set()
+                        return await PostgreSQLCardIntakeService(
+                            intake_session
+                        ).register_from_qr(
+                            payload=json.dumps({
+                                "version": 1,
+                                "card_number": f"QR-RACE-{uuid.uuid4().hex}",
+                                "full_name": "QR Race Patient",
+                                "birth_date": "1985-04-03",
+                            }),
+                            actor_id=user_id,
+                        )
+
+            intake_task = asyncio.create_task(register_card())
+            await asyncio.wait_for(intake_started.wait(), timeout=5)
+
+            # Confirm PostgreSQL itself reports that the intake connection is
+            # blocked by the deactivation transaction before releasing the lock.
+            blocked = False
+            for _ in range(250):
+                blockers = await admin_session.scalar(
+                    text("SELECT pg_blocking_pids(:pid)"),
+                    {"pid": intake_pid["pid"]},
+                )
+                if blockers:
+                    blocked = True
+                    break
+                await asyncio.sleep(0.02)
+            assert blocked, "QR intake did not wait for the branch location lock"
+
+            await admin_session.commit()
+
+        with pytest.raises(CardIntakeError, match="активное место хранения"):
+            await asyncio.wait_for(intake_task, timeout=5)
+        intake_task = None
+    finally:
+        if intake_task is not None and not intake_task.done():
+            intake_task.cancel()
+            await asyncio.gather(intake_task, return_exceptions=True)
+        async with database.session_factory() as session:
+            if user_id is not None:
+                employee = await session.get(User, user_id)
+                if employee is not None:
+                    await session.delete(employee)
+                    await session.flush()
+            if branch_id is not None:
+                location = await session.scalar(
+                    select(Location).where(
+                        Location.kind == "branch", Location.branch_id == branch_id
+                    )
+                )
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        await database.close()
