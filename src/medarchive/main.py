@@ -82,9 +82,10 @@ def create_app(config: Config | None = None) -> FastAPI:
                 return RedirectResponse(url="/login", status_code=303)
             return HTMLResponse("<h1>МедАрхив</h1><p>Дашборд появится в Task 7.</p>")
 
-    # PostgreSQL administration API (target branch/user directory).
-    from medarchive.routers.postgresql_admin import router as pg_admin_router
-    app.include_router(pg_admin_router)
+    # PostgreSQL administration API is enabled only with PostgreSQL authentication.
+    if config.auth_backend == "postgresql":
+        from medarchive.routers.postgresql_admin import router as pg_admin_router
+        app.include_router(pg_admin_router)
 
     # Admin router (Этап 4: справочники)
     try:
