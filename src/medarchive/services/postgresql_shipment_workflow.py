@@ -53,8 +53,6 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Одна и та же карта указана в коробке несколько раз")
         if location.kind == "archive" and not selected_ids:
             raise ShipmentWorkflowError("Архив может создавать коробку только для комплектации заявок ЦО")
-        if location.kind == "archive" and len(selected_ids) == 0:
-            raise ShipmentWorkflowError("Для архивной коробки необходимо выбрать карты по заявкам")
 
         cards: list[Card] = []
         for card_id in selected_ids:
