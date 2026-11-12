@@ -312,6 +312,23 @@ class BoxPlacement(Base):
     removed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
 
 
+class CardPlacement(Base):
+    __tablename__ = "card_placements"
+    __table_args__ = (
+        CheckConstraint("removed_at IS NULL OR removed_at >= placed_at", name="ck_card_placement_dates"),
+        Index("uq_card_one_active_placement", "card_id", unique=True, postgresql_where=text("removed_at IS NULL")),
+        Index("ix_card_placements_shelf", "shelf_id", "placed_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    card_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cards.id", ondelete="RESTRICT"))
+    shelf_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("archive_shelves.id", ondelete="RESTRICT"))
+    placed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    placed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    removed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+
+
 class DomainEvent(Base):
     __tablename__ = "domain_events"
     __table_args__ = (
