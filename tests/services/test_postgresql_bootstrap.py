@@ -6,8 +6,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from medarchive.adapters.postgresql.database import Database
 from medarchive.adapters.postgresql.models import Location
-from medarchive.dependencies import get_pg_database
 from medarchive.services.postgresql_bootstrap import ensure_system_locations
 
 
@@ -19,7 +19,7 @@ async def test_system_locations_bootstrap_is_idempotent():
     if not DATABASE_URL:
         pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
 
-    database = await get_pg_database()
+    database = Database(DATABASE_URL)
     connection = await database.engine.connect()
     outer_transaction = await connection.begin()
     session = AsyncSession(
