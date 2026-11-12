@@ -50,6 +50,15 @@ class PostgreSQLShipmentWorkflow:
         target = await self._location(to_location_id)
         if source.id == target.id:
             raise ShipmentWorkflowError("Отправитель и получатель должны различаться")
+        allowed_routes = {
+            ("branch", "central_office"),
+            ("branch", "archive"),
+            ("central_office", "branch"),
+            ("central_office", "archive"),
+            ("archive", "central_office"),
+        }
+        if (source.kind, target.kind) not in allowed_routes:
+            raise ShipmentWorkflowError("Такой маршрут отправления не разрешён")
         await self._authorize_location(actor, source)
         courier = await self.session.get(Courier, courier_id)
         if courier is None or not courier.is_active:
@@ -82,10 +91,37 @@ class PostgreSQLShipmentWorkflow:
         if box.current_location_id != shipment.from_location_id or box.current_shipment_id is not None:
             raise ShipmentWorkflowError("Коробка не находится в месте отправления")
         existing = await self.session.scalar(
-            select(ShipmentBox).where(ShipmentBox.box_id == box_id)
+            select(ShipmentBox)
+            .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
+            .where(
+                ShipmentBox.box_id == box_id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
         )
         if existing is not None:
-            raise ShipmentWorkflowError("Коробка уже включена в другое отправление")
+            raise ShipmentWorkflowError("Коробка уже включена в другое активное отправление")
+        cycle = await self.session.scalar(
+            select(BoxCycle).where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None))
+        )
+        if cycle is None:
+            raise ShipmentWorkflowError("У коробки нет открытого цикла")
+        members = list((await self.session.scalars(
+            select(BoxCardMembership).where(
+                BoxCardMembership.box_cycle_id == cycle.id,
+                BoxCardMembership.removed_at.is_(None),
+            )
+        )).all())
+        if not members:
+            raise ShipmentWorkflowError("Нельзя добавить пустую коробку в отправление")
+        member_ids = [member.card_id for member in members]
+        already_added = await self.session.scalar(
+            select(ShipmentCard.card_id).where(
+                ShipmentCard.shipment_id == shipment.id,
+                ShipmentCard.card_id.in_(member_ids),
+            ).limit(1)
+        )
+        if already_added is not None:
+            raise ShipmentWorkflowError("Карта из коробки уже добавлена в отправление отдельно")
         self.session.add(ShipmentBox(shipment_id=shipment.id, box_id=box.id))
         await self.session.flush()
 
@@ -105,10 +141,15 @@ class PostgreSQLShipmentWorkflow:
         if membership is not None:
             raise ShipmentWorkflowError("Карта находится в коробке; отправьте коробку целиком")
         existing = await self.session.scalar(
-            select(ShipmentCard).where(ShipmentCard.card_id == card.id)
+            select(ShipmentCard)
+            .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+            .where(
+                ShipmentCard.card_id == card.id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
         )
         if existing is not None:
-            raise ShipmentWorkflowError("Карта уже включена в другое отправление")
+            raise ShipmentWorkflowError("Карта уже включена в другое активное отправление")
         self.session.add(ShipmentCard(shipment_id=shipment.id, card_id=card.id, box_id=None))
         await self.session.flush()
 
