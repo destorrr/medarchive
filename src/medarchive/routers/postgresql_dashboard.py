@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import APIRouter, Depends, Request
@@ -10,12 +10,14 @@ from fastapi.responses import RedirectResponse
 
 from medarchive.adapters.postgresql.models import (
     ArchiveRequest,
-    ArchiveShelf,
     Box,
     Branch,
     Card,
     DomainEvent,
     Location,
+    Shipment,
+    ShipmentBox,
+    ShipmentCard,
     User,
 )
 from medarchive.dependencies import get_pg_current_user, get_pg_session, require_pg_role
@@ -85,47 +87,128 @@ async def postgresql_dashboard(
             Location.kind == "archive", Location.is_active.is_(True)
         )
     )
-    total_cards = await _count(session, Card)
-    cards_placed = 0
-    if archive_id is not None:
-        cards_placed = int(
+    scope_location_id = None
+    if user.role == "branch":
+        scope_location_id = await session.scalar(
+            select(Location.id).where(
+                Location.kind == "branch", Location.branch_id == user.branch_id,
+                Location.is_active.is_(True),
+            )
+        )
+    elif user.role in {"central_office", "archive"}:
+        scope_location_id = await session.scalar(
+            select(Location.id).where(
+                Location.kind == user.role, Location.is_active.is_(True)
+            )
+        )
+
+    if scope_location_id is None:
+        total_cards = await _count(session, Card)
+        cards_placed = 0
+        if archive_id is not None:
+            cards_placed = int(
+                await session.scalar(
+                    select(func.count()).select_from(Card).where(
+                        Card.current_location_id == archive_id
+                    )
+                ) or 0
+            )
+        cards_in_branch = int(
+            await session.scalar(
+                select(func.count())
+                .select_from(Card)
+                .join(Location, Location.id == Card.current_location_id)
+                .where(Location.kind == "branch")
+            ) or 0
+        )
+        cards_in_transit = int(
             await session.scalar(
                 select(func.count()).select_from(Card).where(
-                    Card.current_location_id == archive_id
+                    Card.current_shipment_id.is_not(None)
                 )
             ) or 0
         )
-    cards_in_branch = int(
-        await session.scalar(
-            select(func.count())
-            .select_from(Card)
-            .join(Location, Location.id == Card.current_location_id)
-            .where(Location.kind == "branch")
-        ) or 0
-    )
-    cards_in_transit = int(
-        await session.scalar(
-            select(func.count()).select_from(Card).where(
-                Card.current_shipment_id.is_not(None)
+        total_boxes = await _count(session, Box)
+        open_requests_query = select(func.count()).select_from(ArchiveRequest).where(
+            ArchiveRequest.status.in_(("new", "in_progress"))
+        )
+    else:
+        cards_at_location = int(
+            await session.scalar(
+                select(func.count()).select_from(Card).where(
+                    Card.current_location_id == scope_location_id
+                )
+            ) or 0
+        )
+        cards_in_transit = int(
+            await session.scalar(
+                select(func.count())
+                .select_from(ShipmentCard)
+                .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+                .where(
+                    Shipment.status == "in_transit",
+                    or_(
+                        Shipment.from_location_id == scope_location_id,
+                        Shipment.to_location_id == scope_location_id,
+                    ),
+                )
+            ) or 0
+        )
+        total_cards = cards_at_location + cards_in_transit
+        cards_placed = cards_at_location if user.role == "archive" else 0
+        cards_in_branch = cards_at_location if user.role == "branch" else 0
+        boxes_at_location = int(
+            await session.scalar(
+                select(func.count()).select_from(Box).where(
+                    Box.current_location_id == scope_location_id
+                )
+            ) or 0
+        )
+        boxes_in_transit = int(
+            await session.scalar(
+                select(func.count())
+                .select_from(ShipmentBox)
+                .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
+                .where(
+                    Shipment.status == "in_transit",
+                    or_(
+                        Shipment.from_location_id == scope_location_id,
+                        Shipment.to_location_id == scope_location_id,
+                    ),
+                )
+            ) or 0
+        )
+        total_boxes = boxes_at_location + boxes_in_transit
+        open_requests_query = select(func.count()).select_from(ArchiveRequest).where(
+            ArchiveRequest.status.in_(("new", "in_progress"))
+        )
+        if user.role == "central_office":
+            open_requests_query = open_requests_query.where(
+                ArchiveRequest.requested_by.in_(
+                    select(User.id).where(User.role == "central_office")
+                )
             )
-        ) or 0
-    )
-    total_boxes = await _count(session, Box)
-    open_requests = int(
-        await session.scalar(
-            select(func.count()).select_from(ArchiveRequest).where(
-                ArchiveRequest.status.in_(("new", "in_progress"))
-            )
-        ) or 0
-    )
+        elif user.role != "archive":
+            open_requests_query = open_requests_query.where(False)
 
-    events = list(
-        (
-            await session.scalars(
-                select(DomainEvent).order_by(DomainEvent.occurred_at.desc()).limit(5)
+    open_requests = int(await session.scalar(open_requests_query) or 0)
+
+    events_query = select(DomainEvent).order_by(DomainEvent.occurred_at.desc())
+    if scope_location_id is not None:
+        visible_card_ids = select(Card.id).where(Card.current_location_id == scope_location_id)
+        visible_shipment_ids = select(Shipment.id).where(
+            or_(
+                Shipment.from_location_id == scope_location_id,
+                Shipment.to_location_id == scope_location_id,
             )
-        ).all()
-    )
+        )
+        events_query = events_query.where(
+            or_(
+                (DomainEvent.aggregate_type == "card") & DomainEvent.aggregate_id.in_(visible_card_ids),
+                (DomainEvent.aggregate_type == "shipment") & DomainEvent.aggregate_id.in_(visible_shipment_ids),
+            )
+        )
+    events = list((await session.scalars(events_query.limit(5))).all())
     card_ids = {
         event.aggregate_id for event in events if event.aggregate_type == "card"
     }
@@ -149,9 +232,7 @@ async def postgresql_dashboard(
         destination_id = payload.get("to_location_id")
         recent_movements.append({
             "timestamp": event.occurred_at,
-            "card_name": card.full_name if card else (
-                card.card_number if card else event.aggregate_type
-            ),
+            "card_name": card.full_name if card else event.aggregate_type,
             "action": EVENT_LABELS.get(event.event_type, event.event_type),
             "to_location": locations.get(destination_id) if destination_id else None,
         })
