@@ -226,8 +226,8 @@ async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_
 
     # The same physical box can be reused for the return route after receipt.
     return_shipment = await workflow.create_draft(
-        from_location_id=central_location_id, to_location_id=archive_location_id,
-        courier_id=courier_id, issued_by=central_user_id,
+        from_location_id=central_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=central_user.id,
     )
     await workflow.add_box(
         shipment_id=return_shipment.id, box_id=box.id, actor_id=central_user.id,
