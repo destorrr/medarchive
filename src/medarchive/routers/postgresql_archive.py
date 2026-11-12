@@ -207,7 +207,7 @@ async def placement_page(
     session: AsyncSession = Depends(get_pg_session),
 ):
     archive = await _archive_location(session)
-    boxes, cards, shelves = [], [], []
+    boxes, cards, shelves, box_items = [], [], [], []
     if archive is not None:
         active_box_placement = select(BoxPlacement.id).where(
             BoxPlacement.box_id == Box.id, BoxPlacement.removed_at.is_(None)
@@ -254,6 +254,20 @@ async def placement_page(
                 .order_by(ArchiveShelf.section_name, ArchiveShelf.shelf_name)
             )
         ).all())
+        for box in boxes:
+            box_cards = list((
+                await session.scalars(
+                    select(Card)
+                    .join(BoxCardMembership, BoxCardMembership.card_id == Card.id)
+                    .join(BoxCycle, BoxCycle.id == BoxCardMembership.box_cycle_id)
+                    .where(
+                        BoxCycle.box_id == box.id,
+                        BoxCycle.ended_at.is_(None),
+                        BoxCardMembership.removed_at.is_(None),
+                    ).order_by(Card.card_number)
+                )
+            ).all())
+            box_items.append({"box": box, "cards": box_cards})
 
     placed_boxes = []
     placed_cards = []
@@ -282,10 +296,64 @@ async def placement_page(
         ).all()
     return await _render_page(
         request, user, session, "postgresql_placement.html",
-        boxes=boxes, cards=cards, shelves=shelves,
+        boxes=boxes, cards=cards, shelves=shelves, box_items=box_items,
         placed_boxes=placed_boxes, placed_cards=placed_cards,
         error=error, success=message,
     )
+
+
+@router.post("/placement/add-card")
+async def archive_add_card_to_internal_box(
+    request: Request,
+    box_id: uuid.UUID = Form(...),
+    card_id: uuid.UUID = Form(...),
+    user: User = Depends(archive_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        await PostgreSQLShipmentWorkflow(session).add_card_to_box(
+            box_id=box_id, card_id=card_id, actor_id=user.id
+        )
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        await session.refresh(user)
+        return await placement_page(request, error=str(exc), user=user, session=session)
+    except IntegrityError:
+        await session.rollback()
+        await session.refresh(user)
+        return await placement_page(
+            request, error="Нельзя изменить состав размещённой или зарезервированной коробки.",
+            user=user, session=session,
+        )
+    return RedirectResponse("/placement?message=Карта+добавлена+во+внутреннюю+коробку", status_code=303)
+
+
+@router.post("/placement/remove-card-from-box")
+async def archive_remove_card_from_internal_box(
+    request: Request,
+    box_id: uuid.UUID = Form(...),
+    card_id: uuid.UUID = Form(...),
+    user: User = Depends(archive_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        await PostgreSQLShipmentWorkflow(session).remove_card_from_box(
+            box_id=box_id, card_id=card_id, actor_id=user.id
+        )
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        await session.refresh(user)
+        return await placement_page(request, error=str(exc), user=user, session=session)
+    except IntegrityError:
+        await session.rollback()
+        await session.refresh(user)
+        return await placement_page(
+            request, error="Сначала снимите коробку с архивной полки.",
+            user=user, session=session,
+        )
+    return RedirectResponse("/placement?message=Карта+извлечена+из+внутренней+коробки", status_code=303)
 
 
 @router.post("/placement/new-internal-box")
