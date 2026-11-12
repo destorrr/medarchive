@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -250,6 +251,11 @@ async def postgresql_dashboard(
         payload = event.payload or {}
         card = cards_by_id.get(event.aggregate_id)
         destination_id = payload.get("to_location_id")
+        if destination_id:
+            try:
+                destination_id = uuid.UUID(str(destination_id))
+            except (TypeError, ValueError):
+                destination_id = None
         recent_movements.append({
             "timestamp": event.occurred_at,
             "card_name": card.full_name if card else event.aggregate_type,
@@ -303,11 +309,15 @@ async def _search_context(
     location_id = None
     if user.role == "archive":
         location_id = await session.scalar(
-            select(Location.id).where(Location.kind == "archive")
+            select(Location.id).where(
+                Location.kind == "archive", Location.is_active.is_(True)
+            )
         )
     elif user.role == "central_office":
         location_id = await session.scalar(
-            select(Location.id).where(Location.kind == "central_office")
+            select(Location.id).where(
+                Location.kind == "central_office", Location.is_active.is_(True)
+            )
         )
     if user.role in {"archive", "central_office"} and location_id is None:
         return {"query": query, "cards": cards_out, "boxes": boxes_out}
