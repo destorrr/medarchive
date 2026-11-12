@@ -137,8 +137,8 @@ async def _seed_transit_card(connection):
         text(
             """
             INSERT INTO shipments
-                (id, from_location_id, to_location_id, courier_id, status, issued_by, handed_over_at)
-            VALUES (:id, :source, :target, :courier, 'in_transit', :actor, now())
+                (id, from_location_id, to_location_id, courier_id, status, issued_by)
+            VALUES (:id, :source, :target, :courier, 'draft', :actor)
             """
         ),
         {
@@ -183,8 +183,10 @@ async def test_postgresql_accepts_transit_card_only_with_matching_manifest_row()
                     {"shipment_id": shipment_id, "card_id": card_id},
                 )
                 await connection.execute(
-                    text("SET CONSTRAINTS fk_card_current_shipment, fk_card_shipment_manifest IMMEDIATE")
+                    text("UPDATE shipments SET status = 'in_transit', handed_over_at = now() WHERE id = :id"),
+                    {"id": shipment_id},
                 )
+                await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
                 result = await connection.execute(
                     text("SELECT current_shipment_id FROM cards WHERE id = :id"),
                     {"id": card_id},
