@@ -181,14 +181,16 @@ async def receive_confirm(
         number = shipment.shipment_number
         await session.commit()
     except ValueError as exc:
+        user_id = user.id
         await session.rollback()
-        await session.refresh(user)
+        user = await session.get(User, user_id)
         return await receive_page(
             request, error=str(exc), user=user, session=session
         )
     except IntegrityError:
+        user_id = user.id
         await session.rollback()
-        await session.refresh(user)
+        user = await session.get(User, user_id)
         return await receive_page(
             request,
             error="Приёмка заблокирована ограничениями целостности. Проверьте состав отправления.",

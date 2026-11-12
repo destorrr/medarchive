@@ -170,14 +170,16 @@ async def central_receive_confirm(
         number = shipment.shipment_number
         await session.commit()
     except ValueError as exc:
+        user_id = user.id
         await session.rollback()
-        await session.refresh(user)
+        user = await session.get(User, user_id)
         return await central_receive_page(
             request, error=str(exc), user=user, session=session
         )
     except IntegrityError:
+        user_id = user.id
         await session.rollback()
-        await session.refresh(user)
+        user = await session.get(User, user_id)
         return await central_receive_page(
             request,
             error="Приёмка заблокирована: проверьте манифест и состав отправления.",
