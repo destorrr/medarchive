@@ -4,6 +4,11 @@
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 {% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
 <div class="card">
+    <form method="post" action="/placement/new-internal-box">
+        <button class="btn btn-secondary" type="submit">Создать пустую внутреннюю коробку</button>
+    </form>
+</div>
+<div class="card">
     <h3>Коробки без размещения</h3>
     {% if boxes and shelves %}
     <table class="data"><thead><tr><th>Коробка</th><th>Разместить на полке</th></tr></thead><tbody>
