@@ -110,5 +110,56 @@ def upgrade() -> None:
         """)
 
 
+    # Location changes are only valid as part of a shipment handover/receipt.
+    # This closes direct-SQL teleportation and verifies that an object starts
+    # from the shipment origin and arrives at its declared destination.
+    op.execute("""
+    CREATE OR REPLACE FUNCTION medarchive_guard_object_movement()
+    RETURNS trigger LANGUAGE plpgsql AS $
+    DECLARE
+        expected_location_id uuid;
+    BEGIN
+        IF OLD.current_shipment_id IS NULL
+           AND NEW.current_shipment_id IS NULL THEN
+            IF NEW.current_location_id IS DISTINCT FROM OLD.current_location_id THEN
+                RAISE EXCEPTION
+                    'Местонахождение объекта можно менять только через отправление'
+                    USING ERRCODE = '23514';
+            END IF;
+        ELSIF OLD.current_shipment_id IS NULL
+              AND NEW.current_shipment_id IS NOT NULL THEN
+            SELECT from_location_id INTO expected_location_id
+            FROM shipments WHERE id = NEW.current_shipment_id;
+            IF OLD.current_location_id IS DISTINCT FROM expected_location_id THEN
+                RAISE EXCEPTION
+                    'Отправление должно начинаться из фактической локации объекта'
+                    USING ERRCODE = '23514';
+            END IF;
+        ELSIF OLD.current_shipment_id IS NOT NULL
+              AND NEW.current_shipment_id IS NULL THEN
+            SELECT to_location_id INTO expected_location_id
+            FROM shipments WHERE id = OLD.current_shipment_id;
+            IF NEW.current_location_id IS DISTINCT FROM expected_location_id THEN
+                RAISE EXCEPTION
+                    'Объект должен прибыть в локацию получателя отправления'
+                    USING ERRCODE = '23514';
+            END IF;
+        ELSIF OLD.current_shipment_id IS DISTINCT FROM NEW.current_shipment_id THEN
+            RAISE EXCEPTION
+                'Нельзя напрямую переключать объект между отправлениями'
+                USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+    END;
+    $;
+    """)
+    for table in ("cards", "boxes"):
+        op.execute(f"""
+        CREATE TRIGGER trg_{table}_movement_guard
+        BEFORE UPDATE OF current_location_id, current_shipment_id ON {table}
+        FOR EACH ROW EXECUTE FUNCTION medarchive_guard_object_movement()
+        """)
+
+
 def downgrade() -> None:
     raise RuntimeError("Shipment integrity guards are intentionally irreversible; recreate a disposable DB")
