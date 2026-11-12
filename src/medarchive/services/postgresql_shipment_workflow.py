@@ -51,9 +51,6 @@ class PostgreSQLShipmentWorkflow:
         selected_ids = list(card_ids or [])
         if len(selected_ids) != len(set(selected_ids)):
             raise ShipmentWorkflowError("Одна и та же карта указана в коробке несколько раз")
-        if location.kind == "archive":
-            raise ShipmentWorkflowError("Архив не формирует коробки для выдачи карт ЦО; отправляйте карты отдельно")
-
         cards: list[Card] = []
         for card_id in selected_ids:
             card = await self.session.scalar(
@@ -125,7 +122,19 @@ class PostgreSQLShipmentWorkflow:
         if location.kind == "archive":
             raise ShipmentWorkflowError("Архив не упаковывает карты в коробки; отправляйте их отдельно")
         if location.kind == "archive":
-            raise ShipmentWorkflowError("Архив не упаковывает карты в коробки; отправляйте их отдельно")
+            request = await self.session.scalar(
+                select(ArchiveRequest)
+                .join(User, User.id == ArchiveRequest.requested_by)
+                .where(
+                    ArchiveRequest.card_id == card.id,
+                    ArchiveRequest.status.in_(("new", "in_progress")),
+                    User.role == "central_office",
+                    ArchiveRequest.fulfillment_shipment_id.is_(None),
+                )
+                .with_for_update()
+            )
+            if request is None:
+                raise ShipmentWorkflowError("В архивную коробку можно включать только карты из активных заявок ЦО")
         cycle = await self.session.scalar(
             select(BoxCycle)
             .where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None))
