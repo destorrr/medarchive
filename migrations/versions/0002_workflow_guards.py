@@ -102,13 +102,29 @@ def upgrade() -> None:
         """)
 
     op.execute("""
+    op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_box_membership_mutation()
     RETURNS trigger LANGUAGE plpgsql AS $$
     DECLARE
         cycle_id uuid;
         box_id_value uuid;
     BEGIN
-        cycle_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.box_cycle_id ELSE NEW.box_cycle_id END;
+        IF TG_OP = 'DELETE' THEN
+            RAISE EXCEPTION 'Историю состава коробки нельзя удалять; закройте членство'
+                USING ERRCODE = '23514';
+        END IF;
+        IF TG_OP = 'UPDATE' AND (
+            NEW.box_cycle_id IS DISTINCT FROM OLD.box_cycle_id OR
+            NEW.card_id IS DISTINCT FROM OLD.card_id OR
+            NEW.added_at IS DISTINCT FROM OLD.added_at OR
+            NEW.added_by IS DISTINCT FROM OLD.added_by OR
+            (OLD.removed_at IS NOT NULL AND NEW.removed_at IS DISTINCT FROM OLD.removed_at) OR
+            (NEW.removed_at IS NULL AND NEW.removed_by IS DISTINCT FROM OLD.removed_by)
+        ) THEN
+            RAISE EXCEPTION 'Исторические данные членства коробки неизменяемы'
+                USING ERRCODE = '23514';
+        END IF;
+        cycle_id := NEW.box_cycle_id;
         SELECT box_id INTO box_id_value FROM box_cycles WHERE id = cycle_id;
         IF box_id_value IS NOT NULL AND (
             EXISTS (SELECT 1 FROM boxes b WHERE b.id = box_id_value AND b.current_shipment_id IS NOT NULL)
@@ -125,7 +141,6 @@ def upgrade() -> None:
             RAISE EXCEPTION 'Состав коробки нельзя менять во время отправления или размещения на полке'
                 USING ERRCODE = '23514';
         END IF;
-        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
         RETURN NEW;
     END;
     $$;
@@ -134,6 +149,35 @@ def upgrade() -> None:
     CREATE TRIGGER trg_box_membership_mutation_guard
     BEFORE INSERT OR UPDATE OR DELETE ON box_card_memberships
     FOR EACH ROW EXECUTE FUNCTION medarchive_guard_box_membership_mutation()
+    """)
+    op.execute("""
+    CREATE OR REPLACE FUNCTION medarchive_guard_box_cycle_history()
+    RETURNS trigger LANGUAGE plpgsql AS $
+    BEGIN
+        IF TG_OP = 'DELETE' THEN
+            RAISE EXCEPTION 'Историю циклов коробки нельзя удалять'
+                USING ERRCODE = '23514';
+        END IF;
+        IF NEW.box_id IS DISTINCT FROM OLD.box_id
+           OR NEW.cycle_number IS DISTINCT FROM OLD.cycle_number
+           OR NEW.started_at IS DISTINCT FROM OLD.started_at
+           OR NEW.started_by IS DISTINCT FROM OLD.started_by
+           OR (OLD.ended_at IS NOT NULL AND (
+                NEW.ended_at IS DISTINCT FROM OLD.ended_at
+                OR NEW.ended_by IS DISTINCT FROM OLD.ended_by
+           ))
+           OR (NEW.ended_at IS NULL AND NEW.ended_by IS DISTINCT FROM OLD.ended_by) THEN
+            RAISE EXCEPTION 'Исторические данные цикла коробки неизменяемы'
+                USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+    END;
+    $;
+    """)
+    op.execute("""
+    CREATE TRIGGER trg_box_cycle_history_guard
+    BEFORE UPDATE OR DELETE ON box_cycles
+    FOR EACH ROW EXECUTE FUNCTION medarchive_guard_box_cycle_history()
     """)
 
     op.execute("""
@@ -402,17 +446,23 @@ def upgrade() -> None:
     """)
 
     op.execute("""
+    op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_archive_placement()
     RETURNS trigger LANGUAGE plpgsql AS $$
     DECLARE
         location_kind text;
         shelf_active boolean;
     BEGIN
+        IF TG_OP = 'DELETE' THEN
+            RAISE EXCEPTION 'Историю размещения коробки нельзя удалять'
+                USING ERRCODE = '23514';
+        END IF;
         IF TG_OP = 'UPDATE' AND (
             NEW.box_id IS DISTINCT FROM OLD.box_id OR NEW.shelf_id IS DISTINCT FROM OLD.shelf_id
             OR NEW.placed_at IS DISTINCT FROM OLD.placed_at OR NEW.placed_by IS DISTINCT FROM OLD.placed_by
+            OR (OLD.removed_at IS NOT NULL AND NEW.removed_at IS DISTINCT FROM OLD.removed_at)
         ) THEN
-            RAISE EXCEPTION 'Нельзя изменять исходные данные размещения коробки'
+            RAISE EXCEPTION 'Нельзя изменять исходные данные или повторно открывать размещение коробки'
                 USING ERRCODE = '23514';
         END IF;
         IF NEW.removed_at IS NULL THEN
@@ -426,7 +476,7 @@ def upgrade() -> None:
                     JOIN box_card_memberships m ON m.box_cycle_id = bc.id
                     WHERE bc.box_id = NEW.box_id AND bc.ended_at IS NULL AND m.removed_at IS NULL
                ) THEN
-                RAISE EXCEPTION 'Размещать можно только активную коробку, находящуюся в архиве, на активной полке'
+                RAISE EXCEPTION 'Размещать можно только активную непустую коробку из архива на активной полке'
                     USING ERRCODE = '23514';
             END IF;
         END IF;
