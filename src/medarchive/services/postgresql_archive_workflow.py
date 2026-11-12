@@ -9,8 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
-    ArchiveRequest, ArchiveShelf, Box, BoxPlacement, Card, DomainEvent,
-    Location, User,
+    ArchiveRequest, ArchiveShelf, Box, BoxPlacement, Card, CardPlacement,
+    BoxCardMembership, BoxCycle, DomainEvent, Location, User,
 )
 
 
@@ -140,6 +140,82 @@ class PostgreSQLArchiveWorkflow:
         await self.session.flush()
         await self._event("box.placed_in_archive", "box", box.id, actor.id, {
             "shelf_id": str(shelf.id), "placement_id": str(placement.id),
+        })
+        return placement
+
+    async def place_card(
+        self, *, card_id: uuid.UUID, shelf_id: uuid.UUID, actor_id: uuid.UUID
+    ) -> CardPlacement:
+        actor = await self._user(actor_id, "archive")
+        archive = await self.session.scalar(
+            select(Location).where(Location.kind == "archive", Location.is_active.is_(True))
+        )
+        card = await self.session.scalar(
+            select(Card).where(Card.id == card_id).with_for_update()
+        )
+        shelf = await self.session.scalar(
+            select(ArchiveShelf).where(
+                ArchiveShelf.id == shelf_id, ArchiveShelf.is_active.is_(True)
+            ).with_for_update()
+        )
+        if (
+            card is None or card.status != "active" or archive is None
+            or card.current_location_id != archive.id or card.current_shipment_id is not None
+        ):
+            raise ArchiveWorkflowError("Размещать отдельно можно только принятую активную карту из архива")
+        membership = await self.session.scalar(
+            select(BoxCardMembership.id)
+            .join(BoxCycle, BoxCycle.id == BoxCardMembership.box_cycle_id)
+            .where(
+                BoxCardMembership.card_id == card.id,
+                BoxCardMembership.removed_at.is_(None),
+                BoxCycle.ended_at.is_(None),
+            ).limit(1)
+        )
+        if membership is not None:
+            raise ArchiveWorkflowError("Карта находится в коробке; сначала извлеките её из коробки")
+        if shelf is None:
+            raise ArchiveWorkflowError("Архивная полка не найдена или неактивна")
+        existing = await self.session.scalar(
+            select(CardPlacement.id).where(
+                CardPlacement.card_id == card.id, CardPlacement.removed_at.is_(None)
+            ).limit(1)
+        )
+        if existing is not None:
+            raise ArchiveWorkflowError("Карта уже размещена на архивной полке")
+        placement = CardPlacement(card_id=card.id, shelf_id=shelf.id, placed_by=actor.id)
+        self.session.add(placement)
+        await self.session.flush()
+        await self._event("card.placed_in_archive", "card", card.id, actor.id, {
+            "shelf_id": str(shelf.id), "placement_id": str(placement.id),
+        })
+        return placement
+
+    async def remove_card_from_shelf(
+        self, *, card_id: uuid.UUID, actor_id: uuid.UUID
+    ) -> CardPlacement:
+        actor = await self._user(actor_id, "archive")
+        placement = await self.session.scalar(
+            select(CardPlacement).where(
+                CardPlacement.card_id == card_id, CardPlacement.removed_at.is_(None)
+            ).with_for_update()
+        )
+        if placement is None:
+            raise ArchiveWorkflowError("Активное размещение карты не найдено")
+        card = await self.session.scalar(
+            select(Card).where(Card.id == card_id).with_for_update()
+        )
+        archive = await self.session.scalar(
+            select(Location).where(Location.kind == "archive")
+        )
+        if card is None or archive is None or card.current_location_id != archive.id:
+            raise ArchiveWorkflowError("Карта больше не находится в архиве")
+        now = datetime.now(timezone.utc)
+        placement.removed_at = now
+        placement.removed_by = actor.id
+        await self.session.flush()
+        await self._event("card.removed_from_archive_shelf", "card", card.id, actor.id, {
+            "shelf_id": str(placement.shelf_id), "placement_id": str(placement.id),
         })
         return placement
 
