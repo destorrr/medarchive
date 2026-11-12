@@ -197,6 +197,13 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
     finally:
         # Delete only records created by this test, even after an assertion fails.
         async with database.session_factory() as session:
+            if card_number:
+                card = await session.scalar(
+                    select(Card).where(Card.card_number == card_number)
+                )
+                if card is not None:
+                    await session.delete(card)
+                    await session.flush()
             if user_id is not None:
                 employee = await session.get(User, user_id)
                 if employee is not None:
@@ -875,6 +882,7 @@ async def test_qr_intake_waits_for_branch_deactivation_location_lock():
     database = Database(DATABASE_URL)
     branch_id = None
     user_id = None
+    card_number = f"QR-RACE-{uuid.uuid4().hex}"
     intake_task = None
     try:
         async with database.session_factory() as session:
@@ -918,7 +926,7 @@ async def test_qr_intake_waits_for_branch_deactivation_location_lock():
                         ).register_from_qr(
                             payload=json.dumps({
                                 "version": 1,
-                                "card_number": f"QR-RACE-{uuid.uuid4().hex}",
+                                "card_number": card_number,
                                 "full_name": "QR Race Patient",
                                 "birth_date": "1985-04-03",
                             }),
