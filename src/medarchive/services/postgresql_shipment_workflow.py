@@ -332,8 +332,11 @@ class PostgreSQLShipmentWorkflow:
                 raise ShipmentWorkflowError("Состояние карты не соответствует отправлению")
             if row.box_id != expected_boxed.get(card.id) and row.box_id is not None:
                 raise ShipmentWorkflowError("Карта указана не в той коробке")
-            if row.box_id is None and card.id in expected_boxed:
-                raise ShipmentWorkflowError("Карта из коробки ошибочно указана отдельно")
+            if row.box_id is None:
+                if card.id in expected_boxed:
+                    raise ShipmentWorkflowError("Карта из коробки ошибочно указана отдельно")
+                if await self._active_membership(card.id) is not None:
+                    raise ShipmentWorkflowError("Отдельная карта числится в активной коробке")
             cards.append(card)
 
         # Every active card inside every shipped box must be represented in the
