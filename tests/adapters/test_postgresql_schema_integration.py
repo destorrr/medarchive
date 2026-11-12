@@ -418,7 +418,7 @@ async def test_postgresql_preserves_exception_metadata_when_shipment_is_received
 
 
 @pytest.mark.asyncio
-async def test_postgresql_rejects_reassigning_card_from_an_unreceived_shipment():
+async def test_postgresql_rejects_clearing_transit_pointer_before_receipt():
     if not DATABASE_URL:
         pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
 
@@ -427,22 +427,19 @@ async def test_postgresql_rejects_reassigning_card_from_an_unreceived_shipment()
         async with engine.connect() as connection:
             transaction = await connection.begin()
             try:
-                card_id, previous_shipment_id = await _seed_transit_card(connection)
-                previous = (
+                card_id, shipment_id = await _seed_transit_card(connection)
+                target_location_id = (
                     await connection.execute(
-                        text("""
-                            SELECT from_location_id, to_location_id, courier_id, issued_by
-                            FROM shipments WHERE id = :id
-                        """),
-                        {"id": previous_shipment_id},
+                        text("SELECT to_location_id FROM shipments WHERE id = :id"),
+                        {"id": shipment_id},
                     )
-                ).one()
+                ).scalar_one()
                 await connection.execute(
                     text("""
                         INSERT INTO shipment_cards (shipment_id, card_id, box_id)
                         VALUES (:shipment_id, :card_id, NULL)
                     """),
-                    {"shipment_id": previous_shipment_id, "card_id": card_id},
+                    {"shipment_id": shipment_id, "card_id": card_id},
                 )
                 await connection.execute(
                     text("""
@@ -450,7 +447,7 @@ async def test_postgresql_rejects_reassigning_card_from_an_unreceived_shipment()
                         SET current_location_id = NULL, current_shipment_id = :shipment_id
                         WHERE id = :card_id
                     """),
-                    {"shipment_id": previous_shipment_id, "card_id": card_id},
+                    {"shipment_id": shipment_id, "card_id": card_id},
                 )
                 await connection.execute(
                     text("""
@@ -458,37 +455,15 @@ async def test_postgresql_rejects_reassigning_card_from_an_unreceived_shipment()
                         SET status = 'in_transit', handed_over_at = now()
                         WHERE id = :id
                     """),
-                    {"id": previous_shipment_id},
-                )
-
-                new_shipment_id = uuid.uuid4()
-                await connection.execute(
-                    text("""
-                        INSERT INTO shipments
-                            (id, from_location_id, to_location_id, courier_id, issued_by)
-                        VALUES (:id, :source, :target, :courier, :actor)
-                    """),
-                    {
-                        "id": new_shipment_id,
-                        "source": previous.from_location_id,
-                        "target": previous.to_location_id,
-                        "courier": previous.courier_id,
-                        "actor": previous.issued_by,
-                    },
+                    {"id": shipment_id},
                 )
                 await connection.execute(
                     text("""
-                        INSERT INTO shipment_cards (shipment_id, card_id, box_id)
-                        VALUES (:shipment_id, :card_id, NULL)
-                    """),
-                    {"shipment_id": new_shipment_id, "card_id": card_id},
-                )
-                await connection.execute(
-                    text("""
-                        UPDATE cards SET current_shipment_id = :new_shipment_id
+                        UPDATE cards
+                        SET current_location_id = :target_id, current_shipment_id = NULL
                         WHERE id = :card_id
                     """),
-                    {"new_shipment_id": new_shipment_id, "card_id": card_id},
+                    {"target_id": target_location_id, "card_id": card_id},
                 )
                 with pytest.raises(IntegrityError):
                     await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
@@ -496,7 +471,6 @@ async def test_postgresql_rejects_reassigning_card_from_an_unreceived_shipment()
                 await transaction.rollback()
     finally:
         await engine.dispose()
-
 
 
 @pytest.mark.asyncio
