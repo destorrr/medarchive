@@ -9,22 +9,43 @@
     </form>
 </div>
 <div class="card">
-    <h3>Коробки без размещения</h3>
-    {% if boxes and shelves %}
-    <table class="data"><thead><tr><th>Коробка</th><th>Разместить на полке</th></tr></thead><tbody>
-    {% for box in boxes %}<tr><td>{{ box.box_number }}</td><td>
+    <h3>Внутренние коробки без размещения</h3>
+    {% if boxes %}
+    {% for item in box_items %}
+    <div style="border-bottom:1px solid #ddd;padding:12px 0">
+        <strong>Коробка {{ item.box.box_number }}</strong>
+        {% if item.cards %}
+        <ul>{% for card in item.cards %}<li>{{ card.card_number }} · {{ card.full_name }}
+            <form method="post" action="/placement/remove-card-from-box" style="display:inline">
+                <input type="hidden" name="box_id" value="{{ item.box.id }}">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <button class="btn btn-secondary" type="submit">Извлечь</button>
+            </form>
+        </li>{% endfor %}</ul>
+        {% else %}<p class="muted">Коробка пустая.</p>{% endif %}
+        {% if cards %}
+        <form method="post" action="/placement/add-card" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+            <input type="hidden" name="box_id" value="{{ item.box.id }}">
+            <select name="card_id" required><option value="">— Добавить карту —</option>
+                {% for card in cards %}<option value="{{ card.id }}">{{ card.card_number }} · {{ card.full_name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-secondary" type="submit">Добавить</button>
+        </form>
+        {% endif %}
+        {% if shelves %}
         <form method="post" action="/placement/box">
-            <input type="hidden" name="box_id" value="{{ box.id }}">
+            <input type="hidden" name="box_id" value="{{ item.box.id }}">
             <select name="shelf_id" required><option value="">— Полка —</option>
                 {% for shelf in shelves %}<option value="{{ shelf.id }}">{{ shelf.section_name }} / {{ shelf.shelf_name }}</option>{% endfor %}
             </select>
-            <button class="btn btn-primary" type="submit">Разместить</button>
+            <button class="btn btn-primary" type="submit">Разместить коробку</button>
         </form>
-    </td></tr>{% endfor %}
-    </tbody></table>
-    {% elif boxes %}<p class="muted">Сначала администратор должен настроить архивные полки.</p>
-    {% else %}<p class="muted">Нет коробок, ожидающих размещения.</p>{% endif %}
+        {% else %}<p class="muted">Полки не настроены.</p>{% endif %}
+    </div>
+    {% endfor %}
+    {% else %}<p class="muted">Нет внутренних коробок, ожидающих размещения.</p>{% endif %}
 </div>
+
 <div class="card">
     <h3>Отдельные карты без размещения</h3>
     {% if cards %}
