@@ -307,6 +307,8 @@ async def _search_context(
         location_id = await session.scalar(
             select(Location.id).where(Location.kind == "central_office")
         )
+    if user.role in {"archive", "central_office"} and location_id is None:
+        return {"query": query, "cards": cards_out, "boxes": boxes_out}
 
     matched_cards = await CardRepository(session).search(query, limit=50)
     if location_id is not None:
