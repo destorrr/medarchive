@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +35,7 @@ from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentW
 
 router = APIRouter()
 archive_only = require_pg_role("archive")
+central_only = require_pg_role("central_office")
 
 
 async def _archive_location(session: AsyncSession) -> Location | None:
@@ -567,4 +568,103 @@ async def fulfill_archive_requests(
     message = f"Отправление № {number} с отдельными картами передано курьеру."
     return RedirectResponse(
         url=f"/requests?message={quote(message, safe='')}", status_code=303
+    )
+
+
+def _central_requests_context(request: Request, user: User, **extra) -> dict:
+    initials = "".join(part[0] for part in (user.full_name or "").split()[:2]).upper()
+    if not initials:
+        initials = user.username[:1].upper()
+    context = {
+        "request": request,
+        "username": user.username,
+        "user_login": user.username,
+        "user_full_name": user.full_name or user.username,
+        "user_initials": initials,
+        "user_branch": "Центральный офис",
+        "user_role_pill": "Центральный офис",
+        "role_label": "Центральный офис",
+        "menu_items": [
+            {"url": "/dashboard", "label": "📊 Панель управления"},
+            {"url": "/search", "label": "🔍 Поиск"},
+            {"url": "/requests/new", "label": "📋 Запросить карты из архива"},
+        ],
+    }
+    context.update(extra)
+    return context
+
+
+@router.get("/requests/new")
+async def central_archive_request_page(
+    request: Request,
+    query: str | None = None,
+    error: str | None = None,
+    message: str | None = None,
+    user: User = Depends(central_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    archive = await _archive_location(session)
+    cards = []
+    query = (query or "").strip()
+    if archive is not None and query:
+        active_request = (
+            select(ArchiveRequest.id)
+            .where(
+                ArchiveRequest.card_id == Card.id,
+                ArchiveRequest.status.in_(("new", "in_progress")),
+            )
+            .exists()
+        )
+        cards = list((
+            await session.scalars(
+                select(Card).where(
+                    Card.current_location_id == archive.id,
+                    Card.current_shipment_id.is_(None),
+                    Card.status == "active",
+                    or_(
+                        Card.card_number.ilike(f"%{query}%"),
+                        Card.full_name.ilike(f"%{query}%"),
+                    ),
+                    ~active_request,
+                ).order_by(Card.card_number).limit(100)
+            )
+        ).all())
+    context = _central_requests_context(
+        request, user, query=query, cards=cards, error=error, success=message
+    )
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="postgresql_central_requests.html", context=context
+    )
+
+
+@router.post("/requests/create")
+async def central_create_archive_requests(
+    request: Request,
+    card_ids: list[uuid.UUID] = Form(...),
+    user: User = Depends(central_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        created = await PostgreSQLArchiveWorkflow(session).create_requests(
+            card_ids=card_ids, actor_id=user.id
+        )
+        count = len(created)
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        await session.refresh(user)
+        return await central_archive_request_page(
+            request, error=str(exc), user=user, session=session
+        )
+    except IntegrityError:
+        await session.rollback()
+        await session.refresh(user)
+        return await central_archive_request_page(
+            request,
+            error="Не удалось создать заявки: одна из карт уже запрошена или изменила местонахождение.",
+            user=user, session=session,
+        )
+    message = f"Создано заявок: {count}."
+    return RedirectResponse(
+        url=f"/requests/new?message={quote(message, safe='')}", status_code=303
     )
