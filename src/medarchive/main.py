@@ -28,8 +28,12 @@ def create_app(config: Config | None = None) -> FastAPI:
             await db.init()
         if config.postgres_enabled:
             from medarchive.dependencies import get_pg_database
+            from medarchive.services.postgresql_bootstrap import ensure_system_locations
             pg_db = await get_pg_database()
             await pg_db.health_check()
+            async with pg_db.session_factory() as session:
+                async with session.begin():
+                    await ensure_system_locations(session)
 
     # Shutdown: close DB (safe — no hang on cleanup errors)
     @app.on_event("shutdown")
