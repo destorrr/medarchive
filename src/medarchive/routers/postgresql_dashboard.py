@@ -54,6 +54,8 @@ EVENT_LABELS = {
 def _dashboard_context(request: Request, user: User, branch_name: str | None) -> dict:
     role_label = ROLE_LABELS.get(user.role, "Пользователь")
     menu_items = [{"url": "/dashboard", "label": "📊 Панель управления"}]
+    if user.role == "branch":
+        menu_items.append({"url": "/packing", "label": "📦 Упаковка коробки"})
     if user.role in {"archive", "viewer", "admin", "central_office"}:
         menu_items.append({"url": "/search", "label": "🔍 Поиск"})
     if user.role == "admin":
