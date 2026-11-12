@@ -82,12 +82,19 @@ def test_orm_maps_all_value_checks_and_full_text_index():
 
 
 
-def test_box_maps_active_shipment_partial_unique_index():
+def test_box_maps_partial_index_for_current_shipment_lookups():
     indexes = Base.metadata.tables["boxes"].indexes
-    active_shipment = next(index for index in indexes if index.name == "uq_box_one_active_shipment")
-    assert active_shipment.unique is True
-    assert [column.name for column in active_shipment.columns] == ["current_shipment_id", "id"]
-    assert str(active_shipment.dialect_options["postgresql"]["where"]) == "current_shipment_id IS NOT NULL"
+    current_shipment = next(index for index in indexes if index.name == "ix_boxes_current_shipment")
+    assert current_shipment.unique is False
+    assert [column.name for column in current_shipment.columns] == ["current_shipment_id"]
+    assert str(current_shipment.dialect_options["postgresql"]["where"]) == "current_shipment_id IS NOT NULL"
+
+
+def test_card_custody_check_matches_the_current_status_vocabulary():
+    table = Base.metadata.tables["cards"]
+    constraint = next(c for c in table.constraints if c.name == "cards_custody_status_check")
+    assert "'at_other'" in str(constraint.sqltext)
+    assert "'at_external_organization'" not in str(constraint.sqltext)
 
 
 def test_individual_card_placement_has_one_active_shelf_location():
