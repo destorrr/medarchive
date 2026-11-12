@@ -56,7 +56,10 @@ def _dashboard_context(request: Request, user: User, branch_name: str | None) ->
     role_label = ROLE_LABELS.get(user.role, "Пользователь")
     menu_items = [{"url": "/dashboard", "label": "📊 Панель управления"}]
     if user.role == "branch":
-        menu_items.append({"url": "/packing", "label": "📦 Упаковка коробки"})
+        menu_items.extend([
+            {"url": "/branch/receive", "label": "📥 Приёмка"},
+            {"url": "/packing", "label": "📦 Упаковка коробки"},
+        ])
         menu_items.append({"url": "/transfer", "label": "🚚 Передача курьеру"})
     if user.role in {"archive", "viewer", "admin", "central_office"}:
         menu_items.append({"url": "/search", "label": "🔍 Поиск"})
