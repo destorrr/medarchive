@@ -181,3 +181,73 @@ async def test_archive_cannot_send_unrequested_card_to_central_office(pg_session
     await pg_session.refresh(card)
     assert card.current_location_id == archive_loc.id
     assert card.current_shipment_id is None
+
+
+@pytest.mark.asyncio
+async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_box(pg_session):
+    (
+        branch, _branch_loc, archive_loc, central_loc,
+        _branch_user, archive_user, central_user, courier,
+    ) = await seed_locations(pg_session)
+    cards = [
+        Card(
+            card_number=f"C-{uuid.uuid4().hex}", full_name=f"Requested patient {n}",
+            date_of_birth=__import__("datetime").date(1980 + n, 1, 1),
+            origin_branch_id=branch.id, current_location_id=archive_loc.id,
+        )
+        for n in (1, 2)
+    ]
+    pg_session.add_all(cards)
+    await pg_session.flush()
+    requests = [
+        ArchiveRequest(card_id=card.id, requested_by=central_user.id, status="new")
+        for card in cards
+    ]
+    box = Box(
+        box_number=f"ARCH-{uuid.uuid4().hex[:12]}",
+        current_location_id=archive_loc.id,
+        created_by=archive_user.id,
+    )
+    pg_session.add(box)
+    await pg_session.flush()
+    cycle = BoxCycle(box_id=box.id, cycle_number=1, started_by=archive_user.id)
+    pg_session.add(cycle)
+    await pg_session.flush()
+    pg_session.add_all([
+        BoxCardMembership(box_cycle_id=cycle.id, card_id=card.id, added_by=archive_user.id)
+        for card in cards
+    ] + requests)
+    await pg_session.flush()
+
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    outbound = await workflow.create_draft(
+        from_location_id=archive_loc.id, to_location_id=central_loc.id,
+        courier_id=courier.id, issued_by=archive_user.id,
+    )
+    await workflow.add_box(shipment_id=outbound.id, box_id=box.id, actor_id=archive_user.id)
+    await workflow.hand_over(shipment_id=outbound.id, actor_id=archive_user.id)
+    await workflow.receive(shipment_id=outbound.id, actor_id=central_user.id)
+
+    for card, request in zip(cards, requests):
+        await pg_session.refresh(card)
+        await pg_session.refresh(request)
+        assert card.current_location_id == central_loc.id
+        assert request.status == "completed"
+
+    # The same physical box can be reused for the return route after receipt.
+    return_shipment = await workflow.create_draft(
+        from_location_id=central_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=central_user.id,
+    )
+    await workflow.add_box(
+        shipment_id=return_shipment.id, box_id=box.id, actor_id=central_user.id,
+    )
+    await workflow.hand_over(shipment_id=return_shipment.id, actor_id=central_user.id)
+    await workflow.receive(shipment_id=return_shipment.id, actor_id=archive_user.id)
+    await pg_session.refresh(box)
+    assert box.current_location_id == archive_loc.id
+    assert box.current_shipment_id is None
+    for card in cards:
+        await pg_session.refresh(card)
+        assert card.current_location_id == archive_loc.id
+        assert card.current_shipment_id is None
