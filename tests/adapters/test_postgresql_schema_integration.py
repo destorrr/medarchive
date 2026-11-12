@@ -294,6 +294,11 @@ async def test_workflow_guard_triggers_and_request_fulfillment_link_exist():
             "trg_box_leaving_shelf_guard",
             "trg_shipment_box_not_placed",
             "trg_domain_events_append_only",
+            "trg_box_cycle_history_guard",
+            "trg_cards_no_delete",
+            "trg_boxes_no_delete",
+            "trg_shipments_no_delete",
+            "trg_archive_requests_no_delete",
         } <= trigger_names
         assert "fulfillment_shipment_id" in archive_request_columns
         assert "ck_archive_request_fulfillment" in constraint_names
