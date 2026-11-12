@@ -219,8 +219,7 @@ class PostgreSQLShipmentWorkflow:
         issued_by: uuid.UUID,
     ) -> Shipment:
         actor = await self._active_user(issued_by)
-        source = await self._location(from_location_id)
-        target = await self._location(to_location_id)
+        source, target = await self._locations(from_location_id, to_location_id)
         if source.id == target.id:
             raise ShipmentWorkflowError("Отправитель и получатель должны различаться")
         allowed_routes = {
@@ -257,8 +256,9 @@ class PostgreSQLShipmentWorkflow:
 
     async def add_box(self, *, shipment_id: uuid.UUID, box_id: uuid.UUID, actor_id: uuid.UUID) -> None:
         shipment, actor = await self._draft_and_actor(shipment_id, actor_id)
-        source = await self._location(shipment.from_location_id)
-        target = await self._location(shipment.to_location_id)
+        source, target = await self._locations(
+            shipment.from_location_id, shipment.to_location_id
+        )
         await self._authorize_location(actor, source)
         if source.kind == "archive" and target.kind == "central_office":
             raise ShipmentWorkflowError("По заявкам ЦО архив отправляет только отдельные карты, без коробок")
@@ -341,7 +341,9 @@ class PostgreSQLShipmentWorkflow:
 
     async def hand_over(self, *, shipment_id: uuid.UUID, actor_id: uuid.UUID) -> Shipment:
         shipment, actor = await self._draft_and_actor(shipment_id, actor_id)
-        source = await self._location(shipment.from_location_id)
+        source, target = await self._locations(
+            shipment.from_location_id, shipment.to_location_id
+        )
         await self._authorize_location(actor, source)
 
         boxes = list((await self.session.scalars(
@@ -478,7 +480,9 @@ class PostgreSQLShipmentWorkflow:
         )
         if shipment is None or shipment.status != "in_transit":
             raise ShipmentWorkflowError("Отправление не найдено или уже не находится в пути")
-        target = await self._location(shipment.to_location_id)
+        source, target = await self._locations(
+            shipment.from_location_id, shipment.to_location_id
+        )
         await self._authorize_location(actor, target)
 
         boxes = list((await self.session.scalars(
@@ -556,7 +560,7 @@ class PostgreSQLShipmentWorkflow:
         shipment.received_by = actor.id
         shipment.received_at = now
 
-        if target.kind == "central_office" and (await self._location(shipment.from_location_id)).kind == "archive":
+        if target.kind == "central_office" and source.kind == "archive":
             for card in cards:
                 request = await self.session.scalar(
                     select(ArchiveRequest).where(
@@ -602,6 +606,16 @@ class PostgreSQLShipmentWorkflow:
         if user is None or not user.is_active:
             raise ShipmentWorkflowError("Пользователь не найден или неактивен")
         return user
+
+    async def _locations(
+        self, *location_ids: uuid.UUID
+    ) -> tuple[Location, ...]:
+        """Lock multiple locations in a stable order to avoid cross-route deadlocks."""
+        unique_ids = sorted(set(location_ids), key=str)
+        locked: dict[uuid.UUID, Location] = {}
+        for location_id in unique_ids:
+            locked[location_id] = await self._location(location_id)
+        return tuple(locked[location_id] for location_id in location_ids)
 
     async def _location(self, location_id: uuid.UUID) -> Location:
         # A location row is the serialization point shared with admin branch
