@@ -4,11 +4,15 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from sqlalchemy import select
+from sqlalchemy.orm import aliased
 from sqlalchemy.exc import IntegrityError
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from medarchive.adapters.postgresql.models import User
+from medarchive.adapters.postgresql.models import (
+    Box, Card, Courier, Location, Shipment, ShipmentBox, ShipmentCard, User,
+)
 from medarchive.dependencies import get_auth, get_pg_session, require_pg_role
 from medarchive.services.postgresql_admin_service import PostgreSQLAdminService
 
@@ -45,6 +49,7 @@ def _context(request: Request, user: User, **extra):
             {"url": "/admin/users", "label": "👤 Пользователи"},
             {"url": "/admin/couriers", "label": "🚚 Курьеры"},
             {"url": "/admin/sections", "label": "🗂 Секции / Полки"},
+            {"url": "/admin/incidents", "label": "🚨 Инциденты"},
         ],
     }
     ctx.update(extra)
@@ -359,3 +364,91 @@ async def shelves_status(
         await session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _redirect("/admin/sections")
+
+
+@router.get("/admin/incidents")
+async def incidents_page(
+    request: Request,
+    user: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    source = aliased(Location)
+    target = aliased(Location)
+    rows = (
+        await session.execute(
+            select(Shipment, source.name, target.name, Courier.full_name)
+            .join(source, source.id == Shipment.from_location_id)
+            .join(target, target.id == Shipment.to_location_id)
+            .join(Courier, Courier.id == Shipment.courier_id)
+            .where(Shipment.status == "exception")
+            .order_by(Shipment.exception_at.desc(), Shipment.shipment_number.desc())
+        )
+    ).all()
+    incidents = [
+        {
+            "shipment": shipment,
+            "source_name": source_name,
+            "target_name": target_name,
+            "courier_name": courier_name,
+        }
+        for shipment, source_name, target_name, courier_name in rows
+    ]
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/postgresql_incidents.html",
+        context=_context(request, user, incidents=incidents),
+    )
+
+
+@router.get("/admin/incidents/{shipment_id}")
+async def incident_detail_page(
+    shipment_id: uuid.UUID,
+    request: Request,
+    user: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    source = aliased(Location)
+    target = aliased(Location)
+    row = await session.execute(
+        select(Shipment, source.name, target.name, Courier.full_name, User.full_name)
+        .join(source, source.id == Shipment.from_location_id)
+        .join(target, target.id == Shipment.to_location_id)
+        .join(Courier, Courier.id == Shipment.courier_id)
+        .outerjoin(User, User.id == Shipment.exception_by)
+        .where(Shipment.id == shipment_id, Shipment.status == "exception")
+    )
+    detail = row.first()
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Инцидент не найден")
+    shipment, source_name, target_name, courier_name, reporter_name = detail
+    cargo_rows = (
+        await session.execute(
+            select(Card.card_number, Card.full_name, ShipmentCard.box_id, Box.box_number)
+            .join(ShipmentCard, ShipmentCard.card_id == Card.id)
+            .outerjoin(Box, Box.id == ShipmentCard.box_id)
+            .where(ShipmentCard.shipment_id == shipment_id)
+            .order_by(Card.card_number)
+        )
+    ).all()
+    box_rows = (
+        await session.execute(
+            select(Box.box_number, Box.id)
+            .join(ShipmentBox, ShipmentBox.box_id == Box.id)
+            .where(ShipmentBox.shipment_id == shipment_id)
+            .order_by(Box.box_number)
+        )
+    ).all()
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/postgresql_incident_detail.html",
+        context=_context(
+            request, user, shipment=shipment, source_name=source_name,
+            target_name=target_name, courier_name=courier_name,
+            reporter_name=reporter_name,
+            cargo=[{
+                "card_number": card_number, "full_name": full_name,
+                "box_id": box_id, "box_number": box_number,
+            } for card_number, full_name, box_id, box_number in cargo_rows],
+            boxes=[{"box_number": number, "id": box_id} for number, box_id in box_rows],
+        ),
+    )
