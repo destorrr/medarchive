@@ -114,7 +114,9 @@
 - `origin_branch_id uuid NOT NULL REFERENCES branches(id)` — неизменяемый филиал создания;
 - `current_location_id uuid NULL REFERENCES locations(id)`;
 - `current_shipment_id uuid NULL REFERENCES shipments(id)`;
-- `status text NOT NULL` — состояние карты в бизнес-процессе, не местонахождение;
+- `status text NOT NULL` — общее состояние записи карты;
+- `custody_status text NOT NULL DEFAULT 'available'` — рабочее состояние хранения: `available`, `at_court`, `at_insurance`, `at_external_organization`;
+- `external_organization text NULL`, `external_comment text NULL`, `external_since timestamptz NULL` — реквизиты временной передачи во внешнюю организацию. Внешнее состояние допустимо только при местонахождении Central Office; карта остаётся на балансе ЦО. События передачи/возврата неизменяемы; внешняя карта не может быть упакована или включена во внутреннее отправление.
 - `created_at, updated_at timestamptz NOT NULL`;
 - `created_by uuid NULL REFERENCES users(id)`.
 
