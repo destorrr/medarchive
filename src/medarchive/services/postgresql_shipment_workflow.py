@@ -410,8 +410,6 @@ class PostgreSQLShipmentWorkflow:
         return location
 
     async def _authorize_location(self, user: User, location: Location) -> None:
-        if user.role == "admin":
-            return
         expected_role = {
             "branch": "branch",
             "central_office": "central_office",
