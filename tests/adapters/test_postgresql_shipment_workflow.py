@@ -203,23 +203,15 @@ async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_
         ArchiveRequest(card_id=card.id, requested_by=central_user.id, status="new")
         for card in cards
     ]
-    box = Box(
-        box_number=f"ARCH-{uuid.uuid4().hex[:12]}",
-        current_location_id=archive_loc.id,
-        created_by=archive_user.id,
-    )
-    pg_session.add(box)
-    await pg_session.flush()
-    cycle = BoxCycle(box_id=box.id, cycle_number=1, started_by=archive_user.id)
-    pg_session.add(cycle)
-    await pg_session.flush()
-    pg_session.add_all([
-        BoxCardMembership(box_cycle_id=cycle.id, card_id=card.id, added_by=archive_user.id)
-        for card in cards
-    ] + requests)
+    pg_session.add_all(requests)
     await pg_session.flush()
 
     workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(
+        location_id=archive_loc.id,
+        actor_id=archive_user.id,
+        card_ids=[card.id for card in cards],
+    )
     outbound = await workflow.create_draft(
         from_location_id=archive_loc.id, to_location_id=central_loc.id,
         courier_id=courier.id, issued_by=archive_user.id,
