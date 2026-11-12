@@ -544,11 +544,12 @@ class PostgreSQLShipmentWorkflow:
                         ArchiveRequest.fulfillment_shipment_id == shipment.id,
                     ).with_for_update()
                 )
-                if request is not None:
-                    request.status = "completed"
-                    request.completed_at = now
-                    request.updated_at = now
-                    request.fulfilled_by = actor.id
+                if request is None:
+                    raise ShipmentWorkflowError("Для принятой архивной карты не найдена связанная заявка ЦО")
+                request.status = "completed"
+                request.completed_at = now
+                request.updated_at = now
+                request.fulfilled_by = actor.id
 
         await self.session.flush()
         await self._event("shipment.received", "shipment", shipment.id, actor.id, {
