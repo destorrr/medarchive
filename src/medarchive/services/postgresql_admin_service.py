@@ -10,7 +10,9 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from medarchive.adapters.postgresql.models import Branch, Location, User
+from medarchive.adapters.postgresql.models import (
+    ArchiveShelf, BoxPlacement, Branch, CardPlacement, Courier, Location, Shipment, User,
+)
 from medarchive.adapters.postgresql.repositories import UserRepository
 
 
@@ -87,6 +89,89 @@ class PostgreSQLAdminService:
         location.is_active = active
         await self.session.flush()
         return branch
+
+    async def list_couriers(self) -> list[Courier]:
+        result = await self.session.execute(
+            select(Courier).order_by(Courier.full_name, Courier.phone)
+        )
+        return list(result.scalars().all())
+
+    async def create_courier(
+        self, *, full_name: str, phone: str | None = None
+    ) -> Courier:
+        full_name = full_name.strip()
+        phone = (phone or "").strip() or None
+        if not full_name:
+            raise ValueError("ФИО курьера обязательно")
+        courier = Courier(full_name=full_name, phone=phone, is_active=True)
+        self.session.add(courier)
+        await self.session.flush()
+        return courier
+
+    async def set_courier_active(
+        self, courier_id: uuid.UUID, active: bool
+    ) -> Courier:
+        courier = await self.session.get(Courier, courier_id, with_for_update=True)
+        if courier is None:
+            raise LookupError("Курьер не найден")
+        if not active:
+            active_shipments = await self.session.scalar(
+                select(func.count()).select_from(Shipment).where(
+                    Shipment.courier_id == courier.id,
+                    Shipment.status.in_(("draft", "in_transit")),
+                )
+            )
+            if active_shipments:
+                raise ValueError("Нельзя отключить курьера с активными отправлениями")
+        courier.is_active = active
+        await self.session.flush()
+        return courier
+
+    async def list_shelves(self) -> list[ArchiveShelf]:
+        result = await self.session.execute(
+            select(ArchiveShelf).order_by(
+                ArchiveShelf.section_name, ArchiveShelf.shelf_name
+            )
+        )
+        return list(result.scalars().all())
+
+    async def create_shelf(
+        self, *, section_name: str, shelf_name: str
+    ) -> ArchiveShelf:
+        section_name, shelf_name = section_name.strip(), shelf_name.strip()
+        if not section_name or not shelf_name:
+            raise ValueError("Секция и номер полки обязательны")
+        shelf = ArchiveShelf(
+            section_name=section_name, shelf_name=shelf_name, is_active=True
+        )
+        self.session.add(shelf)
+        await self.session.flush()
+        return shelf
+
+    async def set_shelf_active(
+        self, shelf_id: uuid.UUID, active: bool
+    ) -> ArchiveShelf:
+        shelf = await self.session.get(ArchiveShelf, shelf_id, with_for_update=True)
+        if shelf is None:
+            raise LookupError("Архивная полка не найдена")
+        if not active:
+            box_placements = await self.session.scalar(
+                select(func.count()).select_from(BoxPlacement).where(
+                    BoxPlacement.shelf_id == shelf.id,
+                    BoxPlacement.removed_at.is_(None),
+                )
+            )
+            card_placements = await self.session.scalar(
+                select(func.count()).select_from(CardPlacement).where(
+                    CardPlacement.shelf_id == shelf.id,
+                    CardPlacement.removed_at.is_(None),
+                )
+            )
+            if box_placements or card_placements:
+                raise ValueError("Сначала снимите все коробки и карты с этой полки")
+        shelf.is_active = active
+        await self.session.flush()
+        return shelf
 
     async def list_users(self) -> list[User]:
         result = await self.session.execute(
