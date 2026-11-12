@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🚚 Передача курьеру</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<div class="card">
+    {% if ready_boxes %}
+    <form method="post" action="/transfer/confirm">
+        <div class="form-group">
+            <label for="box_id">Коробка</label>
+            <select id="box_id" name="box_id" required>
+                <option value="">— Выберите коробку —</option>
+                {% for box in ready_boxes %}
+                <option value="{{ box.id }}">{{ box.box_number }} · {{ box.card_count }} карт</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="to_location_id">Получатель</label>
+            <select id="to_location_id" name="to_location_id" required>
+                <option value="">— Выберите место доставки —</option>
+                {% for location in destinations %}
+                <option value="{{ location.id }}">{{ location.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="courier_id">Курьер</label>
+            <select id="courier_id" name="courier_id" required>
+                <option value="">— Выберите курьера —</option>
+                {% for courier in couriers %}
+                <option value="{{ courier.id }}">{{ courier.full_name }}{% if courier.phone %} · {{ courier.phone }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Передать коробку курьеру</button>
+    </form>
+    {% else %}
+    <p>Нет коробок, готовых к отправке. Сначала создайте коробку и добавьте в неё карты.</p>
+    {% endif %}
+</div>
+{% endblock %}
