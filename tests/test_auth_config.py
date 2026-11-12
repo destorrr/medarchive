@@ -1,0 +1,30 @@
+import pytest
+
+from medarchive.config import Config
+
+
+def test_sqlite_remains_the_default_authentication_backend():
+    config = Config(secret_key="test-secret")
+    assert config.auth_backend == "sqlite"
+    assert config.cookie_secure is False
+
+
+def test_postgresql_auth_requires_postgresql_adapter():
+    with pytest.raises(ValueError, match="MEDARCHIVE_POSTGRES_ENABLED"):
+        Config(auth_backend="postgresql", secret_key="test-secret")
+
+
+def test_postgresql_auth_can_be_selected_explicitly():
+    config = Config(
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="test-secret",
+        cookie_secure=True,
+    )
+    assert config.auth_backend == "postgresql"
+    assert config.cookie_secure is True
+
+
+def test_unknown_authentication_backend_is_rejected():
+    with pytest.raises(ValueError, match="MEDARCHIVE_AUTH_BACKEND"):
+        Config(auth_backend="mysql", secret_key="test-secret")
