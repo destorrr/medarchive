@@ -105,6 +105,19 @@ class PostgreSQLArchiveWorkflow:
         )
         if card is None or archive is None or card.current_location_id != archive.id:
             raise ArchiveWorkflowError("Карта уже не находится в архиве")
+        active_manifest = await self.session.scalar(
+            select(ShipmentCard.card_id)
+            .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+            .where(
+                ShipmentCard.card_id == card.id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .limit(1)
+        )
+        if active_manifest is not None:
+            raise ArchiveWorkflowError(
+                "Нельзя отметить карту ненайденной: она уже включена в активное отправление"
+            )
         now = datetime.now(timezone.utc)
         request.status = "not_found"
         request.completed_at = now
@@ -185,6 +198,19 @@ class PostgreSQLArchiveWorkflow:
         )
         if membership is not None:
             raise ArchiveWorkflowError("Карта находится в коробке; сначала извлеките её из коробки")
+        active_manifest = await self.session.scalar(
+            select(ShipmentCard.card_id)
+            .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+            .where(
+                ShipmentCard.card_id == card.id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .limit(1)
+        )
+        if active_manifest is not None:
+            raise ArchiveWorkflowError(
+                "Нельзя разместить карту на полке: она уже включена в активное отправление"
+            )
         if shelf is None:
             raise ArchiveWorkflowError("Архивная полка не найдена или неактивна")
         existing = await self.session.scalar(
