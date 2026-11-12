@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🚨 Инцидент отправления №{{ shipment.shipment_number }}</h1>
+<div class="card">
+    <p><strong>Статус:</strong> {{ shipment.status }}</p>
+    <p><strong>Маршрут:</strong> {{ source_name }} → {{ target_name }}</p>
+    <p><strong>Курьер:</strong> {{ courier_name }}</p>
+    <p><strong>Причина:</strong> {{ shipment.exception_note }}</p>
+    <p><strong>Зарегистрировал:</strong> {{ reporter_name or "—" }}</p>
+    <p><strong>Время регистрации:</strong> {{ shipment.exception_at }}</p>
+    <p><strong>Передано курьеру:</strong> {{ shipment.handed_over_at }}</p>
+</div>
+<div class="card">
+    <h2 style="font-size:16px;">Коробки в отправлении</h2>
+    {% if boxes %}
+    <ul>{% for box in boxes %}<li>{{ box.box_number }}</li>{% endfor %}</ul>
+    {% else %}
+    <p style="color:#888;">Коробок в отправлении нет.</p>
+    {% endif %}
+</div>
+<div class="card">
+    <h2 style="font-size:16px;">Карты по манифесту</h2>
+    {% if cargo %}
+    <table>
+        <thead><tr><th>Номер карты</th><th>Пациент</th><th>Коробка</th></tr></thead>
+        <tbody>
+        {% for card in cargo %}
+        <tr>
+            <td>{{ card.card_number }}</td>
+            <td>{{ card.full_name }}</td>
+            <td>{{ card.box_number or "Отдельно" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888;">В манифесте нет карт.</p>
+    {% endif %}
+</div>
+<p><a href="/admin/incidents">← К списку инцидентов</a></p>
+{% endblock %}
