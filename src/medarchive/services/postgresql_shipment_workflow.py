@@ -110,6 +110,8 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Коробка не найдена или не находится в постоянной локации")
         location = await self._location(box.current_location_id)
         await self._authorize_location(actor, location)
+        if await self._has_active_manifest_box(box.id):
+            raise ShipmentWorkflowError("Коробка уже включена в активное отправление")
         card = await self.session.scalar(
             select(Card).where(Card.id == card_id).with_for_update()
         )
@@ -164,6 +166,8 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Коробка не найдена или недоступна")
         location = await self._location(box.current_location_id)
         await self._authorize_location(actor, location)
+        if await self._has_active_manifest_box(box.id):
+            raise ShipmentWorkflowError("Нельзя менять состав коробки в активном отправлении")
         cycle = await self.session.scalar(
             select(BoxCycle).where(
                 BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None)
@@ -613,6 +617,17 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Недостаточно прав для операции в этом месте")
         if location.kind == "branch" and user.branch_id != location.branch_id:
             raise ShipmentWorkflowError("Нет доступа к указанному филиалу")
+
+    async def _has_active_manifest_box(self, box_id: uuid.UUID) -> bool:
+        return await self.session.scalar(
+            select(ShipmentBox.box_id)
+            .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
+            .where(
+                ShipmentBox.box_id == box_id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .limit(1)
+        ) is not None
 
     async def _has_active_manifest_card(self, card_id: uuid.UUID) -> bool:
         result = await self.session.scalar(
