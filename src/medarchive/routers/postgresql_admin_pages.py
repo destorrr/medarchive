@@ -193,19 +193,13 @@ async def users_create(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
-        raise HTTPException(status_code=409, detail="Логин уже используется или нарушено ограничение БД") from exc
+        raise HTTPException(
+            status_code=409,
+            detail="Логин уже используется или нарушено ограничение БД",
+        ) from exc
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except LookupError as exc:
-        await session.rollback()
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        await session.rollback()
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except IntegrityError as exc:
-        await session.rollback()
-        raise HTTPException(status_code=409, detail="Изменение конфликтует с ограничениями БД") from exc
     except Exception:
         await session.rollback()
         raise
@@ -238,6 +232,18 @@ async def users_edit(
             is_active=is_active,
         )
         await session.commit()
+    except LookupError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Изменение конфликтует с ограничениями БД",
+        ) from exc
     except Exception:
         await session.rollback()
         raise
