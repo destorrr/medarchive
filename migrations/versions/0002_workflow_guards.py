@@ -102,7 +102,6 @@ def upgrade() -> None:
         """)
 
     op.execute("""
-    op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_box_membership_mutation()
     RETURNS trigger LANGUAGE plpgsql AS $$
     DECLARE
@@ -448,7 +447,6 @@ def upgrade() -> None:
     FOR EACH ROW EXECUTE FUNCTION medarchive_guard_archive_request()
     """)
 
-    op.execute("""
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_archive_placement()
     RETURNS trigger LANGUAGE plpgsql AS $$
