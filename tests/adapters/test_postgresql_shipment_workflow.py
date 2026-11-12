@@ -226,8 +226,8 @@ async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_
 
     # The same physical box can be reused for the return route after receipt.
     return_shipment = await workflow.create_draft(
-        from_location_id=central_loc.id, to_location_id=archive_loc.id,
-        courier_id=courier.id, issued_by=central_user.id,
+        from_location_id=central_location_id, to_location_id=archive_location_id,
+        courier_id=courier_id, issued_by=central_user_id,
     )
     await workflow.add_box(
         shipment_id=return_shipment.id, box_id=box.id, actor_id=central_user.id,
@@ -469,29 +469,33 @@ async def test_individual_archive_card_can_be_placed_retrieved_issued_and_return
     await pg_session.flush()
 
     archive = PostgreSQLArchiveWorkflow(pg_session)
+    card_id, shelf_id = card.id, shelf.id
+    archive_location_id, central_location_id = archive_loc.id, central_loc.id
+    archive_user_id, central_user_id, courier_id = archive_user.id, central_user.id, courier.id
     request = (await archive.create_requests(
-        card_ids=[card.id], actor_id=central_user.id,
+        card_ids=[card_id], actor_id=central_user_id,
     ))[0]
     first_placement = await archive.place_card(
-        card_id=card.id, shelf_id=shelf.id, actor_id=archive_user.id,
+        card_id=card_id, shelf_id=shelf_id, actor_id=archive_user_id,
     )
     shipping = PostgreSQLShipmentWorkflow(pg_session)
     outbound = await shipping.create_draft(
-        from_location_id=archive_loc.id, to_location_id=central_loc.id,
-        courier_id=courier.id, issued_by=archive_user.id,
+        from_location_id=archive_location_id, to_location_id=central_location_id,
+        courier_id=courier_id, issued_by=archive_user_id,
     )
+    outbound_id = outbound.id
     with pytest.raises(DBAPIError):
         async with pg_session.begin_nested():
             await shipping.add_standalone_card(
-                shipment_id=outbound.id, card_id=card.id, actor_id=archive_user.id,
+                shipment_id=outbound_id, card_id=card_id, actor_id=archive_user_id,
             )
 
-    await archive.remove_card_from_shelf(card_id=card.id, actor_id=archive_user.id)
+    await archive.remove_card_from_shelf(card_id=card_id, actor_id=archive_user_id)
     await shipping.add_standalone_card(
-        shipment_id=outbound.id, card_id=card.id, actor_id=archive_user.id,
+        shipment_id=outbound_id, card_id=card_id, actor_id=archive_user_id,
     )
-    await shipping.hand_over(shipment_id=outbound.id, actor_id=archive_user.id)
-    await shipping.receive(shipment_id=outbound.id, actor_id=central_user.id)
+    await shipping.hand_over(shipment_id=outbound_id, actor_id=archive_user_id)
+    await shipping.receive(shipment_id=outbound_id, actor_id=central_user_id)
     await pg_session.refresh(request)
     assert request.status == "completed"
     assert request.fulfillment_shipment_id == outbound.id
@@ -501,12 +505,13 @@ async def test_individual_archive_card_can_be_placed_retrieved_issued_and_return
         courier_id=courier.id, issued_by=central_user.id,
     )
     await shipping.add_standalone_card(
-        shipment_id=return_shipment.id, card_id=card.id, actor_id=central_user.id,
+        shipment_id=return_shipment.id, card_id=card_id, actor_id=central_user_id,
     )
-    await shipping.hand_over(shipment_id=return_shipment.id, actor_id=central_user.id)
-    await shipping.receive(shipment_id=return_shipment.id, actor_id=archive_user.id)
+    return_shipment_id = return_shipment.id
+    await shipping.hand_over(shipment_id=return_shipment_id, actor_id=central_user_id)
+    await shipping.receive(shipment_id=return_shipment_id, actor_id=archive_user_id)
     returned_placement = await archive.place_card(
-        card_id=card.id, shelf_id=shelf.id, actor_id=archive_user.id,
+        card_id=card_id, shelf_id=shelf_id, actor_id=archive_user_id,
     )
     await pg_session.refresh(first_placement)
     assert first_placement.removed_at is not None
