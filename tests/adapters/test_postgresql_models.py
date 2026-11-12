@@ -48,3 +48,30 @@ def test_active_box_membership_is_unique_per_card():
     index = next(i for i in indexes if i.name == "uq_card_one_active_box")
     assert index.unique is True
     assert str(index.dialect_options["postgresql"]["where"]) == "removed_at IS NULL"
+
+
+
+def test_orm_maps_all_value_checks_and_full_text_index():
+    expected_checks = {
+        "locations_kind_check",
+        "ck_location_branch_binding",
+        "users_role_check",
+        "ck_user_branch_binding",
+        "cards_status_check",
+        "ck_card_exactly_one_location",
+        "boxes_status_check",
+        "ck_box_exactly_one_location",
+        "shipments_status_check",
+    }
+    actual_checks = {
+        constraint.name
+        for table in Base.metadata.tables.values()
+        for constraint in table.constraints
+        if constraint.__class__.__name__ == "CheckConstraint"
+    }
+    assert expected_checks <= actual_checks
+
+    indexes = Base.metadata.tables["cards"].indexes
+    full_text = next(index for index in indexes if index.name == "ix_cards_full_name")
+    assert full_text.dialect_options["postgresql"]["using"] == "gin"
+    assert "to_tsvector('simple', full_name)" in str(full_text.expressions[0])
