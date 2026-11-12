@@ -22,7 +22,7 @@
             <tbody>
             {% for card in cards %}
             <tr>
-                <td><input type="checkbox" name="card_ids" value="{{ card.id }}" required></td>
+                <td><input type="checkbox" name="card_ids" value="{{ card.id }}"></td>
                 <td>{{ card.card_number }}</td>
                 <td>{{ card.full_name }}</td>
                 <td>{{ card.date_of_birth }}</td>
