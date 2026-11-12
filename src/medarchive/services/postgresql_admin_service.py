@@ -188,7 +188,7 @@ class PostgreSQLAdminService:
         if await self.users.get_by_username(username):
             raise ValueError("Пользователь с таким логином уже существует")
         if role == "branch":
-            branch = await self.session.get(Branch, branch_id)
+            branch = await self.session.get(Branch, branch_id, with_for_update=True)
             if branch is None or not branch.is_active:
                 raise ValueError("Выберите действующий филиал")
         return await self.users.create(
@@ -207,7 +207,7 @@ class PostgreSQLAdminService:
         full_name = full_name.strip()
         self._validate_user_fields(user.username, full_name, role, branch_id)
         if role == "branch":
-            branch = await self.session.get(Branch, branch_id)
+            branch = await self.session.get(Branch, branch_id, with_for_update=True)
             if branch is None or not branch.is_active:
                 raise ValueError("Выберите действующий филиал")
         next_active = user.is_active if is_active is None else is_active
