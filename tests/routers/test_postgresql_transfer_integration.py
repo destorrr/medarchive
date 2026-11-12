@@ -62,7 +62,10 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/transfer", cookies={"session": token})
+            receive_response = await client.get("/branch/receive", cookies={"session": token})
 
+        assert receive_response.status_code == 200
+        assert "Приёмка отправлений в филиале" in receive_response.text
         assert response.status_code == 200
         assert "Передача курьеру" in response.text
         assert "Нет коробок, готовых к отправке" in response.text
