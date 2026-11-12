@@ -548,6 +548,21 @@ def upgrade() -> None:
     BEFORE UPDATE OR DELETE ON domain_events
     FOR EACH ROW EXECUTE FUNCTION medarchive_domain_events_append_only()
     """)
+    op.execute("""
+    CREATE OR REPLACE FUNCTION medarchive_reject_historical_delete()
+    RETURNS trigger LANGUAGE plpgsql AS $
+    BEGIN
+        RAISE EXCEPTION 'Исторические записи нельзя удалять; используйте корректирующую операцию'
+            USING ERRCODE = '23514';
+    END;
+    $;
+    """)
+    for table in ("cards", "boxes", "shipments", "archive_requests"):
+        op.execute(f"""
+        CREATE TRIGGER trg_{table}_no_delete
+        BEFORE DELETE ON {table}
+        FOR EACH ROW EXECUTE FUNCTION medarchive_reject_historical_delete()
+        """)
 
 
 def downgrade() -> None:
