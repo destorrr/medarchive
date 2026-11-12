@@ -11,12 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
-    Box,
     BoxCardMembership,
-    BoxCycle,
     Branch,
     Card,
-    DomainEvent,
     Location,
     User,
 )
@@ -161,7 +158,8 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
             assert card.origin_branch_id == branch_id
     finally:
         app.dependency_overrides.clear()
-        await session.close()
+        await session.rollback()
         await outer_transaction.rollback()
+        await session.close()
         await connection.close()
         await database.close()
