@@ -86,7 +86,11 @@ async def _packing_context(
         "user_branch": location.name if location else role_label,
         "user_role_pill": role_label,
         "role_label": role_label,
-        "menu_items": [{"url": "/packing", "label": "📦 Упаковка коробки"}],
+        "menu_items": [
+            {"url": "/dashboard", "label": "📊 Панель управления"},
+            {"url": "/packing", "label": "📦 Упаковка коробки"},
+            {"url": "/transfer", "label": "🚚 Передача курьеру"},
+        ],
         "location": location,
         "box": box,
         "cards": cards,
