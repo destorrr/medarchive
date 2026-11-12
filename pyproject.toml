@@ -18,6 +18,9 @@ dependencies = [
     "qrcode[pil]>=7.4.0",  # QR-коды полок (Task 5-QR)
 ]
 
+[project.scripts]
+medarchive-admin = "medarchive.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
