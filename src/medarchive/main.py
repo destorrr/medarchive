@@ -11,6 +11,7 @@ def create_app(config: Config | None = None) -> FastAPI:
         config = Config()
 
     app = FastAPI(title="МедАрхив", version="0.1.0")
+    app.state.config = config
 
     # Jinja2 templates
     app.state.templates = Jinja2Templates(directory="src/medarchive/templates")
