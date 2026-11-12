@@ -95,12 +95,6 @@ async def branches_create(
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except IntegrityError as exc:
-        await session.rollback()
-        raise HTTPException(status_code=409, detail="Код филиала уже используется") from exc
-    except ValueError as exc:
-        await session.rollback()
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception:
         await session.rollback()
         raise
@@ -120,6 +114,15 @@ async def branches_edit(
             branch_id, code=code, name=name
         )
         await session.commit()
+    except LookupError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Код филиала уже используется") from exc
     except Exception:
         await session.rollback()
         raise
@@ -138,6 +141,12 @@ async def branches_status(
             branch_id, is_active
         )
         await session.commit()
+    except LookupError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception:
         await session.rollback()
         raise
@@ -188,12 +197,15 @@ async def users_create(
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except LookupError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except IntegrityError as exc:
         await session.rollback()
         raise HTTPException(status_code=409, detail="Изменение конфликтует с ограничениями БД") from exc
-    except ValueError as exc:
-        await session.rollback()
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception:
         await session.rollback()
         raise
