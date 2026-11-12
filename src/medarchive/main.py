@@ -24,16 +24,25 @@ def create_app(config: Config | None = None) -> FastAPI:
         from medarchive.dependencies import get_db
         db = await get_db()
         await db.init()
+        if config.postgres_enabled:
+            from medarchive.dependencies import get_pg_database
+            pg_db = await get_pg_database()
+            await pg_db.health_check()
 
     # Shutdown: close DB (safe — no hang on cleanup errors)
     @app.on_event("shutdown")
     async def shutdown():
-        from medarchive.dependencies import _db
+        from medarchive.dependencies import _db, _pg_db
         if _db is not None:
             try:
                 db = _db
                 _db = None  # prevent double-close
                 await db.close()
+            except Exception:
+                pass
+        if _pg_db is not None:
+            try:
+                await _pg_db.close()
             except Exception:
                 pass
 
