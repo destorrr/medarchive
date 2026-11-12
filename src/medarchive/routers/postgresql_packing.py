@@ -160,7 +160,49 @@ async def scan_card(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        card, created = await PostgreSQLCardIntakeService(session).register_from_qr(
+        data, existing = await PostgreSQLCardIntakeService(session).inspect_from_qr(
+            payload=qr_payload, actor_id=user.id
+        )
+        if existing is None:
+            return await _render_packing(
+                request,
+                user,
+                session,
+                box_id=box_id,
+                pending_qr_payload=qr_payload,
+                pending_card_data=data,
+            )
+        await PostgreSQLShipmentWorkflow(session).add_card_to_box(
+            box_id=box_id, card_id=existing.id, actor_id=user.id
+        )
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        return await _render_packing(
+            request, user, session, box_id=box_id, error=str(exc)
+        )
+    except IntegrityError:
+        await session.rollback()
+        return await _render_packing(
+            request, user, session, box_id=box_id,
+            error="Карта уже обрабатывается или нарушено ограничение БД.",
+        )
+    message = "Карта добавлена в коробку."
+    return RedirectResponse(
+        url=f"/packing?box_id={box_id}&message={quote(message, safe='')}", status_code=303
+    )
+
+
+@router.post("/packing/confirm-card")
+async def confirm_card_registration(
+    request: Request,
+    box_id: uuid.UUID = Form(...),
+    qr_payload: str = Form(...),
+    user: User = Depends(branch_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        card, _created = await PostgreSQLCardIntakeService(session).register_from_qr(
             payload=qr_payload, actor_id=user.id
         )
         await PostgreSQLShipmentWorkflow(session).add_card_to_box(
@@ -176,9 +218,9 @@ async def scan_card(
         await session.rollback()
         return await _render_packing(
             request, user, session, box_id=box_id,
-            error="Карта с таким номером уже обрабатывается или нарушено ограничение БД.",
+            error="Карта уже зарегистрирована или нарушено ограничение БД.",
         )
-    message = "Карта зарегистрирована в МедАрхиве и добавлена в коробку." if created else "Карта добавлена в коробку."
+    message = "Карта зарегистрирована в МедАрхиве и добавлена в коробку."
     return RedirectResponse(
         url=f"/packing?box_id={box_id}&message={quote(message, safe='')}", status_code=303
     )
