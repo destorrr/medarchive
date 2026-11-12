@@ -151,7 +151,8 @@ def upgrade() -> None:
         END IF;
         RETURN NEW;
     END;
-    $func$;    """)
+    $func$;
+    """)
     for table in ("cards", "boxes"):
         op.execute(f"""
         CREATE TRIGGER trg_{table}_movement_guard
@@ -173,7 +174,8 @@ def upgrade() -> None:
         END IF;
         RETURN NEW;
     END;
-    $func$;    """)
+    $func$;
+    """)
     for table in ("cards", "boxes"):
         op.execute(f"""
         CREATE TRIGGER trg_{table}_transit_insert_guard
@@ -199,7 +201,8 @@ def upgrade() -> None:
         END IF;
         RETURN NULL;
     END;
-    $func$;    """)
+    $func$;
+    """)
     for table in ("cards", "boxes"):
         op.execute(f"""
         CREATE CONSTRAINT TRIGGER trg_{table}_current_shipment_status
