@@ -124,7 +124,7 @@ def upgrade() -> None:
 
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_external_card_box_membership()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
         IF EXISTS (
             SELECT 1 FROM cards
@@ -135,7 +135,7 @@ def upgrade() -> None:
         END IF;
         RETURN NEW;
     END;
-    $;
+    $$;
     """)
     op.execute("""
     CREATE TRIGGER trg_external_card_box_membership_guard
