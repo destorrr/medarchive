@@ -232,7 +232,7 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert archive_to_central.from_location_id == archive_location.id
             assert archive_to_central.to_location_id == central_location.id
             assert await session.scalar(
-                select(ShipmentBox.id).where(
+                select(ShipmentBox.box_id).where(
                     ShipmentBox.shipment_id == archive_to_central.id
                 )
             ) is None
