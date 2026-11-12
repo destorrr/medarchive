@@ -201,3 +201,9 @@ async def update_user(
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Изменение конфликтует с ограничениями БД",
+        ) from exc
