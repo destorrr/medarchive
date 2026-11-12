@@ -172,6 +172,7 @@ async def confirm_transfer(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         context = await _transfer_context(request, user, session, error=str(exc))
         return request.app.state.templates.TemplateResponse(
             request=request, name="postgresql_transfer.html",
@@ -179,6 +180,7 @@ async def confirm_transfer(
         )
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         context = await _transfer_context(
             request, user, session,
             error="Не удалось передать коробку из-за конфликта данных. Обновите страницу и повторите.",
