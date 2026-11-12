@@ -64,12 +64,14 @@ def create_app(config: Config | None = None) -> FastAPI:
         from medarchive.routers.postgresql_packing import router as pg_packing_router
         from medarchive.routers.postgresql_transfer import router as pg_transfer_router
         from medarchive.routers.postgresql_archive import router as pg_archive_router
+        from medarchive.routers.postgresql_central_office import router as pg_central_router
         from medarchive.routers.postgresql_admin import router as pg_admin_router
         from medarchive.routers.postgresql_admin_pages import router as pg_admin_pages_router
         app.include_router(pg_dashboard_router)
         app.include_router(pg_packing_router)
         app.include_router(pg_transfer_router)
         app.include_router(pg_archive_router)
+        app.include_router(pg_central_router)
         app.include_router(pg_admin_router)
         app.include_router(pg_admin_pages_router)
     else:
