@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🚨 Инциденты отправлений</h1>
+<div class="card">
+    <p>Отправления с зафиксированным инцидентом. Просмотр не изменяет состав груза и его местонахождение.</p>
+    {% if incidents %}
+    <table>
+        <thead>
+            <tr><th>№ отправления</th><th>Маршрут</th><th>Курьер</th><th>Причина</th><th>Зафиксирован</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for item in incidents %}
+            <tr>
+                <td>{{ item.shipment.shipment_number }}</td>
+                <td>{{ item.source_name }} → {{ item.target_name }}</td>
+                <td>{{ item.courier_name }}</td>
+                <td>{{ item.shipment.exception_note }}</td>
+                <td>{{ item.shipment.exception_at }}</td>
+                <td><a href="/admin/incidents/{{ item.shipment.id }}">Открыть</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#888;">Зафиксированных инцидентов нет.</p>
+    {% endif %}
+</div>
+{% endblock %}
