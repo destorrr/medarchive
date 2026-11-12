@@ -2,7 +2,7 @@
 
 from alembic import op
 
-revision = "0007_transition_metadata_immutable"
+revision = "0007_transition_meta"
 down_revision = "0006_external_custody_at_other"
 branch_labels = None
 depends_on = None
