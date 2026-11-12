@@ -10,8 +10,9 @@ import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from medarchive.adapters.postgresql.models import Branch, Location, User
+from medarchive.adapters.postgresql.models import Branch, Courier, Location, User
 from medarchive.config import Config
 from medarchive.dependencies import get_pg_database
 from medarchive.main import create_app
@@ -372,4 +373,73 @@ async def test_concurrent_admin_demotion_keeps_one_active_admin():
                 if admin is not None:
                     await session.delete(admin)
             await session.commit()
+        await database.close()
+
+
+@pytest.mark.asyncio
+async def test_courier_with_draft_shipment_cannot_be_deactivated():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+
+    database = Database(DATABASE_URL)
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    try:
+        async with session.begin():
+            branch = Branch(
+                code=f"CR-{uuid.uuid4().hex[:10]}",
+                name="Courier race test branch",
+                is_active=True,
+            )
+            session.add(branch)
+            await session.flush()
+            source = Location(
+                kind="branch", branch_id=branch.id,
+                name=branch.name, is_active=True,
+            )
+            actor = User(
+                username=f"courier-test-{uuid.uuid4().hex[:12]}",
+                password_hash="test-hash",
+                full_name="Courier Test Actor",
+                role="branch", branch_id=branch.id, is_active=True,
+            )
+            courier = Courier(full_name="Courier Test", is_active=True)
+            session.add_all([source, actor, courier])
+            await session.flush()
+            target = await session.scalar(
+                select(Location).where(
+                    Location.kind == "central_office", Location.is_active.is_(True)
+                )
+            )
+            if target is None:
+                target = Location(
+                    kind="central_office", branch_id=None,
+                    name="Test Central Office", is_active=True,
+                )
+                session.add(target)
+                await session.flush()
+
+            await PostgreSQLShipmentWorkflow(session).create_draft(
+                from_location_id=source.id,
+                to_location_id=target.id,
+                courier_id=courier.id,
+                issued_by=actor.id,
+            )
+            with pytest.raises(ValueError, match="активными отправлениями"):
+                await PostgreSQLAdminService(session).set_courier_active(
+                    courier.id, False
+                )
+    finally:
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
         await database.close()
