@@ -29,7 +29,7 @@ class PostgreSQLCardCustodyWorkflow:
     EXTERNAL_STATES = {
         "at_court",
         "at_insurance",
-        "at_other",
+        "at_external_organization",
     }
 
     def __init__(self, session: AsyncSession):
