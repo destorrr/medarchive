@@ -179,7 +179,7 @@ class PostgreSQLShipmentWorkflow:
             if box.status != "active" or box.current_location_id != source.id or box.current_shipment_id is not None:
                 raise ShipmentWorkflowError("Коробка изменила местонахождение или недоступна")
             cycle = await self.session.scalar(
-                select(BoxCycle).where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None))
+                select(BoxCycle).where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None)).with_for_update()
             )
             if cycle is None:
                 raise ShipmentWorkflowError(f"У коробки {box.box_number} нет открытого цикла")
@@ -187,6 +187,7 @@ class PostgreSQLShipmentWorkflow:
                 select(BoxCardMembership)
                 .where(BoxCardMembership.box_cycle_id == cycle.id, BoxCardMembership.removed_at.is_(None))
                 .order_by(BoxCardMembership.card_id)
+                .with_for_update()
             )).all())
             if not memberships:
                 raise ShipmentWorkflowError(f"Нельзя отправить пустую коробку {box.box_number}")
@@ -254,6 +255,22 @@ class PostgreSQLShipmentWorkflow:
             "boxed_cards": [str(card.id) for card, _ in boxed_cards],
             "standalone_cards": [str(row.card_id) for row in standalone_rows],
         })
+        for box in boxes:
+            await self._event("box.shipment_handed_over", "box", box.id, actor.id, {
+                "shipment_id": str(shipment.id),
+                "from_location_id": str(source.id),
+                "to_location_id": str(target.id),
+            })
+        for card, box_id in boxed_cards:
+            await self._event("card.shipment_handed_over", "card", card.id, actor.id, {
+                "shipment_id": str(shipment.id), "box_id": str(box_id),
+                "from_location_id": str(source.id), "to_location_id": str(target.id),
+            })
+        for row in standalone_rows:
+            await self._event("card.shipment_handed_over", "card", row.card_id, actor.id, {
+                "shipment_id": str(shipment.id),
+                "from_location_id": str(source.id), "to_location_id": str(target.id),
+            })
         return shipment
 
     async def receive(self, *, shipment_id: uuid.UUID, actor_id: uuid.UUID) -> Shipment:
@@ -287,7 +304,7 @@ class PostgreSQLShipmentWorkflow:
             if box.current_shipment_id != shipment.id or box.current_location_id is not None:
                 raise ShipmentWorkflowError("Состояние коробки не соответствует отправлению")
             cycle = await self.session.scalar(
-                select(BoxCycle).where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None))
+                select(BoxCycle).where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None)).with_for_update()
             )
             if cycle is None:
                 raise ShipmentWorkflowError("У отправляемой коробки отсутствует открытый цикл")
@@ -358,6 +375,14 @@ class PostgreSQLShipmentWorkflow:
             "boxes": [str(box.id) for box in boxes],
             "cards": [str(card.id) for card in cards],
         })
+        for box in boxes:
+            await self._event("box.shipment_received", "box", box.id, actor.id, {
+                "shipment_id": str(shipment.id), "to_location_id": str(target.id),
+            })
+        for card in cards:
+            await self._event("card.shipment_received", "card", card.id, actor.id, {
+                "shipment_id": str(shipment.id), "to_location_id": str(target.id),
+            })
         return shipment
 
     async def _draft_and_actor(self, shipment_id: uuid.UUID, actor_id: uuid.UUID) -> tuple[Shipment, User]:
