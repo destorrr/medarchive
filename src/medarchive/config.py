@@ -14,6 +14,9 @@ class Config:
             "postgresql+asyncpg://medarchive:medarchive@localhost:5432/medarchive",
         )
     )
+    postgres_enabled: bool = field(
+        default_factory=lambda: os.environ.get("MEDARCHIVE_POSTGRES_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    )
     secret_key: str | None = field(
         default_factory=lambda: os.environ.get("MEDARCHIVE_SECRET_KEY")
     )
