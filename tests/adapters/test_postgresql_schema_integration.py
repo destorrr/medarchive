@@ -321,6 +321,10 @@ async def test_workflow_guard_triggers_and_request_fulfillment_link_exist():
             "trg_boxes_previous_shipment_pointer",
             "trg_cards_movement_guard",
             "trg_boxes_movement_guard",
+            "trg_cards_transit_insert_guard",
+            "trg_boxes_transit_insert_guard",
+            "trg_cards_current_shipment_status",
+            "trg_boxes_current_shipment_status",
         } <= trigger_names
         assert "fulfillment_shipment_id" in archive_request_columns
         assert "ck_archive_request_fulfillment" in constraint_names
@@ -577,6 +581,41 @@ async def test_postgresql_rejects_handover_from_a_location_other_than_the_object
                         """),
                         {"shipment_id": wrong_route_shipment_id, "card_id": card_id},
                     )
+            finally:
+                await transaction.rollback()
+    finally:
+        await engine.dispose()
+
+
+
+@pytest.mark.asyncio
+async def test_postgresql_rejects_transit_pointer_to_a_draft_shipment():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                card_id, shipment_id = await _seed_transit_card(connection)
+                await connection.execute(
+                    text("""
+                        INSERT INTO shipment_cards (shipment_id, card_id, box_id)
+                        VALUES (:shipment_id, :card_id, NULL)
+                    """),
+                    {"shipment_id": shipment_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE cards
+                        SET current_location_id = NULL, current_shipment_id = :shipment_id
+                        WHERE id = :card_id
+                    """),
+                    {"shipment_id": shipment_id, "card_id": card_id},
+                )
+                with pytest.raises(IntegrityError):
+                    await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
             finally:
                 await transaction.rollback()
     finally:
