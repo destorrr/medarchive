@@ -188,12 +188,20 @@ def upgrade() -> None:
     RETURNS trigger LANGUAGE plpgsql AS $func$
     DECLARE
         shipment_status text;
+        active_shipment_id uuid;
     BEGIN
-        IF NEW.current_shipment_id IS NULL THEN
+        IF TG_TABLE_NAME = 'cards' THEN
+            SELECT current_shipment_id INTO active_shipment_id
+            FROM cards WHERE id = NEW.id;
+        ELSE
+            SELECT current_shipment_id INTO active_shipment_id
+            FROM boxes WHERE id = NEW.id;
+        END IF;
+        IF active_shipment_id IS NULL THEN
             RETURN NULL;
         END IF;
         SELECT status INTO shipment_status
-        FROM shipments WHERE id = NEW.current_shipment_id;
+        FROM shipments WHERE id = active_shipment_id;
         IF shipment_status IS NULL OR shipment_status NOT IN ('in_transit', 'exception') THEN
             RAISE EXCEPTION
                 'Объект может числиться в отправлении только после передачи курьеру'
