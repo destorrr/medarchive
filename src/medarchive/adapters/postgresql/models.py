@@ -92,8 +92,9 @@ class Card(Base):
             name="cards_custody_status_check",
         ),
         CheckConstraint(
-            "(custody_status = 'available' AND external_since IS NULL) OR "
-            "(custody_status <> 'available' AND external_since IS NOT NULL)",
+            "(custody_status = 'available' AND external_since IS NULL AND external_organization IS NULL) OR "
+            "(custody_status <> 'available' AND external_since IS NOT NULL "
+            "AND NULLIF(btrim(external_organization), '') IS NOT NULL)",
             name="ck_card_external_custody_fields",
         ),
         CheckConstraint(
