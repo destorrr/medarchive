@@ -22,21 +22,30 @@
 </div>
 <div class="card">
     <h3>Отдельные карты без размещения</h3>
-    {% if cards and shelves %}
-    <table class="data"><thead><tr><th>№ карты</th><th>ФИО</th><th>Разместить на полке</th></tr></thead><tbody>
-    {% for card in cards %}<tr><td>{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>
-        <form method="post" action="/placement/card">
-            <input type="hidden" name="card_id" value="{{ card.id }}">
-            <select name="shelf_id" required><option value="">— Полка —</option>
-                {% for shelf in shelves %}<option value="{{ shelf.id }}">{{ shelf.section_name }} / {{ shelf.shelf_name }}</option>{% endfor %}
-            </select>
-            <button class="btn btn-primary" type="submit">Разместить</button>
-        </form>
-    </td></tr>{% endfor %}
+    {% if cards %}
+    <p class="muted">Можно разместить карту отдельно или объединить выбранные карты во внутреннюю коробку хранения. Внутренние коробки архива не используются для отправки в ЦО.</p>
+    <table class="data"><thead><tr><th>В коробку</th><th>№ карты</th><th>ФИО</th><th>Размещение</th></tr></thead><tbody>
+    {% for card in cards %}<tr>
+        <td><input type="checkbox" name="card_ids" value="{{ card.id }}" form="internal-box-form"></td>
+        <td>{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>
+            {% if shelves %}
+            <form method="post" action="/placement/card">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <select name="shelf_id" required><option value="">— Полка —</option>
+                    {% for shelf in shelves %}<option value="{{ shelf.id }}">{{ shelf.section_name }} / {{ shelf.shelf_name }}</option>{% endfor %}
+                </select>
+                <button class="btn btn-primary" type="submit">На полку</button>
+            </form>
+            {% else %}<span class="muted">Полки не настроены</span>{% endif %}
+        </td>
+    </tr>{% endfor %}
     </tbody></table>
-    {% elif cards %}<p class="muted">Сначала администратор должен настроить архивные полки.</p>
+    <form id="internal-box-form" method="post" action="/placement/new-internal-box" style="margin-top:12px">
+        <button class="btn btn-primary" type="submit">Создать внутреннюю коробку из выбранных карт</button>
+    </form>
     {% else %}<p class="muted">Нет отдельных карт, ожидающих размещения.</p>{% endif %}
 </div>
+
 <div class="card">
     <h3>Коробки на полках</h3>
     {% if placed_boxes %}
