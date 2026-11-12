@@ -33,17 +33,19 @@ def create_app(config: Config | None = None) -> FastAPI:
     # Shutdown: close DB (safe — no hang on cleanup errors)
     @app.on_event("shutdown")
     async def shutdown():
-        from medarchive.dependencies import _db, _pg_db
-        if _db is not None:
+        import medarchive.dependencies as dependencies
+        if dependencies._db is not None:
             try:
-                db = _db
-                _db = None  # prevent double-close
+                db = dependencies._db
+                dependencies._db = None  # prevent double-close
                 await db.close()
             except Exception:
                 pass
-        if _pg_db is not None:
+        if dependencies._pg_db is not None:
             try:
-                await _pg_db.close()
+                pg_db = dependencies._pg_db
+                dependencies._pg_db = None  # allow clean app re-initialization
+                await pg_db.close()
             except Exception:
                 pass
 
