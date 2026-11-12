@@ -161,5 +161,56 @@ def upgrade() -> None:
         """)
 
 
+    # New cards and boxes enter the system at a physical location; they cannot
+    # be inserted already attached to a shipment. A transit pointer written by
+    # an UPDATE must resolve to a handed-over (or exceptional) shipment.
+    op.execute("""
+    CREATE OR REPLACE FUNCTION medarchive_guard_transit_object_insert()
+    RETURNS trigger LANGUAGE plpgsql AS $
+    BEGIN
+        IF NEW.current_shipment_id IS NOT NULL THEN
+            RAISE EXCEPTION 'Нельзя создавать объект сразу в составе отправления'
+                USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+    END;
+    $;
+    """)
+    for table in ("cards", "boxes"):
+        op.execute(f"""
+        CREATE TRIGGER trg_{table}_transit_insert_guard
+        BEFORE INSERT ON {table}
+        FOR EACH ROW EXECUTE FUNCTION medarchive_guard_transit_object_insert()
+        """)
+
+    op.execute("""
+    CREATE OR REPLACE FUNCTION medarchive_guard_current_shipment_status()
+    RETURNS trigger LANGUAGE plpgsql AS $
+    DECLARE
+        shipment_status text;
+    BEGIN
+        IF NEW.current_shipment_id IS NULL THEN
+            RETURN NULL;
+        END IF;
+        SELECT status INTO shipment_status
+        FROM shipments WHERE id = NEW.current_shipment_id;
+        IF shipment_status NOT IN ('in_transit', 'exception') THEN
+            RAISE EXCEPTION
+                'Объект может числиться в отправлении только после передачи курьеру'
+                USING ERRCODE = '23514';
+        END IF;
+        RETURN NULL;
+    END;
+    $;
+    """)
+    for table in ("cards", "boxes"):
+        op.execute(f"""
+        CREATE CONSTRAINT TRIGGER trg_{table}_current_shipment_status
+        AFTER UPDATE ON {table}
+        DEFERRABLE INITIALLY DEFERRED
+        FOR EACH ROW EXECUTE FUNCTION medarchive_guard_current_shipment_status()
+        """)
+
+
 def downgrade() -> None:
     raise RuntimeError("Shipment integrity guards are intentionally irreversible; recreate a disposable DB")
