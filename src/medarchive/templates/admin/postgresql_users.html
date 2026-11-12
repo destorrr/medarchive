@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>👤 Пользователи</h1>
+<div class="card">
+    <h2 style="font-size:16px; margin-bottom:12px;">Создать пользователя</h2>
+    <form method="post" action="/admin/users">
+        <input type="text" name="username" placeholder="Логин" maxlength="128" required>
+        <input type="text" name="full_name" placeholder="ФИО" maxlength="255" required>
+        <input type="password" name="password" placeholder="Пароль (не менее 12 символов)" minlength="12" required>
+        <select name="role" required>
+            {% for r in role_options %}
+            <option value="{{ r.value }}">{{ r.label }}</option>
+            {% endfor %}
+        </select>
+        <select name="branch_id">
+            <option value="">— Без филиала —</option>
+            {% for b in branches %}
+            {% if b.is_active %}
+            <option value="{{ b.id }}">{{ b.code }} — {{ b.name }}</option>
+            {% endif %}
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Создать</button>
+    </form>
+    <p class="muted" style="margin-top:8px">Для роли «Филиал» необходимо выбрать действующий филиал. Для остальных ролей филиал не указывается.</p>
+</div>
+<div class="card">
+    <table>
+        <thead><tr><th>Логин</th><th>ФИО</th><th>Роль</th><th>Филиал</th><th>Статус и действия</th></tr></thead>
+        <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.username }}</td>
+            <td>
+                <input type="text" name="full_name" value="{{ u.full_name }}" form="user-{{ u.id }}" required>
+            </td>
+            <td>
+                <select name="role" form="user-{{ u.id }}">
+                    {% for r in role_options %}
+                    <option value="{{ r.value }}" {% if r.value == u.role %}selected{% endif %}>{{ r.label }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <select name="branch_id" form="user-{{ u.id }}">
+                    <option value="">— Без филиала —</option>
+                    {% for b in branches %}
+                    {% if b.is_active or b.id == u.branch_id %}
+                    <option value="{{ b.id }}" {% if b.id == u.branch_id %}selected{% endif %}>{{ b.code }} — {{ b.name }}{% if not b.is_active %} (отключён){% endif %}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <form id="user-{{ u.id }}" method="post" action="/admin/users/{{ u.id }}/edit">
+                    <input type="password" name="password" placeholder="Новый пароль (необязательно)" minlength="12">
+                    {% if u.id == user.id %}
+                    <input type="hidden" name="is_active" value="true">
+                    <label><input type="checkbox" checked disabled> Активен (свою учётную запись отключить нельзя)</label>
+                    {% else %}
+                    <label><input type="checkbox" name="is_active" value="true" {% if u.is_active %}checked{% endif %}> Активен</label>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </form>
+                <span class="muted">Создан: {{ u.created_at.strftime("%d.%m.%Y") if u.created_at else "—" }}</span>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">Пользователей пока нет.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
