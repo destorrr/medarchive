@@ -77,13 +77,17 @@ class PostgreSQLAdminService:
             )
             if active_users:
                 raise ValueError("Сначала отключите пользователей этого филиала")
-            location_id = await self.session.scalar(
-                select(Location.id).where(
+            # Lock the logistics location before checking inventory. All workflows
+            # that create or move branch inventory take this same lock, so a
+            # concurrent intake/transfer cannot slip in after these checks.
+            location = await self.session.scalar(
+                select(Location).where(
                     Location.kind == "branch", Location.branch_id == branch.id
-                )
+                ).with_for_update()
             )
-            if location_id is None:
+            if location is None:
                 raise RuntimeError("Для филиала отсутствует логистическая локация")
+            location_id = location.id
             cards = await self.session.scalar(
                 select(func.count()).select_from(Card).where(
                     Card.current_location_id == location_id
@@ -110,14 +114,15 @@ class PostgreSQLAdminService:
                     "Нельзя отключить филиал: есть незавершённые отправления"
                 )
         branch.is_active = active
-        result = await self.session.execute(
-            select(Location).where(
-                Location.kind == "branch", Location.branch_id == branch.id
-            ).with_for_update()
-        )
-        location = result.scalar_one_or_none()
-        if location is None:
-            raise RuntimeError("Для филиала отсутствует логистическая локация")
+        if active:
+            result = await self.session.execute(
+                select(Location).where(
+                    Location.kind == "branch", Location.branch_id == branch.id
+                ).with_for_update()
+            )
+            location = result.scalar_one_or_none()
+            if location is None:
+                raise RuntimeError("Для филиала отсутствует логистическая локация")
         location.is_active = active
         await self.session.flush()
         return branch
