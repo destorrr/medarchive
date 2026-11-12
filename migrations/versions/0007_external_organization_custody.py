@@ -2,7 +2,7 @@
 
 from alembic import op
 
-revision = "0009_external_organization_custody"
+revision = "0009_external_org_custody"
 down_revision = "0008_shipment_integrity"
 branch_labels = None
 depends_on = None
