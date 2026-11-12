@@ -194,7 +194,7 @@ def upgrade() -> None:
         END IF;
         SELECT status INTO shipment_status
         FROM shipments WHERE id = NEW.current_shipment_id;
-        IF shipment_status NOT IN ('in_transit', 'exception') THEN
+        IF shipment_status IS NULL OR shipment_status NOT IN ('in_transit', 'exception') THEN
             RAISE EXCEPTION
                 'Объект может числиться в отправлении только после передачи курьеру'
                 USING ERRCODE = '23514';
