@@ -27,9 +27,12 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
         pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
 
     engine = create_async_engine(DATABASE_URL)
-    factory = async_sessionmaker(engine, expire_on_commit=False)
+    connection = await engine.connect()
+    outer_transaction = await connection.begin()
+    factory = async_sessionmaker(
+        bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint",
+    )
     async with factory() as session:
-        transaction = await session.begin()
         app = create_app(Config(
             database_url=DATABASE_URL,
             postgres_enabled=True,
@@ -184,5 +187,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 assert event.payload["resolution_note"] == "Коробка и полный состав сверены с манифестом"
         finally:
             app.dependency_overrides.clear()
-            await transaction.rollback()
+            await session.close()
+            await outer_transaction.rollback()
+            await connection.close()
     await engine.dispose()
