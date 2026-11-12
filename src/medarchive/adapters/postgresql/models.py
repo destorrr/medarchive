@@ -247,7 +247,7 @@ class ShipmentCard(Base):
 class ArchiveRequest(Base):
     __tablename__ = "archive_requests"
     __table_args__ = (
-        CheckConstraint("status IN ('new', 'in_progress', 'completed', 'not_found', 'cancelled)", name="ck_archive_request_status"),
+        CheckConstraint("status IN ('new', 'in_progress', 'completed', 'not_found', 'cancelled')", name="ck_archive_request_status"),
         Index("uq_card_one_active_archive_request", "card_id", unique=True, postgresql_where=text("status IN ('new', 'in_progress')")),
         Index("ix_archive_requests_status_created", "status", "created_at"),
     )
