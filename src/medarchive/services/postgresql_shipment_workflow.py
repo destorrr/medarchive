@@ -37,6 +37,79 @@ class PostgreSQLShipmentWorkflow:
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    async def create_box(
+        self,
+        *,
+        location_id: uuid.UUID,
+        actor_id: uuid.UUID,
+        card_ids: list[uuid.UUID] | None = None,
+    ) -> Box:
+        """Create a box and its first cycle; archive boxes must be request-backed."""
+        actor = await self._active_user(actor_id)
+        location = await self._location(location_id)
+        await self._authorize_location(actor, location)
+        selected_ids = list(card_ids or [])
+        if len(selected_ids) != len(set(selected_ids)):
+            raise ShipmentWorkflowError("Одна и та же карта указана в коробке несколько раз")
+        if location.kind == "archive" and not selected_ids:
+            raise ShipmentWorkflowError("Архив может создавать коробку только для комплектации заявок ЦО")
+        if location.kind == "archive" and len(selected_ids) == 0:
+            raise ShipmentWorkflowError("Для архивной коробки необходимо выбрать карты по заявкам")
+
+        cards: list[Card] = []
+        for card_id in selected_ids:
+            card = await self.session.scalar(
+                select(Card).where(Card.id == card_id).with_for_update()
+            )
+            if (
+                card is None or card.status != "active"
+                or card.current_location_id != location.id
+                or card.current_shipment_id is not None
+            ):
+                raise ShipmentWorkflowError("Карта не найдена в указанном месте или недоступна")
+            if await self._active_membership(card.id) is not None:
+                raise ShipmentWorkflowError("Карта уже находится в другой активной коробке")
+            if location.kind == "archive":
+                request = await self.session.scalar(
+                    select(ArchiveRequest)
+                    .join(User, User.id == ArchiveRequest.requested_by)
+                    .where(
+                        ArchiveRequest.card_id == card.id,
+                        ArchiveRequest.status.in_(("new", "in_progress")),
+                        User.role == "central_office",
+                    )
+                    .with_for_update()
+                )
+                if request is None:
+                    raise ShipmentWorkflowError("В архивную коробку можно включать только карты из активных заявок ЦО")
+            cards.append(card)
+
+        box = Box(
+            box_number=f"BX-{uuid.uuid4().hex[:16].upper()}",
+            current_location_id=location.id,
+            created_by=actor.id,
+        )
+        self.session.add(box)
+        await self.session.flush()
+        cycle = BoxCycle(box_id=box.id, cycle_number=1, started_by=actor.id)
+        self.session.add(cycle)
+        await self.session.flush()
+        for card in cards:
+            self.session.add(BoxCardMembership(
+                box_cycle_id=cycle.id, card_id=card.id, added_by=actor.id,
+            ))
+        await self.session.flush()
+        await self._event("box.created", "box", box.id, actor.id, {
+            "box_number": box.box_number,
+            "location_id": str(location.id),
+            "initial_card_ids": [str(card.id) for card in cards],
+        })
+        for card in cards:
+            await self._event("card.added_to_box", "card", card.id, actor.id, {
+                "box_id": str(box.id), "location_id": str(location.id),
+            })
+        return box
+
     async def create_draft(
         self,
         *,
