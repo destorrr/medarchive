@@ -25,24 +25,47 @@ def upgrade() -> None:
 
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_shipment_update()
-    RETURNS trigger LANGUAGE plpgsql AS $$
+    RETURNS trigger LANGUAGE plpgsql AS $
+    DECLARE
+        source_kind text;
+        target_kind text;
     BEGIN
-        IF OLD.status <> 'draft' AND (
-            NEW.from_location_id IS DISTINCT FROM OLD.from_location_id OR
-            NEW.to_location_id IS DISTINCT FROM OLD.to_location_id OR
-            NEW.courier_id IS DISTINCT FROM OLD.courier_id OR
-            NEW.issued_by IS DISTINCT FROM OLD.issued_by
+        SELECT kind INTO source_kind FROM locations WHERE id = NEW.from_location_id;
+        SELECT kind INTO target_kind FROM locations WHERE id = NEW.to_location_id;
+        IF NOT (
+            (source_kind = 'branch' AND target_kind IN ('central_office', 'archive'))
+            OR (source_kind = 'central_office' AND target_kind IN ('branch', 'archive'))
+            OR (source_kind = 'archive' AND target_kind = 'central_office')
         ) THEN
-            RAISE EXCEPTION 'Нельзя менять маршрут, курьера или отправителя после передачи'
+            RAISE EXCEPTION 'Недопустимый маршрут отправления'
                 USING ERRCODE = '23514';
+        END IF;
+        IF TG_OP = 'UPDATE' THEN
+            IF OLD.status <> 'draft' AND (
+                NEW.from_location_id IS DISTINCT FROM OLD.from_location_id OR
+                NEW.to_location_id IS DISTINCT FROM OLD.to_location_id OR
+                NEW.courier_id IS DISTINCT FROM OLD.courier_id OR
+                NEW.issued_by IS DISTINCT FROM OLD.issued_by
+            ) THEN
+                RAISE EXCEPTION 'Нельзя менять маршрут, курьера или отправителя после передачи'
+                    USING ERRCODE = '23514';
+            END IF;
+            IF (OLD.status = 'draft' AND NEW.status NOT IN ('draft', 'in_transit', 'cancelled'))
+               OR (OLD.status = 'in_transit' AND NEW.status NOT IN ('in_transit', 'received', 'exception'))
+               OR (OLD.status = 'received' AND NEW.status <> 'received')
+               OR (OLD.status = 'cancelled' AND NEW.status <> 'cancelled')
+               OR (OLD.status = 'exception' AND NEW.status NOT IN ('exception', 'received')) THEN
+                RAISE EXCEPTION 'Недопустимый переход статуса отправления'
+                    USING ERRCODE = '23514';
+            END IF;
         END IF;
         RETURN NEW;
     END;
-    $$;
+    $;
     """)
     op.execute("""
     CREATE TRIGGER trg_shipment_route_immutable
-    BEFORE UPDATE ON shipments
+    BEFORE INSERT OR UPDATE ON shipments
     FOR EACH ROW EXECUTE FUNCTION medarchive_guard_shipment_update()
     """)
 
@@ -263,6 +286,11 @@ def upgrade() -> None:
                     USING ERRCODE = '23514';
             END IF;
         ELSIF shipment_status = 'received' THEN
+            IF NOT EXISTS (SELECT 1 FROM shipment_boxes WHERE shipment_id = sid)
+               AND NOT EXISTS (SELECT 1 FROM shipment_cards WHERE shipment_id = sid) THEN
+                RAISE EXCEPTION 'Нельзя принять пустое отправление'
+                    USING ERRCODE = '23514';
+            END IF;
             IF EXISTS (
                 SELECT 1 FROM shipment_boxes sb JOIN boxes b ON b.id = sb.box_id
                 WHERE sb.shipment_id = sid
