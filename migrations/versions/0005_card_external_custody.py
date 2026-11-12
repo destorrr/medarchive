@@ -121,6 +121,28 @@ def upgrade() -> None:
     ON cards FOR EACH ROW EXECUTE FUNCTION medarchive_guard_card_external_custody_update()
     """)
 
+
+    op.execute("""
+    CREATE OR REPLACE FUNCTION medarchive_guard_external_card_box_membership()
+    RETURNS trigger LANGUAGE plpgsql AS $
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM cards
+            WHERE id = NEW.card_id AND custody_status <> 'available'
+        ) THEN
+            RAISE EXCEPTION 'Нельзя упаковать карту, переданную во внешнюю организацию'
+                USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+    END;
+    $;
+    """)
+    op.execute("""
+    CREATE TRIGGER trg_external_card_box_membership_guard
+    BEFORE INSERT OR UPDATE ON box_card_memberships
+    FOR EACH ROW EXECUTE FUNCTION medarchive_guard_external_card_box_membership()
+    """)
+
     # Prevent a draft route change from bypassing the no-box rule after a box
     # manifest row was already inserted.
     op.execute("""
