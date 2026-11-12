@@ -65,15 +65,17 @@ async def create_branch(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        async with session.begin():
-            branch = await PostgreSQLAdminService(session).create_branch(
-                code=data.code, name=data.name
-            )
-            result = _branch_json(branch)
+        branch = await PostgreSQLAdminService(session).create_branch(
+            code=data.code, name=data.name
+        )
+        result = _branch_json(branch)
+        await session.commit()
         return result
     except ValueError as exc:
+        await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
+        await session.rollback()
         if "unique" in str(exc).lower():
             raise HTTPException(status_code=409, detail="Код филиала уже используется") from exc
         raise
@@ -85,15 +87,17 @@ async def update_branch(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        async with session.begin():
-            branch = await PostgreSQLAdminService(session).update_branch(
-                branch_id, code=data.code, name=data.name
-            )
-            result = _branch_json(branch)
+        branch = await PostgreSQLAdminService(session).update_branch(
+            branch_id, code=data.code, name=data.name
+        )
+        result = _branch_json(branch)
+        await session.commit()
         return result
     except LookupError as exc:
+        await session.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
+        await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
@@ -103,13 +107,15 @@ async def deactivate_branch(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        async with session.begin():
-            branch = await PostgreSQLAdminService(session).set_branch_active(branch_id, False)
-            result = _branch_json(branch)
+        branch = await PostgreSQLAdminService(session).set_branch_active(branch_id, False)
+        result = _branch_json(branch)
+        await session.commit()
         return result
     except LookupError as exc:
+        await session.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
+        await session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
@@ -119,11 +125,12 @@ async def activate_branch(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        async with session.begin():
-            branch = await PostgreSQLAdminService(session).set_branch_active(branch_id, True)
-            result = _branch_json(branch)
+        branch = await PostgreSQLAdminService(session).set_branch_active(branch_id, True)
+        result = _branch_json(branch)
+        await session.commit()
         return result
     except LookupError as exc:
+        await session.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
@@ -141,15 +148,16 @@ async def create_user(
 ):
     auth = get_auth()
     try:
-        async with session.begin():
-            user = await PostgreSQLAdminService(session).create_user(
-                username=data.username, full_name=data.full_name,
-                password_hash=auth.hash_password(data.password),
-                role=data.role, branch_id=data.branch_id,
-            )
-            result = _user_json(user)
+        user = await PostgreSQLAdminService(session).create_user(
+            username=data.username, full_name=data.full_name,
+            password_hash=auth.hash_password(data.password),
+            role=data.role, branch_id=data.branch_id,
+        )
+        result = _user_json(user)
+        await session.commit()
         return result
     except ValueError as exc:
+        await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
@@ -163,16 +171,18 @@ async def update_user(
         raise HTTPException(status_code=409, detail="Нельзя отключить себя или снять с себя роль администратора")
     auth = get_auth()
     try:
-        async with session.begin():
-            user = await PostgreSQLAdminService(session).update_user(
-                user_id, full_name=data.full_name, role=data.role,
-                branch_id=data.branch_id,
-                password_hash=auth.hash_password(data.password) if data.password else None,
-                is_active=data.is_active,
-            )
-            result = _user_json(user)
+        user = await PostgreSQLAdminService(session).update_user(
+            user_id, full_name=data.full_name, role=data.role,
+            branch_id=data.branch_id,
+            password_hash=auth.hash_password(data.password) if data.password else None,
+            is_active=data.is_active,
+        )
+        result = _user_json(user)
+        await session.commit()
         return result
     except LookupError as exc:
+        await session.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
+        await session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
