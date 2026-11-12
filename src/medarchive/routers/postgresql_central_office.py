@@ -359,6 +359,35 @@ async def central_transfer_page(
             {"id": box.id, "box_number": box.box_number, "card_count": int(count)}
             for box, count in rows.all()
         ]
+        active_membership = (
+            select(BoxCardMembership.id)
+            .where(
+                BoxCardMembership.card_id == Card.id,
+                BoxCardMembership.removed_at.is_(None),
+            )
+            .exists()
+        )
+        active_manifest_card = (
+            select(ShipmentCard.card_id)
+            .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+            .where(
+                ShipmentCard.card_id == Card.id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .exists()
+        )
+        cards = list((
+            await session.scalars(
+                select(Card).where(
+                    Card.current_location_id == location.id,
+                    Card.current_shipment_id.is_(None),
+                    Card.status == "active",
+                    Card.custody_status == "available",
+                    ~active_membership,
+                    ~active_manifest_card,
+                ).order_by(Card.card_number)
+            )
+        ).all())
         destinations = list((
             await session.scalars(
                 select(Location).where(
@@ -373,9 +402,12 @@ async def central_transfer_page(
                 .order_by(Courier.full_name)
             )
         ).all())
+    else:
+        cards = []
     return await _render(
         request, user, session, "postgresql_central_transfer.html",
-        ready_boxes=ready_boxes, destinations=destinations, couriers=couriers,
+        ready_boxes=ready_boxes, cards=cards,
+        destinations=destinations, couriers=couriers,
         error=error, success=message,
     )
 
@@ -383,7 +415,8 @@ async def central_transfer_page(
 @router.post("/central/transfer/confirm")
 async def central_transfer_confirm(
     request: Request,
-    box_id: uuid.UUID = Form(...),
+    box_id: uuid.UUID | None = Form(None),
+    card_ids: list[uuid.UUID] = Form(default=[]),
     to_location_id: uuid.UUID = Form(...),
     courier_id: uuid.UUID = Form(...),
     user: User = Depends(central_only),
@@ -393,6 +426,8 @@ async def central_transfer_confirm(
         source = await _central_location(session)
         if source is None:
             raise ValueError("Локация центрального офиса не настроена")
+        if box_id is None and not card_ids:
+            raise ValueError("Выберите коробку или хотя бы одну отдельную карту")
         workflow = PostgreSQLShipmentWorkflow(session)
         shipment = await workflow.create_draft(
             from_location_id=source.id,
@@ -400,9 +435,14 @@ async def central_transfer_confirm(
             courier_id=courier_id,
             issued_by=user.id,
         )
-        await workflow.add_box(
-            shipment_id=shipment.id, box_id=box_id, actor_id=user.id
-        )
+        if box_id is not None:
+            await workflow.add_box(
+                shipment_id=shipment.id, box_id=box_id, actor_id=user.id
+            )
+        for card_id in card_ids:
+            await workflow.add_standalone_card(
+                shipment_id=shipment.id, card_id=card_id, actor_id=user.id
+            )
         await workflow.hand_over(shipment_id=shipment.id, actor_id=user.id)
         number = shipment.shipment_number
         await session.commit()
