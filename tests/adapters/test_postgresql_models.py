@@ -10,7 +10,7 @@ def test_target_metadata_contains_core_and_logistics_tables():
         "branches", "locations", "users", "couriers", "cards", "boxes",
         "box_cycles", "box_card_memberships", "shipments", "shipment_boxes",
         "shipment_cards", "archive_requests", "archive_shelves",
-        "box_placements", "domain_events",
+        "box_placements", "card_placements", "domain_events",
     }
     assert expected <= set(Base.metadata.tables)
 
@@ -64,6 +64,8 @@ def test_orm_maps_all_value_checks_and_full_text_index():
         "shipments_status_check",
         "box_cycles_cycle_number_check",
         "archive_requests_status_check",
+        "ck_archive_request_fulfillment",
+        "ck_card_placement_dates",
     }
     actual_checks = {
         constraint.name
@@ -86,3 +88,11 @@ def test_box_maps_active_shipment_partial_unique_index():
     assert active_shipment.unique is True
     assert [column.name for column in active_shipment.columns] == ["current_shipment_id", "id"]
     assert str(active_shipment.dialect_options["postgresql"]["where"]) == "current_shipment_id IS NOT NULL"
+
+
+def test_individual_card_placement_has_one_active_shelf_location():
+    table = Base.metadata.tables["card_placements"]
+    index = next(i for i in table.indexes if i.name == "uq_card_one_active_placement")
+    assert index.unique is True
+    assert [column.name for column in index.columns] == ["card_id"]
+    assert str(index.dialect_options["postgresql"]["where"]) == "removed_at IS NULL"
