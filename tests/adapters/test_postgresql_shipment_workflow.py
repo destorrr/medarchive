@@ -947,3 +947,112 @@ async def test_register_shipment_exception_rejects_blank_note_wrong_actor_and_wr
     assert transit.status == "in_transit"
     assert transit.exception_by is None
     assert card.current_shipment_id == transit.id
+
+
+@pytest.mark.asyncio
+async def test_exception_is_resolved_only_by_receiving_the_complete_verified_manifest(pg_session):
+    (
+        branch, branch_loc, archive_loc, _central_loc,
+        branch_user, archive_user, _central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Recovered incident patient",
+        date_of_birth=__import__("datetime").date(1987, 5, 6),
+        origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(
+        location_id=branch_loc.id, actor_id=branch_user.id, card_ids=[card.id],
+    )
+    shipment = await workflow.create_draft(
+        from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=branch_user.id,
+    )
+    await workflow.add_box(
+        shipment_id=shipment.id, box_id=box.id, actor_id=branch_user.id,
+    )
+    await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
+    await workflow.register_exception(
+        shipment_id=shipment.id, actor_id=archive_user.id,
+        note="Отправление временно не было обнаружено",
+    )
+
+    await workflow.resolve_exception(
+        shipment_id=shipment.id, actor_id=archive_user.id,
+        resolution_note="Коробка и карта найдены; номер и полный состав сверены с манифестом",
+    )
+
+    await pg_session.refresh(shipment)
+    await pg_session.refresh(box)
+    await pg_session.refresh(card)
+    assert shipment.status == "received"
+    assert shipment.received_by == archive_user.id
+    assert shipment.received_at is not None
+    assert shipment.exception_by == archive_user.id
+    assert shipment.exception_at is not None
+    assert shipment.exception_note == "Отправление временно не было обнаружено"
+    assert box.current_location_id == archive_loc.id
+    assert box.current_shipment_id is None
+    assert card.current_location_id == archive_loc.id
+    assert card.current_shipment_id is None
+
+    event = await pg_session.scalar(
+        select(DomainEvent).where(
+            DomainEvent.event_type == "shipment.exception_resolved",
+            DomainEvent.aggregate_id == shipment.id,
+        )
+    )
+    assert event is not None
+    assert event.actor_user_id == archive_user.id
+    assert event.payload["resolution"] == "complete_manifest_verified"
+    assert "полный состав" in event.payload["resolution_note"]
+    assert event.payload["original_exception_note"] == shipment.exception_note
+
+
+@pytest.mark.asyncio
+async def test_exception_resolution_requires_recipient_and_valid_incident(pg_session):
+    (
+        _branch, branch_loc, archive_loc, _central_loc,
+        branch_user, archive_user, _central_user, courier,
+    ) = await seed_locations(pg_session)
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    shipment = await workflow.create_draft(
+        from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=branch_user.id,
+    )
+    with pytest.raises(ShipmentWorkflowError, match="результат проверки"):
+        await workflow.resolve_exception(
+            shipment_id=shipment.id, actor_id=archive_user.id, resolution_note=" ",
+        )
+    with pytest.raises(ShipmentWorkflowError, match="разрешён"):
+        await workflow.resolve_exception(
+            shipment_id=shipment.id, actor_id=archive_user.id,
+            resolution_note="Проверено",
+        )
+
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Wrong resolver patient",
+        date_of_birth=__import__("datetime").date(1988, 6, 7),
+        origin_branch_id=_branch.id, current_location_id=branch_loc.id, status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+    await workflow.add_standalone_card(
+        shipment_id=shipment.id, card_id=card.id, actor_id=branch_user.id,
+    )
+    await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
+    await workflow.register_exception(
+        shipment_id=shipment.id, actor_id=archive_user.id, note="Нужна проверка груза",
+    )
+    with pytest.raises(ShipmentWorkflowError, match="Недостаточно прав"):
+        await workflow.resolve_exception(
+            shipment_id=shipment.id, actor_id=branch_user.id,
+            resolution_note="Груз проверен",
+        )
+    await pg_session.refresh(shipment)
+    await pg_session.refresh(card)
+    assert shipment.status == "exception"
+    assert card.current_shipment_id == shipment.id
+    assert card.current_location_id is None
