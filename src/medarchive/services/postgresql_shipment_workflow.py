@@ -108,6 +108,56 @@ class PostgreSQLShipmentWorkflow:
             })
         return box
 
+    async def add_card_to_box(
+        self, *, box_id: uuid.UUID, card_id: uuid.UUID, actor_id: uuid.UUID
+    ) -> None:
+        actor = await self._active_user(actor_id)
+        box = await self.session.scalar(
+            select(Box).where(Box.id == box_id).with_for_update()
+        )
+        if box is None or box.status != "active" or box.current_location_id is None:
+            raise ShipmentWorkflowError("Коробка не найдена или не находится в постоянной локации")
+        location = await self._location(box.current_location_id)
+        await self._authorize_location(actor, location)
+        card = await self.session.scalar(
+            select(Card).where(Card.id == card_id).with_for_update()
+        )
+        if (
+            card is None or card.status != "active"
+            or card.current_location_id != location.id
+            or card.current_shipment_id is not None
+        ):
+            raise ShipmentWorkflowError("Карта не найдена в месте хранения коробки или недоступна")
+        if await self._active_membership(card.id) is not None:
+            raise ShipmentWorkflowError("Карта уже находится в активной коробке")
+        if location.kind == "archive":
+            request = await self.session.scalar(
+                select(ArchiveRequest)
+                .join(User, User.id == ArchiveRequest.requested_by)
+                .where(
+                    ArchiveRequest.card_id == card.id,
+                    ArchiveRequest.status.in_(("new", "in_progress")),
+                    User.role == "central_office",
+                )
+                .with_for_update()
+            )
+            if request is None:
+                raise ShipmentWorkflowError("В архивную коробку можно включать только карты из активных заявок ЦО")
+        cycle = await self.session.scalar(
+            select(BoxCycle)
+            .where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None))
+            .with_for_update()
+        )
+        if cycle is None:
+            raise ShipmentWorkflowError("У коробки нет открытого цикла")
+        self.session.add(BoxCardMembership(
+            box_cycle_id=cycle.id, card_id=card.id, added_by=actor.id,
+        ))
+        await self.session.flush()
+        await self._event("card.added_to_box", "card", card.id, actor.id, {
+            "box_id": str(box.id), "location_id": str(location.id),
+        })
+
     async def create_draft(
         self,
         *,
