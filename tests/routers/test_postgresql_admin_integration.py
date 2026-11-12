@@ -316,3 +316,60 @@ async def test_admin_service_preserves_password_hash_and_requires_another_admin(
                     await session.delete(admin)
                     await session.commit()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_admin_demotion_keeps_one_active_admin():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    import asyncio
+    from medarchive.adapters.postgresql.database import Database
+
+    database = Database(DATABASE_URL)
+    admin_ids = []
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                for index in range(2):
+                    admin = User(
+                        username=f"race-admin-{index}-{uuid.uuid4().hex[:10]}",
+                        password_hash="test-hash",
+                        full_name=f"Race Admin {index}",
+                        role="admin",
+                        is_active=True,
+                    )
+                    session.add(admin)
+                    await session.flush()
+                    admin_ids.append(admin.id)
+
+        async def demote(admin_id):
+            async with database.session_factory() as session:
+                try:
+                    async with session.begin():
+                        await PostgreSQLAdminService(session).update_user(
+                            admin_id,
+                            full_name="Demoted Admin",
+                            role="viewer",
+                            branch_id=None,
+                        )
+                    return "updated"
+                except ValueError as exc:
+                    assert "последнего активного администратора" in str(exc)
+                    return "rejected"
+
+        outcomes = await asyncio.gather(*(demote(admin_id) for admin_id in admin_ids))
+        assert sorted(outcomes) == ["rejected", "updated"]
+        async with database.session_factory() as session:
+            active_admin = await session.scalar(
+                select(User).where(User.role == "admin", User.is_active.is_(True))
+            )
+            assert active_admin is not None
+    finally:
+        async with database.session_factory() as session:
+            for admin_id in admin_ids:
+                admin = await session.get(User, admin_id)
+                if admin is not None:
+                    await session.delete(admin)
+            await session.commit()
+        await database.close()
