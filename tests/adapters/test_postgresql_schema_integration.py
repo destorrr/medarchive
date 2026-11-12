@@ -55,6 +55,11 @@ async def test_migrated_schema_contains_required_checks_and_logistics_indexes():
             "ck_shipment_received_fields",
             "ck_shipment_exception_fields",
             "ck_shipment_cancelled_fields",
+            "box_cycles_cycle_number_check",
+            "archive_requests_status_check",
+            "ck_box_cycle_dates",
+            "ck_box_membership_dates",
+            "ck_placement_dates",
         } <= check_names
 
         assert {
