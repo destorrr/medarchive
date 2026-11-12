@@ -711,3 +711,95 @@ async def test_archive_cannot_mark_not_found_or_place_card_reserved_in_draft_shi
     assert request.status == "completed"
     assert card.current_location_id == central_loc.id
     assert card.current_shipment_id is None
+
+
+
+@pytest.mark.asyncio
+async def test_branch_to_central_and_central_to_branch_round_trip_preserves_box_and_card_balance(pg_session):
+    (
+        branch, branch_loc, _archive_loc, central_loc,
+        branch_user, _archive_user, central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}",
+        full_name="Branch round-trip patient",
+        date_of_birth=__import__("datetime").date(1992, 8, 14),
+        origin_branch_id=branch.id,
+        current_location_id=branch_loc.id,
+        status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(
+        location_id=branch_loc.id,
+        actor_id=branch_user.id,
+        card_ids=[card.id],
+    )
+
+    outbound = await workflow.create_draft(
+        from_location_id=branch_loc.id,
+        to_location_id=central_loc.id,
+        courier_id=courier.id,
+        issued_by=branch_user.id,
+    )
+    await workflow.add_box(
+        shipment_id=outbound.id,
+        box_id=box.id,
+        actor_id=branch_user.id,
+    )
+    await workflow.hand_over(shipment_id=outbound.id, actor_id=branch_user.id)
+    await workflow.receive(shipment_id=outbound.id, actor_id=central_user.id)
+
+    await pg_session.refresh(box)
+    await pg_session.refresh(card)
+    await pg_session.refresh(outbound)
+    assert outbound.status == "received"
+    assert box.current_location_id == central_loc.id
+    assert box.current_shipment_id is None
+    assert card.current_location_id == central_loc.id
+    assert card.current_shipment_id is None
+
+    return_shipment = await workflow.create_draft(
+        from_location_id=central_loc.id,
+        to_location_id=branch_loc.id,
+        courier_id=courier.id,
+        issued_by=central_user.id,
+    )
+    await workflow.add_box(
+        shipment_id=return_shipment.id,
+        box_id=box.id,
+        actor_id=central_user.id,
+    )
+    await workflow.hand_over(
+        shipment_id=return_shipment.id,
+        actor_id=central_user.id,
+    )
+    await workflow.receive(
+        shipment_id=return_shipment.id,
+        actor_id=branch_user.id,
+    )
+
+    await pg_session.refresh(box)
+    await pg_session.refresh(card)
+    await pg_session.refresh(return_shipment)
+    assert return_shipment.status == "received"
+    assert box.current_location_id == branch_loc.id
+    assert box.current_shipment_id is None
+    assert card.current_location_id == branch_loc.id
+    assert card.current_shipment_id is None
+
+    events = list((await pg_session.scalars(
+        select(DomainEvent).where(
+            DomainEvent.aggregate_type == "card",
+            DomainEvent.aggregate_id == card.id,
+        ).order_by(DomainEvent.id)
+    )).all())
+    assert [event.event_type for event in events] == [
+        "card.added_to_box",
+        "card.shipment_handed_over",
+        "card.shipment_received",
+        "card.shipment_handed_over",
+        "card.shipment_received",
+    ]
