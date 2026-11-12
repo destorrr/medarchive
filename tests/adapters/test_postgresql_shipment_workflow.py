@@ -36,22 +36,22 @@ async def pg_session():
 async def seed_locations(session):
     branch_id = uuid.uuid4()
     branch = Branch(id=branch_id, code=f"T-{branch_id.hex[:10]}", name="Test branch")
-    branch_location = Location(kind="branch", branch_id=branch_id, name="Test branch")
-    archive_location = Location(kind="archive", branch_id=None, name="Archive")
-    central_location = Location(kind="central_office", branch_id=None, name="Central office")
+    branch_location = Location(kind="branch", branch_id=branch_id, name="Test branch", is_active=True)
+    archive_location = Location(kind="archive", branch_id=None, name="Archive", is_active=True)
+    central_location = Location(kind="central_office", branch_id=None, name="Central office", is_active=True)
     branch_user = User(
         username=f"branch-{uuid.uuid4().hex}", password_hash="x",
-        full_name="Branch user", role="branch", branch_id=branch_id,
+        full_name="Branch user", role="branch", branch_id=branch_id, is_active=True,
     )
     archive_user = User(
         username=f"archive-{uuid.uuid4().hex}", password_hash="x",
-        full_name="Archive user", role="archive", branch_id=None,
+        full_name="Archive user", role="archive", branch_id=None, is_active=True,
     )
     central_user = User(
         username=f"central-{uuid.uuid4().hex}", password_hash="x",
-        full_name="Central user", role="central_office", branch_id=None,
+        full_name="Central user", role="central_office", branch_id=None, is_active=True,
     )
-    courier = Courier(full_name="Test courier")
+    courier = Courier(full_name="Test courier", is_active=True)
     session.add_all([
         branch, branch_location, archive_location, central_location,
         branch_user, archive_user, central_user, courier,
@@ -70,7 +70,7 @@ async def test_branch_box_shipment_is_handed_over_and_received_atomically(pg_ses
     card = Card(
         card_number=f"C-{uuid.uuid4().hex}", full_name="Test patient",
         date_of_birth=__import__("datetime").date(1980, 1, 1),
-        origin_branch_id=branch.id, current_location_id=branch_loc.id,
+        origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active",
     )
     pg_session.add(card)
     await pg_session.flush()
@@ -121,7 +121,7 @@ async def test_archive_to_central_requires_request_and_completes_it_on_receipt(p
     card = Card(
         card_number=f"C-{uuid.uuid4().hex}", full_name="Requested patient",
         date_of_birth=__import__("datetime").date(1975, 2, 3),
-        origin_branch_id=branch.id, current_location_id=archive_loc.id,
+        origin_branch_id=branch.id, current_location_id=archive_loc.id, status="active",
     )
     pg_session.add(card)
     await pg_session.flush()
@@ -157,7 +157,7 @@ async def test_archive_cannot_send_unrequested_card_to_central_office(pg_session
     card = Card(
         card_number=f"C-{uuid.uuid4().hex}", full_name="Unrequested patient",
         date_of_birth=__import__("datetime").date(1990, 4, 5),
-        origin_branch_id=branch.id, current_location_id=archive_loc.id,
+        origin_branch_id=branch.id, current_location_id=archive_loc.id, status="active",
     )
     pg_session.add(card)
     await pg_session.flush()
@@ -187,7 +187,7 @@ async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_
         Card(
             card_number=f"C-{uuid.uuid4().hex}", full_name=f"Requested patient {n}",
             date_of_birth=__import__("datetime").date(1980 + n, 1, 1),
-            origin_branch_id=branch.id, current_location_id=archive_loc.id,
+            origin_branch_id=branch.id, current_location_id=archive_loc.id, status="active",
         )
         for n in (1, 2)
     ]
@@ -247,7 +247,7 @@ async def test_admin_cannot_perform_ordinary_logistics(pg_session):
     ) = await seed_locations(pg_session)
     admin = User(
         username=f"admin-{uuid.uuid4().hex}", password_hash="x",
-        full_name="Administrator", role="admin", branch_id=None,
+        full_name="Administrator", role="admin", branch_id=None, is_active=True,
     )
     pg_session.add(admin)
     await pg_session.flush()
@@ -269,11 +269,11 @@ async def test_receipt_is_blocked_without_changing_transit_state_when_box_manife
     card = Card(
         card_number=f"C-{uuid.uuid4().hex}", full_name="Mismatch patient",
         date_of_birth=__import__("datetime").date(1988, 6, 7),
-        origin_branch_id=branch.id, current_location_id=branch_loc.id,
+        origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active",
     )
     box = Box(
         box_number=f"BX-{uuid.uuid4().hex[:16]}",
-        current_location_id=branch_loc.id, created_by=branch_user.id,
+        current_location_id=branch_loc.id, status="active", created_by=branch_user.id,
     )
     pg_session.add_all([card, box])
     await pg_session.flush()
