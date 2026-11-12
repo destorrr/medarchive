@@ -801,3 +801,59 @@ async def test_admin_service_rejects_deactivating_shelf_with_active_card_placeme
         await outer_transaction.rollback()
         await connection.close()
         await database.close()
+
+@pytest.mark.asyncio
+async def test_admin_service_rejects_deactivating_branch_with_remaining_card_inventory():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+
+    database = Database(DATABASE_URL)
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    try:
+        async with session.begin():
+            branch = Branch(
+                code=f"INV-{uuid.uuid4().hex[:10]}",
+                name="Inventory guard branch",
+                is_active=True,
+            )
+            session.add(branch)
+            await session.flush()
+            location = Location(
+                kind="branch",
+                branch_id=branch.id,
+                name=branch.name,
+                is_active=True,
+            )
+            session.add(location)
+            await session.flush()
+            card = Card(
+                card_number=f"INV-{uuid.uuid4().hex[:12]}",
+                full_name="Inventory Guard Patient",
+                date_of_birth=date(1980, 1, 1),
+                origin_branch_id=branch.id,
+                current_location_id=location.id,
+                current_shipment_id=None,
+            )
+            session.add(card)
+            await session.flush()
+
+            with pytest.raises(ValueError, match="на его балансе остаются карты или коробки"):
+                await PostgreSQLAdminService(session).set_branch_active(
+                    branch.id, False
+                )
+            assert branch.is_active is True
+            assert location.is_active is True
+    finally:
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
+        await database.close()
