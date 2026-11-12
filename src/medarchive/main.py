@@ -82,17 +82,15 @@ def create_app(config: Config | None = None) -> FastAPI:
                 return RedirectResponse(url="/login", status_code=303)
             return HTMLResponse("<h1>МедАрхив</h1><p>Дашборд появится в Task 7.</p>")
 
-    # PostgreSQL administration API is enabled only with PostgreSQL authentication.
+    # PostgreSQL and legacy SQLite administration are separate UI/API stacks.
     if config.auth_backend == "postgresql":
         from medarchive.routers.postgresql_admin import router as pg_admin_router
+        from medarchive.routers.postgresql_admin_pages import router as pg_admin_pages_router
         app.include_router(pg_admin_router)
-
-    # Admin router (Этап 4: справочники)
-    try:
+        app.include_router(pg_admin_pages_router)
+    else:
         from medarchive.routers.admin import router as admin_router
         app.include_router(admin_router)
-    except ImportError:
-        pass
 
     # Transfer router (Task 5)
     try:
