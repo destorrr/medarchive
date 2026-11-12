@@ -110,13 +110,37 @@ async def receive_page(
                     )
                 ) or 0
             )
-            card_count = int(
-                await session.scalar(
-                    select(func.count()).select_from(ShipmentCard).where(
-                        ShipmentCard.shipment_id == shipment.id
-                    )
-                ) or 0
-            )
+            manifest_rows = (
+                await session.execute(
+                    select(ShipmentCard, Card)
+                    .join(Card, Card.id == ShipmentCard.card_id)
+                    .where(ShipmentCard.shipment_id == shipment.id)
+                    .order_by(Card.card_number)
+                )
+            ).all()
+            card_count = len(manifest_rows)
+            boxes = list((
+                await session.scalars(
+                    select(Box)
+                    .join(ShipmentBox, ShipmentBox.box_id == Box.id)
+                    .where(ShipmentBox.shipment_id == shipment.id)
+                    .order_by(Box.box_number)
+                )
+            ).all())
+            manifest_boxes = []
+            for box in boxes:
+                members = [
+                    {"card_number": card.card_number, "full_name": card.full_name}
+                    for row, card in manifest_rows if row.box_id == box.id
+                ]
+                manifest_boxes.append({
+                    "box_number": box.box_number,
+                    "cards": members,
+                })
+            standalone_cards = [
+                {"card_number": card.card_number, "full_name": card.full_name}
+                for row, card in manifest_rows if row.box_id is None
+            ]
             incoming.append({
                 "id": shipment.id,
                 "number": shipment.shipment_number,
@@ -125,6 +149,8 @@ async def receive_page(
                 "handed_over_at": shipment.handed_over_at,
                 "box_count": box_count,
                 "card_count": card_count,
+                "boxes": manifest_boxes,
+                "standalone_cards": standalone_cards,
             })
     return await _render_page(
         request, user, session, "postgresql_receive.html",
