@@ -165,6 +165,47 @@ class PostgreSQLShipmentWorkflow:
             "box_id": str(box.id), "location_id": str(location.id),
         })
 
+    async def remove_card_from_box(
+        self, *, box_id: uuid.UUID, card_id: uuid.UUID, actor_id: uuid.UUID
+    ) -> None:
+        """Remove a card from the current box cycle without deleting history."""
+        actor = await self._active_user(actor_id)
+        box = await self.session.scalar(
+            select(Box).where(Box.id == box_id).with_for_update()
+        )
+        if box is None or box.status != "active" or box.current_location_id is None:
+            raise ShipmentWorkflowError("Коробка не найдена или недоступна")
+        location = await self._location(box.current_location_id)
+        await self._authorize_location(actor, location)
+        cycle = await self.session.scalar(
+            select(BoxCycle).where(
+                BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None)
+            ).with_for_update()
+        )
+        if cycle is None:
+            raise ShipmentWorkflowError("У коробки нет открытого цикла")
+        membership = await self.session.scalar(
+            select(BoxCardMembership).where(
+                BoxCardMembership.box_cycle_id == cycle.id,
+                BoxCardMembership.card_id == card_id,
+                BoxCardMembership.removed_at.is_(None),
+            ).with_for_update()
+        )
+        if membership is None:
+            raise ShipmentWorkflowError("Карта не числится в этой коробке")
+        card = await self.session.scalar(
+            select(Card).where(Card.id == card_id).with_for_update()
+        )
+        if card is None or card.current_location_id != location.id or card.current_shipment_id is not None:
+            raise ShipmentWorkflowError("Местонахождение карты не совпадает с коробкой")
+        now = datetime.now(timezone.utc)
+        membership.removed_at = now
+        membership.removed_by = actor.id
+        await self.session.flush()
+        await self._event("card.removed_from_box", "card", card.id, actor.id, {
+            "box_id": str(box.id), "location_id": str(location.id),
+        })
+
     async def create_draft(
         self,
         *,
