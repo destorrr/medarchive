@@ -35,6 +35,7 @@ class Branch(Base):
 class Location(Base):
     __tablename__ = "locations"
     __table_args__ = (
+        CheckConstraint("kind IN ('branch', 'central_office', 'archive')", name="ck_location_kind"),
         CheckConstraint(
             "(kind = 'branch' AND branch_id IS NOT NULL) OR (kind <> 'branch' AND branch_id IS NULL)",
             name="ck_location_branch_binding",
@@ -53,10 +54,13 @@ class Location(Base):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint(
-        "(role = 'branch' AND branch_id IS NOT NULL) OR (role <> 'branch' AND branch_id IS NULL)",
-        name="ck_user_branch_binding",
-    ),)
+    __table_args__ = (
+        CheckConstraint("role IN ('branch', 'central_office', 'archive', 'admin', 'viewer')", name="ck_user_role"),
+        CheckConstraint(
+            "(role = 'branch' AND branch_id IS NOT NULL) OR (role <> 'branch' AND branch_id IS NULL)",
+            name="ck_user_branch_binding",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     username: Mapped[str] = mapped_column(Text, unique=True)
@@ -82,6 +86,7 @@ class Courier(Base):
 class Card(Base):
     __tablename__ = "cards"
     __table_args__ = (
+        CheckConstraint("status IN ('active', 'inactive', 'under_review')", name="ck_card_status"),
         CheckConstraint(
             "(current_location_id IS NOT NULL AND current_shipment_id IS NULL) OR "
             "(current_location_id IS NULL AND current_shipment_id IS NOT NULL)",
@@ -93,6 +98,7 @@ class Card(Base):
         ),
         Index("ix_cards_current_location", "current_location_id"),
         Index("ix_cards_current_shipment", "current_shipment_id"),
+        Index("ix_cards_full_name", text("to_tsvector('simple', full_name)"), postgresql_using="gin"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
@@ -112,6 +118,7 @@ class Card(Base):
 class Box(Base):
     __tablename__ = "boxes"
     __table_args__ = (
+        CheckConstraint("status IN ('active', 'written_off', 'under_review')", name="ck_box_status"),
         CheckConstraint(
             "(current_location_id IS NOT NULL AND current_shipment_id IS NULL) OR "
             "(current_location_id IS NULL AND current_shipment_id IS NOT NULL)",
@@ -172,6 +179,10 @@ class BoxCardMembership(Base):
 class Shipment(Base):
     __tablename__ = "shipments"
     __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'in_transit', 'received', 'exception', 'cancelled')",
+            name="ck_shipment_status",
+        ),
         CheckConstraint("from_location_id <> to_location_id", name="ck_shipment_distinct_locations"),
         CheckConstraint(
             "(status IN ('draft', 'cancelled') AND handed_over_at IS NULL) OR "
