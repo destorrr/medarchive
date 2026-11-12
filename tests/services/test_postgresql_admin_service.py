@@ -54,3 +54,13 @@ def test_postgresql_admin_routes_are_registered():
     paths = set(app.openapi()["paths"])
     assert "/api/admin/branches" in paths
     assert "/api/admin/users" in paths
+    assert "/admin" in paths
+    assert "/admin/branches" in paths
+    assert "/admin/users" in paths
+
+
+def test_user_update_preserves_active_status_when_omitted():
+    from medarchive.routers.postgresql_admin import UserUpdateInput
+
+    payload = UserUpdateInput(full_name="Иванов Иван", role="admin")
+    assert payload.is_active is None
