@@ -264,3 +264,53 @@ async def test_admin_cannot_perform_ordinary_logistics(pg_session):
             from_location_id=branch_loc.id, to_location_id=archive_loc.id,
             courier_id=courier.id, issued_by=admin.id,
         )
+
+
+@pytest.mark.asyncio
+async def test_receipt_is_blocked_without_changing_transit_state_when_box_manifest_differs(pg_session):
+    (
+        branch, branch_loc, archive_loc, _central_loc,
+        branch_user, archive_user, _central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Mismatch patient",
+        date_of_birth=__import__("datetime").date(1988, 6, 7),
+        origin_branch_id=branch.id, current_location_id=branch_loc.id,
+    )
+    box = Box(
+        box_number=f"BX-{uuid.uuid4().hex[:16]}",
+        current_location_id=branch_loc.id, created_by=branch_user.id,
+    )
+    pg_session.add_all([card, box])
+    await pg_session.flush()
+    cycle = BoxCycle(box_id=box.id, cycle_number=1, started_by=branch_user.id)
+    pg_session.add(cycle)
+    await pg_session.flush()
+    membership = BoxCardMembership(
+        box_cycle_id=cycle.id, card_id=card.id, added_by=branch_user.id,
+    )
+    pg_session.add(membership)
+    await pg_session.flush()
+
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    shipment = await workflow.create_draft(
+        from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=branch_user.id,
+    )
+    await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=branch_user.id)
+    await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
+
+    # Simulate an inconsistent membership record; ordinary receipt must stop.
+    membership.removed_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    await pg_session.flush()
+    with pytest.raises(ShipmentWorkflowError, match="состав"):
+        await workflow.receive(shipment_id=shipment.id, actor_id=archive_user.id)
+
+    await pg_session.refresh(shipment)
+    await pg_session.refresh(box)
+    await pg_session.refresh(card)
+    assert shipment.status == "in_transit"
+    assert box.current_shipment_id == shipment.id
+    assert card.current_shipment_id == shipment.id
+    assert box.current_location_id is None
+    assert card.current_location_id is None
