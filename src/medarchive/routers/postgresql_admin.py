@@ -83,11 +83,9 @@ async def create_branch(
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except Exception as exc:
+    except IntegrityError as exc:
         await session.rollback()
-        if "unique" in str(exc).lower():
-            raise HTTPException(status_code=409, detail="Код филиала уже используется") from exc
-        raise
+        raise HTTPException(status_code=409, detail="Код филиала уже используется") from exc
 
 
 @router.put("/branches/{branch_id}")
@@ -108,6 +106,9 @@ async def update_branch(
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Код филиала уже используется") from exc
 
 
 @router.post("/branches/{branch_id}/deactivate")
