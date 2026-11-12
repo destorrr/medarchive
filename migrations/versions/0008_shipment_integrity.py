@@ -115,7 +115,7 @@ def upgrade() -> None:
     # from the shipment origin and arrives at its declared destination.
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_object_movement()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $func$
     DECLARE
         expected_location_id uuid;
     BEGIN
@@ -151,8 +151,7 @@ def upgrade() -> None:
         END IF;
         RETURN NEW;
     END;
-    $;
-    """)
+    $func$;    """)
     for table in ("cards", "boxes"):
         op.execute(f"""
         CREATE TRIGGER trg_{table}_movement_guard
@@ -166,7 +165,7 @@ def upgrade() -> None:
     # an UPDATE must resolve to a handed-over (or exceptional) shipment.
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_transit_object_insert()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $func$
     BEGIN
         IF NEW.current_shipment_id IS NOT NULL THEN
             RAISE EXCEPTION 'Нельзя создавать объект сразу в составе отправления'
@@ -174,8 +173,7 @@ def upgrade() -> None:
         END IF;
         RETURN NEW;
     END;
-    $;
-    """)
+    $func$;    """)
     for table in ("cards", "boxes"):
         op.execute(f"""
         CREATE TRIGGER trg_{table}_transit_insert_guard
@@ -185,7 +183,7 @@ def upgrade() -> None:
 
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_current_shipment_status()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $func$
     DECLARE
         shipment_status text;
     BEGIN
@@ -201,8 +199,7 @@ def upgrade() -> None:
         END IF;
         RETURN NULL;
     END;
-    $;
-    """)
+    $func$;    """)
     for table in ("cards", "boxes"):
         op.execute(f"""
         CREATE CONSTRAINT TRIGGER trg_{table}_current_shipment_status
