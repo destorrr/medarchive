@@ -208,17 +208,22 @@ async def test_archive_issues_standalone_cards_and_central_office_boxes_them_for
     await pg_session.flush()
 
     workflow = PostgreSQLShipmentWorkflow(pg_session)
-    with pytest.raises(ShipmentWorkflowError, match="не формирует коробки"):
-        await workflow.create_box(
-            location_id=archive_loc.id, actor_id=archive_user.id,
-            card_ids=[card.id for card in cards],
-        )
-
+    archive_box = await workflow.create_box(
+        location_id=archive_loc.id, actor_id=archive_user.id,
+        card_ids=[card.id for card in cards],
+    )
     outbound = await workflow.create_draft(
         from_location_id=archive_loc.id, to_location_id=central_loc.id,
         courier_id=courier.id, issued_by=archive_user.id,
     )
+    with pytest.raises(ShipmentWorkflowError, match="только отдельные карты"):
+        await workflow.add_box(
+            shipment_id=outbound.id, box_id=archive_box.id, actor_id=archive_user.id,
+        )
     for card in cards:
+        await workflow.remove_card_from_box(
+            box_id=archive_box.id, card_id=card.id, actor_id=archive_user.id,
+        )
         await workflow.add_standalone_card(
             shipment_id=outbound.id, card_id=card.id, actor_id=archive_user.id,
         )
