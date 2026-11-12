@@ -66,12 +66,14 @@ class PostgreSQLCardIntakeService:
             )
         if actor.branch_id is None:
             raise CardIntakeError("К учётной записи не привязан филиал")
+        # Serialize card registration with branch deactivation and all
+        # logistics workflows that mutate this location's inventory.
         location = await self.session.scalar(
             select(Location).where(
                 Location.kind == "branch",
                 Location.branch_id == actor.branch_id,
                 Location.is_active.is_(True),
-            )
+            ).with_for_update()
         )
         if location is None:
             raise CardIntakeError("Для филиала не настроено активное место хранения")
