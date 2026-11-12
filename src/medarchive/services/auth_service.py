@@ -17,11 +17,15 @@ class AuthService:
     def verify_password(self, password: str, password_hash: str) -> bool:
         return pwd_context.verify(password, password_hash)
 
-    def create_session_token(self, user: User) -> str:
+    def create_session_token(self, user) -> str:
+        # SQLite IDs remain integers; target PostgreSQL UUIDs are serialized as strings.
+        user_id = user.id
+        if not isinstance(user_id, (str, int)):
+            user_id = str(user_id)
         payload = {
-            "user_id": user.id,
+            "user_id": user_id,
             "username": user.username,
-            "role": user.role.value,
+            "role": user.role.value if hasattr(user.role, "value") else user.role,
         }
         return self._serializer.dumps(payload)
 
