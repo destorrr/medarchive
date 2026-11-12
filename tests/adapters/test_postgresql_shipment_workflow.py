@@ -154,6 +154,11 @@ async def test_archive_to_central_requires_request_and_completes_it_on_receipt(p
     assert request.status == "completed"
     assert request.fulfilled_by == central_user.id
 
+    with pytest.raises(DBAPIError):
+        async with pg_session.begin_nested():
+            request.fulfilled_by = archive_user.id
+            await pg_session.flush()
+
 
 @pytest.mark.asyncio
 async def test_archive_cannot_send_unrequested_card_to_central_office(pg_session):
@@ -351,6 +356,13 @@ async def test_database_freezes_route_and_manifest_after_handover(pg_session):
         async with pg_session.begin_nested():
             shipment.to_location_id = central_loc.id
             shipment.courier_id = another_courier.id
+            await pg_session.flush()
+
+    with pytest.raises(DBAPIError):
+        async with pg_session.begin_nested():
+            shipment.handed_over_at = __import__("datetime").datetime.now(
+                __import__("datetime").timezone.utc
+            )
             await pg_session.flush()
 
     with pytest.raises(DBAPIError):
