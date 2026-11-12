@@ -89,7 +89,7 @@ def upgrade() -> None:
 
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_card_external_custody_update()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $$
     DECLARE
         location_kind text;
     BEGIN
@@ -113,7 +113,7 @@ def upgrade() -> None:
         END IF;
         RETURN NEW;
     END;
-    $;
+    $$;
     """)
     op.execute("""
     CREATE TRIGGER trg_card_external_custody_update
@@ -125,7 +125,7 @@ def upgrade() -> None:
     # manifest row was already inserted.
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_archive_central_route_manifest()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
         IF EXISTS (
             SELECT 1 FROM locations src, locations dst
@@ -143,7 +143,7 @@ def upgrade() -> None:
         END IF;
         RETURN NEW;
     END;
-    $;
+    $$;
     """)
     op.execute("""
     CREATE TRIGGER trg_archive_central_route_manifest_guard
