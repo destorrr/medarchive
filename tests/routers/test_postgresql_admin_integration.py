@@ -241,6 +241,7 @@ async def test_admin_service_rejects_deactivating_branch_with_active_employee():
                 )
                 if location is not None:
                     await session.delete(location)
+                    await session.flush()
                 branch = await session.get(Branch, branch_id)
                 if branch is not None:
                     await session.delete(branch)
