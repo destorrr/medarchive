@@ -13,7 +13,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from medarchive.adapters.postgresql.models import ArchiveShelf, Box, BoxPlacement, Branch, Courier, Location, User
+from medarchive.adapters.postgresql.models import (
+    ArchiveShelf, Box, BoxCardMembership, BoxCycle, BoxPlacement, Branch,
+    Card, CardPlacement, Courier, Location, User,
+)
 from medarchive.config import Config
 from medarchive.dependencies import get_pg_database
 from medarchive.main import create_app
@@ -507,6 +510,46 @@ async def test_shelf_with_active_box_placement_cannot_be_deactivated():
             session.add(box)
             await session.flush()
             box_id = box.id
+
+            card = Card(
+                card_number=f"SG-CARD-{uuid.uuid4().hex[:10]}",
+                full_name="Shelf Guard Box Patient",
+                date_of_birth=date(1980, 1, 1),
+                origin_branch_id=uuid.uuid4(),
+                current_location_id=archive.id,
+                current_shipment_id=None,
+                created_by=actor.id,
+            )
+            # Use the branch that owns a valid origin location for the card.
+            origin_branch = await session.scalar(
+                select(Branch).limit(1)
+            )
+            if origin_branch is None:
+                origin_branch = Branch(
+                    code=f"SG-BR-{uuid.uuid4().hex[:8]}",
+                    name="Shelf Guard Origin",
+                    is_active=True,
+                )
+                session.add(origin_branch)
+                await session.flush()
+                origin_location = Location(
+                    kind="branch", branch_id=origin_branch.id,
+                    name=origin_branch.name, is_active=True,
+                )
+                session.add(origin_location)
+                await session.flush()
+            card.origin_branch_id = origin_branch.id
+            session.add(card)
+            await session.flush()
+            cycle = BoxCycle(
+                box_id=box.id, cycle_number=1, started_by=actor.id
+            )
+            session.add(cycle)
+            await session.flush()
+            session.add(BoxCardMembership(
+                box_cycle_id=cycle.id, card_id=card.id, added_by=actor.id
+            ))
+            await session.flush()
 
             await PostgreSQLArchiveWorkflow(session).place_box(
                 box_id=box.id, shelf_id=shelf.id, actor_id=actor.id
