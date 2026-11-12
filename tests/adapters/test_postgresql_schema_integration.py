@@ -1,5 +1,8 @@
 """Read-only contract checks against the PostgreSQL schema created by Alembic."""
 import os
+import uuid
+
+from sqlalchemy.exc import IntegrityError
 
 import pytest
 from sqlalchemy import text
@@ -75,5 +78,150 @@ async def test_migrated_schema_contains_required_checks_and_logistics_indexes():
             "ix_domain_events_aggregate",
             "ix_domain_events_occurred_at",
         } <= index_names
+    finally:
+        await engine.dispose()
+
+
+
+async def _seed_transit_card(connection):
+    branch_id, branch_location_id, central_location_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    user_id, courier_id, card_id, shipment_id = (uuid.uuid4() for _ in range(4))
+
+    await connection.execute(
+        text("INSERT INTO branches (id, code, name) VALUES (:id, :code, 'Test branch')"),
+        {"id": branch_id, "code": f"IT-{branch_id.hex[:10]}"},
+    )
+    await connection.execute(
+        text(
+            """
+            INSERT INTO locations (id, kind, branch_id, name)
+            VALUES (:branch_location, 'branch', :branch_id, 'Test branch'),
+                   (:central_location, 'central_office', NULL, 'Test central office')
+            """
+        ),
+        {
+            "branch_location": branch_location_id,
+            "branch_id": branch_id,
+            "central_location": central_location_id,
+        },
+    )
+    await connection.execute(
+        text(
+            """
+            INSERT INTO users (id, username, password_hash, full_name, role)
+            VALUES (:id, :username, 'test-hash', 'Integration Test', 'admin')
+            """
+        ),
+        {"id": user_id, "username": f"it-{user_id.hex}"},
+    )
+    await connection.execute(
+        text("INSERT INTO couriers (id, full_name) VALUES (:id, 'Test courier')"),
+        {"id": courier_id},
+    )
+    await connection.execute(
+        text(
+            """
+            INSERT INTO cards
+                (id, card_number, full_name, date_of_birth, origin_branch_id, current_location_id)
+            VALUES (:id, :number, 'Test Patient', DATE '1980-01-01', :branch_id, :location_id)
+            """
+        ),
+        {
+            "id": card_id,
+            "number": f"IT-{card_id.hex}",
+            "branch_id": branch_id,
+            "location_id": branch_location_id,
+        },
+    )
+    await connection.execute(
+        text(
+            """
+            INSERT INTO shipments
+                (id, from_location_id, to_location_id, courier_id, status, issued_by, handed_over_at)
+            VALUES (:id, :source, :target, :courier, 'in_transit', :actor, now())
+            """
+        ),
+        {
+            "id": shipment_id,
+            "source": branch_location_id,
+            "target": central_location_id,
+            "courier": courier_id,
+            "actor": user_id,
+        },
+    )
+    return card_id, shipment_id
+
+
+@pytest.mark.asyncio
+async def test_postgresql_accepts_transit_card_only_with_matching_manifest_row():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                card_id, shipment_id = await _seed_transit_card(connection)
+                await connection.execute(
+                    text(
+                        """
+                        INSERT INTO shipment_cards (shipment_id, card_id, box_id)
+                        VALUES (:shipment_id, :card_id, NULL)
+                        """
+                    ),
+                    {"shipment_id": shipment_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text(
+                        """
+                        UPDATE cards
+                        SET current_location_id = NULL, current_shipment_id = :shipment_id
+                        WHERE id = :card_id
+                        """
+                    ),
+                    {"shipment_id": shipment_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text("SET CONSTRAINTS fk_card_current_shipment, fk_card_shipment_manifest IMMEDIATE")
+                )
+                result = await connection.execute(
+                    text("SELECT current_shipment_id FROM cards WHERE id = :id"),
+                    {"id": card_id},
+                )
+                assert result.scalar_one() == shipment_id
+            finally:
+                await transaction.rollback()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_postgresql_rejects_transit_card_without_manifest_row():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                card_id, shipment_id = await _seed_transit_card(connection)
+                await connection.execute(
+                    text(
+                        """
+                        UPDATE cards
+                        SET current_location_id = NULL, current_shipment_id = :shipment_id
+                        WHERE id = :card_id
+                        """
+                    ),
+                    {"shipment_id": shipment_id, "card_id": card_id},
+                )
+                with pytest.raises(IntegrityError):
+                    await connection.execute(
+                        text("SET CONSTRAINTS fk_card_shipment_manifest IMMEDIATE")
+                    )
+            finally:
+                await transaction.rollback()
     finally:
         await engine.dispose()
