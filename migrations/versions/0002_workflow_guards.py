@@ -25,7 +25,7 @@ def upgrade() -> None:
 
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_shipment_update()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $$
     DECLARE
         source_kind text;
         target_kind text;
