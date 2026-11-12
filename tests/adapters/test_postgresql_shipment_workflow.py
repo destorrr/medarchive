@@ -605,3 +605,43 @@ async def test_central_office_external_custody_keeps_card_on_balance_and_blocks_
     ]
     assert events[0].payload["organization"] == "Районный суд"
     assert events[1].payload["previous_external_custody"]["comment"] == "Дело № 123/2026"
+
+
+@pytest.mark.asyncio
+async def test_central_office_external_custody_uses_at_other_and_returns_to_balance(pg_session):
+    (
+        branch, _branch_loc, _archive_loc, central_loc,
+        _branch_user, _archive_user, central_user, _courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}",
+        full_name="External custody patient",
+        date_of_birth=__import__("datetime").date(1987, 7, 9),
+        origin_branch_id=branch.id,
+        current_location_id=central_loc.id,
+        status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+
+    workflow = PostgreSQLCardCustodyWorkflow(pg_session)
+    await workflow.mark_external(
+        card_id=card.id,
+        actor_id=central_user.id,
+        custody_status="at_other",
+        organization="Внешняя организация",
+        comment="Временная передача",
+    )
+    await pg_session.refresh(card)
+    assert card.custody_status == "at_other"
+    assert card.current_location_id == central_loc.id
+    assert card.external_organization == "Внешняя организация"
+
+    await workflow.return_to_central_office(
+        card_id=card.id, actor_id=central_user.id, comment="Возвращена"
+    )
+    await pg_session.refresh(card)
+    assert card.custody_status == "available"
+    assert card.current_location_id == central_loc.id
+    assert card.external_organization is None
+    assert card.external_since is None
