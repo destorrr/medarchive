@@ -196,7 +196,7 @@ async def central_packing_page(
     session: AsyncSession = Depends(get_pg_session),
 ):
     location = await _central_location(session)
-    boxes, cards = [], []
+    boxes, cards, box_items = [], [], []
     if location is not None:
         boxes = list((
             await session.scalars(
@@ -228,16 +228,30 @@ async def central_packing_page(
                 ).order_by(Card.card_number)
             )
         ).all())
+        for box in boxes:
+            box_cards = list((
+                await session.scalars(
+                    select(Card)
+                    .join(BoxCardMembership, BoxCardMembership.card_id == Card.id)
+                    .join(BoxCycle, BoxCycle.id == BoxCardMembership.box_cycle_id)
+                    .where(
+                        BoxCycle.box_id == box.id,
+                        BoxCycle.ended_at.is_(None),
+                        BoxCardMembership.removed_at.is_(None),
+                    ).order_by(Card.card_number)
+                )
+            ).all())
+            box_items.append({"box": box, "cards": box_cards})
     return await _render(
         request, user, session, "postgresql_central_packing.html",
-        boxes=boxes, cards=cards, error=error, success=message,
+        boxes=boxes, cards=cards, box_items=box_items, error=error, success=message,
     )
 
 
 @router.post("/central/packing/new-box")
 async def central_create_box(
     request: Request,
-    card_ids: list[uuid.UUID] = Form(...),
+    card_ids: list[uuid.UUID] = Form(default=[]),
     user: User = Depends(central_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
