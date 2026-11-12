@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.dependencies import get_auth, get_pg_session, require_pg_role
@@ -18,6 +18,14 @@ admin_only = require_pg_role("admin")
 class BranchInput(BaseModel):
     code: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=255)
+
+    @field_validator("code", "name")
+    @classmethod
+    def reject_blank_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Поле не должно быть пустым")
+        return value
 
 
 class UserCreateInput(BaseModel):
