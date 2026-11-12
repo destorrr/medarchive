@@ -309,8 +309,12 @@ class PostgreSQLShipmentWorkflow:
         card = await self.session.scalar(
             select(Card).where(Card.id == card_id).with_for_update()
         )
-        if card is None or card.status != "active" or card.custody_status != "available":
-            raise ShipmentWorkflowError("Карта не найдена, находится во внешней организации или недоступна для отправки")
+        if card is not None and card.custody_status != "available":
+            raise ShipmentWorkflowError(
+                "Карта передана во внешнюю организацию и недоступна для внутреннего перемещения"
+            )
+        if card is None or card.status != "active":
+            raise ShipmentWorkflowError("Карта не найдена или недоступна для отправки")
         if card.current_location_id != shipment.from_location_id or card.current_shipment_id is not None:
             raise ShipmentWorkflowError("Карта не находится в месте отправления")
         membership = await self._active_membership(card.id)
