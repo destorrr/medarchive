@@ -78,3 +78,9 @@ The PostgreSQLArchiveWorkflow provides transaction-scoped use cases for bulk req
 Use one Database.transaction() around each service operation. These services do not commit independently. Database triggers are defensive integrity guards; role/location authorization remains in the application service and must be retained when the FastAPI dependencies and routers are migrated.
 
 The guard migration is intentionally irreversible in the same way as the initial schema revision. For local development, recreate the disposable PostgreSQL database if you need to reset the complete schema.
+ 
+## Individual archive card storage (0003)
+
+A card can return to the archive as a standalone item, not only inside a box. The card_placements table therefore records an individual card's shelf history separately from box_placements. Archive staff can place and retrieve individual cards; a card must be removed from its shelf before it can be packed into a box or included in an outbound shipment. Conversely, cards inside a box cannot also have individual shelf placements.
+
+When the last active card is removed from a box, its usage cycle is closed. Reusing that physical box starts the next numbered cycle; previous membership rows and cycle records remain intact.
