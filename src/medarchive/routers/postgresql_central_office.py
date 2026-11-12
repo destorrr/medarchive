@@ -425,7 +425,7 @@ async def central_transfer_page(
 @router.post("/central/transfer/confirm")
 async def central_transfer_confirm(
     request: Request,
-    box_id: uuid.UUID | None = Form(None),
+    box_id: str = Form(""),
     card_ids: list[uuid.UUID] = Form(default=[]),
     to_location_id: uuid.UUID = Form(...),
     courier_id: uuid.UUID = Form(...),
@@ -436,7 +436,8 @@ async def central_transfer_confirm(
         source = await _central_location(session)
         if source is None:
             raise ValueError("Локация центрального офиса не настроена")
-        if box_id is None and not card_ids:
+        selected_box_id = uuid.UUID(box_id) if box_id.strip() else None
+        if selected_box_id is None and not card_ids:
             raise ValueError("Выберите коробку или хотя бы одну отдельную карту")
         workflow = PostgreSQLShipmentWorkflow(session)
         shipment = await workflow.create_draft(
@@ -445,9 +446,9 @@ async def central_transfer_confirm(
             courier_id=courier_id,
             issued_by=user.id,
         )
-        if box_id is not None:
+        if selected_box_id is not None:
             await workflow.add_box(
-                shipment_id=shipment.id, box_id=box_id, actor_id=user.id
+                shipment_id=shipment.id, box_id=selected_box_id, actor_id=user.id
             )
         for card_id in card_ids:
             await workflow.add_standalone_card(
