@@ -1,28 +1,47 @@
 """Зависимости FastAPI: БД, текущий пользователь, проверка ролей."""
 from fastapi import Request, HTTPException, Depends
 from medarchive.config import Config
-from medarchive.adapters.sqlite.database import Database
+from medarchive.adapters.sqlite.database import Database as SQLiteDatabase
+from medarchive.adapters.postgresql.database import Database as PostgreSQLDatabase
 from medarchive.services.auth_service import AuthService
 from medarchive.domain.models import User
 from medarchive.domain.statuses import UserRole
 
-_db: Database | None = None
+_db: SQLiteDatabase | None = None
+_pg_db: PostgreSQLDatabase | None = None
 _auth: AuthService | None = None
 
 
 def init_dependencies(config: Config) -> None:
-    global _db, _auth
-    _db = Database(config)
+    global _db, _pg_db, _auth
+    _db = SQLiteDatabase(config)
+    _pg_db = PostgreSQLDatabase(config.effective_database_url) if config.postgres_enabled else None
     _auth = AuthService(secret_key=config.effective_secret_key)
 
 
-async def get_db() -> Database:
+async def get_db() -> SQLiteDatabase:
     if _db is None:
         raise RuntimeError("Dependencies not initialized. Call init_dependencies first.")
     # Идемпотентная инициализация: подключаемся при первом обращении,
     # даже если startup-событие ещё не отработало (например, в тестах).
     await _db.init()
     return _db
+
+
+async def get_pg_database() -> PostgreSQLDatabase:
+    """Return the PostgreSQL pool when the staged adapter is enabled."""
+    if _pg_db is None:
+        raise RuntimeError(
+            "PostgreSQL adapter is disabled. Set MEDARCHIVE_POSTGRES_ENABLED=true."
+        )
+    return _pg_db
+
+
+async def get_pg_session():
+    """Provide a PostgreSQL session; business services own transaction boundaries."""
+    db = await get_pg_database()
+    async with db.session_factory() as session:
+        yield session
 
 
 def get_auth() -> AuthService:
