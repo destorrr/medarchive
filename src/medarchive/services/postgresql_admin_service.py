@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
@@ -183,6 +183,7 @@ class PostgreSQLAdminService:
         self, *, username: str, full_name: str, password_hash: str,
         role: str, branch_id: uuid.UUID | None,
     ) -> User:
+        await self.session.execute(text("SELECT pg_advisory_xact_lock(741928363)"))
         username, full_name = username.strip().lower(), full_name.strip()
         self._validate_user_fields(username, full_name, role, branch_id)
         if await self.users.get_by_username(username):
@@ -201,6 +202,10 @@ class PostgreSQLAdminService:
         branch_id: uuid.UUID | None, password_hash: str | None = None,
         is_active: bool | None = None,
     ) -> User:
+        # Acquire the shared user-mutation lock before any row lock. This gives
+        # concurrent administrator role changes a consistent lock order and
+        # prevents deadlocks while checking that one active admin remains.
+        await self.session.execute(text("SELECT pg_advisory_xact_lock(741928363)"))
         user = await self.session.get(User, user_id, with_for_update=True)
         if user is None:
             raise LookupError("Пользователь не найден")
