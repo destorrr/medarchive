@@ -45,7 +45,7 @@ The ORM metadata is not yet connected to Alembic autogenerate. The initial SQL r
 
 The composite manifest foreign keys encode an important invariant: an object's `current_shipment_id` must refer to a manifest row for that exact card or box; a card transported inside a box must reference a `shipment_boxes` row for the same shipment. The partial unique index on active box membership prevents one card from being active in two boxes.
 
-These relational constraints do **not** yet enforce all workflow rules. Before enabling shipment operations, PostgreSQL integration tests and deferred/guard triggers are still required for complete box manifests, location consistency of box contents, non-empty manifests, and immutability of shipment route/courier/manifest after handover. Whole-shipment acceptance and role/route authorization remain service-layer responsibilities.
+These relational constraints do **not** enforce all workflow rules. The first PostgreSQL shipment workflow is now implemented as a transaction-scoped service: it creates drafts, adds standalone cards and boxes, snapshots the active cards inside boxes at handover, validates archive-to-central requests, and atomically receives the complete manifest. PostgreSQL integration tests cover a branch-to-archive box cycle and archive-to-central request fulfillment. The workflow remains an isolated adapter/service foundation; FastAPI is not wired to it yet. Database guard triggers are still needed for manifest immutability and cross-row membership invariants against direct SQL or future service paths.
 
 
 ## ORM / DDL parity and PostgreSQL contract tests
