@@ -409,6 +409,11 @@ class PostgreSQLShipmentWorkflow:
         for card, box_id in boxed_cards:
             self.session.add(ShipmentCard(shipment_id=shipment.id, card_id=card.id, box_id=box_id))
 
+        # Persist the complete manifest while the shipment is still a draft.
+        # The deferred composite FKs permit the card/box transit pointers to be
+        # updated in the following flush, within this same outer transaction.
+        await self.session.flush()
+
         now = datetime.now(timezone.utc)
         for box in boxes:
             box.current_location_id = None
