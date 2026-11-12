@@ -329,6 +329,8 @@ async def test_database_freezes_route_and_manifest_after_handover(pg_session):
         shipment_id=shipment.id, card_id=card.id, actor_id=branch_user.id,
     )
     await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
+    shipment_id = shipment.id
+    card_id = card.id
 
     with pytest.raises(DBAPIError):
         async with pg_session.begin_nested():
@@ -339,14 +341,14 @@ async def test_database_freezes_route_and_manifest_after_handover(pg_session):
     with pytest.raises(DBAPIError):
         async with pg_session.begin_nested():
             pg_session.add(ShipmentCard(
-                shipment_id=shipment.id, card_id=card.id, box_id=None,
+                shipment_id=shipment_id, card_id=card_id, box_id=None,
             ))
             await pg_session.flush()
 
     event = await pg_session.scalar(
         select(DomainEvent).where(
             DomainEvent.aggregate_type == "shipment",
-            DomainEvent.aggregate_id == shipment.id,
+            DomainEvent.aggregate_id == shipment_id,
         ).limit(1)
     )
     with pytest.raises(DBAPIError):
