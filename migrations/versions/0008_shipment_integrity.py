@@ -48,6 +48,16 @@ def upgrade() -> None:
         )
     """)
 
+    # The old composite UNIQUE index added no uniqueness because id is
+    # already the boxes primary key. Keep the useful lookup path, but model it
+    # honestly as a non-unique partial index.
+    op.execute("DROP INDEX IF EXISTS uq_box_one_active_shipment")
+    op.execute("""
+        CREATE INDEX ix_boxes_current_shipment
+        ON boxes(current_shipment_id)
+        WHERE current_shipment_id IS NOT NULL
+    """)
+
     # The current_shipment_id pointer is the authoritative indication that an
     # object is in transit. A pointer may be cleared only in the same transaction
     # that completes receipt of its previous shipment. This deferred check also
