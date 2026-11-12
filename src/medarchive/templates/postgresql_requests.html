@@ -10,7 +10,12 @@
             <thead><tr><th>Выбрать</th><th>№ карты</th><th>Пациент</th><th>Статус</th><th>Местонахождение / действие</th></tr></thead>
             <tbody>
             {% for item in requests %}<tr>
-                <td>{% if item.request.status == "new" %}<input type="checkbox" name="card_ids" value="{{ item.card.id }}" form="fulfill-form">{% else %}—{% endif %}</td>
+                <td>
+                    {% if item.request.status == "new" and not item.box and not item.card_placement %}
+                    <input type="checkbox" name="card_ids" value="{{ item.card.id }}" form="fulfill-form">
+                    {% elif item.request.status == "new" %}Сначала извлеките карту из коробки или снимите с полки
+                    {% else %}—{% endif %}
+                </td>
                 <td>{{ item.card.card_number }}</td><td>{{ item.card.full_name }}</td>
                 <td>{{ "Новая" if item.request.status == "new" else "Передана курьеру" }}</td>
                 <td>
