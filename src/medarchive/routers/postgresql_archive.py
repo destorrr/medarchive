@@ -209,6 +209,24 @@ async def placement_page(
     archive = await _archive_location(session)
     boxes, cards, shelves, box_items = [], [], [], []
     if archive is not None:
+        active_manifest_box = (
+            select(ShipmentBox.box_id)
+            .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
+            .where(
+                ShipmentBox.box_id == Box.id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .exists()
+        )
+        active_manifest_card = (
+            select(ShipmentCard.card_id)
+            .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+            .where(
+                ShipmentCard.card_id == Card.id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .exists()
+        )
         active_box_placement = select(BoxPlacement.id).where(
             BoxPlacement.box_id == Box.id, BoxPlacement.removed_at.is_(None)
         ).exists()
