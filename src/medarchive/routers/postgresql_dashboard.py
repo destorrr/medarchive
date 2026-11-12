@@ -292,7 +292,7 @@ def _card_status(card: Card, location_kind: str | None) -> tuple[str, str]:
         labels = {
             "at_court": ("В суде", "badge-pending_return"),
             "at_insurance": ("В страховой", "badge-pending_return"),
-            "at_external_organization": ("Во внешней организации", "badge-pending_return"),
+            "at_other": ("Во внешней организации", "badge-pending_return"),
         }
         return labels.get(card.custody_status, (card.custody_status, "badge-pending_return"))
     if card.current_shipment_id is not None:
