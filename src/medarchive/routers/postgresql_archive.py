@@ -289,7 +289,7 @@ async def placement_page(
 @router.post("/placement/new-internal-box")
 async def create_internal_box(
     request: Request,
-    card_ids: list[uuid.UUID] = Form(...),
+    card_ids: list[uuid.UUID] = Form(default=[]),
     user: User = Depends(archive_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
