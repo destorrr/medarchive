@@ -57,6 +57,7 @@ def _dashboard_context(request: Request, user: User, branch_name: str | None) ->
     menu_items = [{"url": "/dashboard", "label": "📊 Панель управления"}]
     if user.role == "branch":
         menu_items.append({"url": "/packing", "label": "📦 Упаковка коробки"})
+        menu_items.append({"url": "/transfer", "label": "🚚 Передача курьеру"})
     if user.role in {"archive", "viewer", "admin", "central_office"}:
         menu_items.append({"url": "/search", "label": "🔍 Поиск"})
     if user.role == "admin":
