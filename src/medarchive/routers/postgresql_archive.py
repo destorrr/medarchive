@@ -218,6 +218,7 @@ async def placement_page(
                     Box.current_location_id == archive.id,
                     Box.status == "active",
                     ~active_box_placement,
+                    ~active_manifest_box,
                 ).order_by(Box.box_number)
             )
         ).scalars().all()
@@ -243,6 +244,7 @@ async def placement_page(
                     Card.status == "active",
                     ~active_card_placement,
                     ~active_membership,
+                    ~active_manifest_card,
                 ).order_by(Card.card_number)
             )
         ).all())
