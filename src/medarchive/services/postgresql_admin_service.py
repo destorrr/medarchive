@@ -11,7 +11,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
-    ArchiveShelf, BoxPlacement, Branch, CardPlacement, Courier, Location, Shipment, User,
+    ArchiveShelf, Box, BoxPlacement, Branch, Card, CardPlacement, Courier, Location, Shipment, User,
 )
 from medarchive.adapters.postgresql.repositories import UserRepository
 
@@ -77,6 +77,38 @@ class PostgreSQLAdminService:
             )
             if active_users:
                 raise ValueError("Сначала отключите пользователей этого филиала")
+            location_id = await self.session.scalar(
+                select(Location.id).where(
+                    Location.kind == "branch", Location.branch_id == branch.id
+                )
+            )
+            if location_id is None:
+                raise RuntimeError("Для филиала отсутствует логистическая локация")
+            cards = await self.session.scalar(
+                select(func.count()).select_from(Card).where(
+                    Card.current_location_id == location_id
+                )
+            )
+            boxes = await self.session.scalar(
+                select(func.count()).select_from(Box).where(
+                    Box.current_location_id == location_id
+                )
+            )
+            active_shipments = await self.session.scalar(
+                select(func.count()).select_from(Shipment).where(
+                    (Shipment.from_location_id == location_id)
+                    | (Shipment.to_location_id == location_id),
+                    Shipment.status.in_(("draft", "in_transit", "exception")),
+                )
+            )
+            if cards or boxes:
+                raise ValueError(
+                    "Нельзя отключить филиал: на его балансе остаются карты или коробки"
+                )
+            if active_shipments:
+                raise ValueError(
+                    "Нельзя отключить филиал: есть незавершённые отправления"
+                )
         branch.is_active = active
         result = await self.session.execute(
             select(Location).where(
