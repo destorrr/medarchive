@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
@@ -175,7 +176,7 @@ async def scan_card(
         )
     message = "Карта зарегистрирована в МедАрхиве и добавлена в коробку." if created else "Карта добавлена в коробку."
     return RedirectResponse(
-        url=f"/packing?box_id={box_id}&message={message}", status_code=303
+        url=f"/packing?box_id={box_id}&message={quote(message, safe='')}", status_code=303
     )
 
 
@@ -197,6 +198,6 @@ async def remove_card(
             request, user, session, box_id=box_id, error=str(exc)
         )
     return RedirectResponse(
-        url=f"/packing?box_id={box_id}&message=Карта извлечена из коробки",
+        url=f"/packing?box_id={box_id}&message={quote('Карта извлечена из коробки', safe='')}",
         status_code=303,
     )
