@@ -7,12 +7,25 @@
     <h3>Отправления в пути в архив</h3>
     {% if incoming %}
     <table class="data">
-        <thead><tr><th>№</th><th>Откуда</th><th>Курьер</th><th>Коробки</th><th>Карты</th><th>Передано</th><th>Приёмка</th></tr></thead>
+        <thead><tr><th>№</th><th>Откуда</th><th>Курьер</th><th>Коробки</th><th>Карты</th><th>Передано</th><th>Состав отправления</th><th>Приёмка</th></tr></thead>
         <tbody>
         {% for shipment in incoming %}
         <tr>
             <td>{{ shipment.number }}</td><td>{{ shipment.source }}</td><td>{{ shipment.courier }}</td>
             <td>{{ shipment.box_count }}</td><td>{{ shipment.card_count }}</td><td>{{ shipment.handed_over_at }}</td>
+            <td>
+                <details>
+                    <summary>Показать манифест</summary>
+                    {% for box in shipment.boxes %}
+                    <p><strong>Коробка {{ box.box_number }}</strong></p>
+                    <ul>{% for card in box.cards %}<li>{{ card.card_number }} · {{ card.full_name }}</li>{% endfor %}</ul>
+                    {% endfor %}
+                    {% if shipment.standalone_cards %}
+                    <p><strong>Отдельные карты</strong></p>
+                    <ul>{% for card in shipment.standalone_cards %}<li>{{ card.card_number }} · {{ card.full_name }}</li>{% endfor %}</ul>
+                    {% endif %}
+                </details>
+            </td>
             <td>
                 <form method="post" action="/receive/confirm">
                     <input type="hidden" name="shipment_id" value="{{ shipment.id }}">
