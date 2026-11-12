@@ -344,7 +344,7 @@ async def _search_context(
 
     membership_rows = []
     if card_ids:
-        membership_rows = list((
+        membership_rows = (
             await session.execute(
                 select(BoxCardMembership, Box, BoxPlacement, ArchiveShelf)
                 .join(BoxCycle, BoxCycle.id == BoxCardMembership.box_cycle_id)
@@ -360,7 +360,7 @@ async def _search_context(
                     BoxCycle.ended_at.is_(None),
                 )
             )
-        )).all()
+        ).all()
     memberships_by_card = {}
     for membership, box, placement, shelf in membership_rows:
         memberships_by_card[membership.card_id] = {
@@ -370,7 +370,7 @@ async def _search_context(
 
     card_placements = {}
     if card_ids:
-        rows = list((
+        rows = (
             await session.execute(
                 select(CardPlacement, ArchiveShelf)
                 .join(ArchiveShelf, ArchiveShelf.id == CardPlacement.shelf_id)
@@ -379,7 +379,7 @@ async def _search_context(
                     CardPlacement.removed_at.is_(None),
                 )
             )
-        )).all()
+        ).all()
         card_placements = {
             placement.card_id: f"{shelf.section_name} / {shelf.shelf_name}"
             for placement, shelf in rows
