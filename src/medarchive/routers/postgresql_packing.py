@@ -164,6 +164,21 @@ async def scan_card(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
+        box = await session.scalar(
+            select(Box).where(
+                Box.id == box_id,
+                Box.current_location_id == (
+                    select(Location.id).where(
+                        Location.kind == "branch",
+                        Location.branch_id == user.branch_id,
+                        Location.is_active.is_(True),
+                    ).scalar_subquery()
+                ),
+                Box.status == "active",
+            )
+        )
+        if box is None:
+            raise ValueError("Коробка не найдена или недоступна в вашем филиале")
         data, existing = await PostgreSQLCardIntakeService(session).inspect_from_qr(
             payload=qr_payload, actor_id=user.id
         )
