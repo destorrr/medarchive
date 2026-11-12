@@ -49,6 +49,8 @@ async def test_migrated_schema_contains_required_checks_and_logistics_indexes():
             "users_role_check",
             "ck_user_branch_binding",
             "cards_status_check",
+            "cards_custody_status_check",
+            "ck_card_external_custody_fields",
             "ck_card_exactly_one_location",
             "boxes_status_check",
             "ck_box_exactly_one_location",
