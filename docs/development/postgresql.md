@@ -31,11 +31,11 @@ Alembic owns schema transactions. The initial revision contains a frozen copy of
 
 `medarchive.adapters.postgresql.database.Database` owns an async SQLAlchemy engine, bounded connection pool, and async session factory. Use one session/transaction per application use case. Repositories must not commit; transaction ownership belongs to the service layer.
 
-The adapter is now available through an opt-in FastAPI dependency and is managed by the application startup/shutdown lifecycle. Set `MEDARCHIVE_POSTGRES_ENABLED=true` to create the PostgreSQL pool and run a startup health check; `get_pg_session` provides an `AsyncSession` to PostgreSQL routes and leaves transaction ownership to the service layer. The existing routers still use SQLite during this staged migration, so the flag enables the PostgreSQL connection but does not switch legacy routes to PostgreSQL. Do not enable it in an environment without a reachable PostgreSQL database.
+The adapter is now available through an opt-in FastAPI dependency and is managed by the application startup/shutdown lifecycle. Set `MEDARCHIVE_POSTGRES_ENABLED=true` to create the PostgreSQL pool and run a startup health check; `get_pg_session` provides an `AsyncSession` to PostgreSQL routes and leaves transaction ownership to the service layer. The existing business routers still use SQLite during this staged migration. Login can be switched independently with MEDARCHIVE_AUTH_BACKEND=postgresql; this requires MEDARCHIVE_POSTGRES_ENABLED=true. Do not enable either flag in an environment without a reachable PostgreSQL database.
 
 ## Status
 
-This is still an infrastructure and service-layer milestone, not a completed application migration. The FastAPI process can now optionally own a PostgreSQL pool alongside the legacy SQLite adapter. The PostgreSQL session dependency and feature-flag behavior have unit coverage. Existing routers and authentication still use SQLite; migrate them incrementally before changing the default backend.
+This is still an infrastructure and service-layer milestone, not a completed application migration. The FastAPI process can now optionally own a PostgreSQL pool alongside the legacy SQLite adapter. The PostgreSQL session dependency and feature-flag behavior have unit coverage. Most business routers and user-administration screens still use SQLite; login supports an explicit PostgreSQL backend, but the default remains SQLite until the rest of the application is migrated.
 
 ## ORM and repository foundation
 
