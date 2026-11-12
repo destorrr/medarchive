@@ -145,11 +145,10 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             # An unrequested card must block the entire dispatch transaction.
             rejected = await client.post(
                 "/requests/fulfill",
-                data=[
-                    ("card_ids", str(requested_card_id)),
-                    ("card_ids", str(unrequested_card_id)),
-                    ("courier_id", str(courier_id)),
-                ],
+                data={
+                    "card_ids": [str(requested_card_id), str(unrequested_card_id)],
+                    "courier_id": str(courier_id),
+                },
                 cookies={"session": archive_token},
             )
             assert rejected.status_code == 200
@@ -164,10 +163,10 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
 
             dispatched = await client.post(
                 "/requests/fulfill",
-                data=[
-                    ("card_ids", str(requested_card_id)),
-                    ("courier_id", str(courier_id)),
-                ],
+                data={
+                    "card_ids": [str(requested_card_id)],
+                    "courier_id": str(courier_id),
+                },
                 cookies={"session": archive_token},
             )
             assert dispatched.status_code == 303
