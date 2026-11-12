@@ -479,6 +479,12 @@ async def test_individual_archive_card_can_be_placed_retrieved_issued_and_return
         card_id=card_id, shelf_id=shelf_id, actor_id=archive_user_id,
     )
     shipping = PostgreSQLShipmentWorkflow(pg_session)
+    with pytest.raises(DBAPIError):
+        async with pg_session.begin_nested():
+            await shipping.create_box(
+                location_id=archive_location_id, actor_id=archive_user_id,
+                card_ids=[card_id],
+            )
     outbound = await shipping.create_draft(
         from_location_id=archive_location_id, to_location_id=central_location_id,
         courier_id=courier_id, issued_by=archive_user_id,
