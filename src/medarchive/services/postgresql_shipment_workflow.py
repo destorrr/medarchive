@@ -473,6 +473,56 @@ class PostgreSQLShipmentWorkflow:
             })
         return shipment
 
+    async def register_exception(
+        self, *, shipment_id: uuid.UUID, actor_id: uuid.UUID, note: str
+    ) -> Shipment:
+        """Mark an in-transit shipment as exceptional without moving its cargo."""
+        actor = await self._active_user(actor_id)
+        normalized_note = (note or "").strip()
+        if not normalized_note:
+            raise ShipmentWorkflowError("Укажите причину инцидента")
+        if len(normalized_note) > 2000:
+            raise ShipmentWorkflowError("Причина инцидента не должна превышать 2000 символов")
+
+        shipment = await self.session.scalar(
+            select(Shipment).where(Shipment.id == shipment_id).with_for_update()
+        )
+        if shipment is None or shipment.status != "in_transit":
+            raise ShipmentWorkflowError("Инцидент можно зарегистрировать только для отправления в пути")
+
+        source, target = await self._locations(
+            shipment.from_location_id, shipment.to_location_id
+        )
+
+        def may_report(location: Location) -> bool:
+            expected_role = {
+                "branch": "branch",
+                "central_office": "central_office",
+                "archive": "archive",
+            }[location.kind]
+            return (
+                actor.role == expected_role
+                and (location.kind != "branch" or actor.branch_id == location.branch_id)
+            )
+
+        if not (may_report(source) or may_report(target)):
+            raise ShipmentWorkflowError(
+                "Зарегистрировать инцидент может сотрудник места отправления или получения"
+            )
+
+        now = datetime.now(timezone.utc)
+        shipment.status = "exception"
+        shipment.exception_by = actor.id
+        shipment.exception_at = now
+        shipment.exception_note = normalized_note
+        await self.session.flush()
+        await self._event("shipment.exception_registered", "shipment", shipment.id, actor.id, {
+            "from_location_id": str(source.id),
+            "to_location_id": str(target.id),
+            "note": normalized_note,
+        })
+        return shipment
+
     async def receive(self, *, shipment_id: uuid.UUID, actor_id: uuid.UUID) -> Shipment:
         actor = await self._active_user(actor_id)
         shipment = await self.session.scalar(
