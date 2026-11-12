@@ -144,8 +144,8 @@ class Box(Base):
         ),
         Index("ix_boxes_current_location", "current_location_id"),
         Index(
-            "uq_box_one_active_shipment", "current_shipment_id", "id",
-            unique=True, postgresql_where=text("current_shipment_id IS NOT NULL"),
+            "ix_boxes_current_shipment", "current_shipment_id",
+            postgresql_where=text("current_shipment_id IS NOT NULL"),
         ),
     )
 
