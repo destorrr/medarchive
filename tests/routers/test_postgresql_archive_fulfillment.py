@@ -185,7 +185,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert shipment.from_location_id == archive_location_id
             assert shipment.to_location_id == central_location_id
             assert await session.scalar(
-                select(ShipmentBox.id).where(ShipmentBox.shipment_id == shipment_id)
+                select(ShipmentBox.box_id).where(ShipmentBox.shipment_id == shipment_id)
             ) is None
             manifest_row = await session.scalar(
                 select(ShipmentCard).where(
