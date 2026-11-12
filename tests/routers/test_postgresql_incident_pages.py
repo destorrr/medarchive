@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
-    Branch, Card, Courier, Location, User,
+    Branch, Card, Courier, DomainEvent, Location, User,
 )
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_session
@@ -109,6 +109,8 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
 
         admin_token = get_auth().create_session_token(admin)
         viewer_token = get_auth().create_session_token(viewer)
+        archive_token = get_auth().create_session_token(archive_user)
+        branch_token = get_auth().create_session_token(branch_user)
         shipment_id = shipment.id
         box_number = box.box_number
 
@@ -137,6 +139,49 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 assert forbidden.status_code == 403
                 forbidden_detail = await client.get(f"/admin/incidents/{shipment_id}")
                 assert forbidden_detail.status_code == 403
+
+                client.cookies.set("session", branch_token)
+                wrong_recipient = await client.post(
+                    "/receive/resolve",
+                    data={"shipment_id": str(shipment_id), "confirmed": "true",
+                          "resolution_note": "Попытка постороннего филиала"},
+                )
+                assert wrong_recipient.status_code == 403
+
+                client.cookies.set("session", archive_token)
+                receive_page = await client.get("/receive")
+                assert receive_page.status_code == 200
+                assert "Инциденты, ожидающие проверки" in receive_page.text
+                assert "Интеграционная проверка инцидента" in receive_page.text
+                assert f"INC-CARD-{suffix}" in receive_page.text
+
+                blank_result = await client.post(
+                    "/receive/resolve",
+                    data={"shipment_id": str(shipment_id), "confirmed": "true",
+                          "resolution_note": "   "},
+                )
+                assert blank_result.status_code == 200
+                assert "Укажите результат проверки" in blank_result.text
+                await session.refresh(shipment)
+                assert shipment.status == "exception"
+
+                resolved = await client.post(
+                    "/receive/resolve",
+                    data={"shipment_id": str(shipment_id), "confirmed": "true",
+                          "resolution_note": "Коробка и полный состав сверены с манифестом"},
+                    follow_redirects=False,
+                )
+                assert resolved.status_code == 303
+                assert resolved.headers["location"].startswith("/receive?message=")
+                await session.refresh(shipment)
+                assert shipment.status == "received"
+                assert shipment.exception_note == "Интеграционная проверка инцидента"
+                event = await session.scalar(select(DomainEvent).where(
+                    DomainEvent.event_type == "shipment.exception_resolved",
+                    DomainEvent.aggregate_id == shipment_id,
+                ))
+                assert event is not None
+                assert event.payload["resolution_note"] == "Коробка и полный состав сверены с манифестом"
         finally:
             app.dependency_overrides.clear()
             await transaction.rollback()

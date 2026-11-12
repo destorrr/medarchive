@@ -31,6 +31,7 @@ from medarchive.adapters.postgresql.models import (
 from medarchive.dependencies import get_pg_session, require_pg_role
 from medarchive.services.postgresql_archive_workflow import PostgreSQLArchiveWorkflow
 from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+from medarchive.services.postgresql_receive_queries import exception_shipments
 
 
 router = APIRouter()
@@ -90,6 +91,7 @@ async def receive_page(
 ):
     archive = await _archive_location(session)
     incoming = []
+    incidents = await exception_shipments(session, archive.id) if archive is not None else []
     if archive is not None:
         rows = (
             await session.execute(
@@ -155,7 +157,7 @@ async def receive_page(
             })
     return await _render_page(
         request, user, session, "postgresql_receive.html",
-        incoming=incoming, error=error, success=message,
+        incoming=incoming, incidents=incidents, error=error, success=message,
     )
 
 
@@ -756,3 +758,31 @@ async def central_create_archive_requests(
     return RedirectResponse(
         url=f"/requests/new?message={quote(message, safe='')}", status_code=303
     )
+
+@router.post("/receive/resolve")
+async def receive_resolve(
+    request: Request,
+    shipment_id: uuid.UUID = Form(...),
+    confirmed: bool = Form(False),
+    resolution_note: str = Form(...),
+    user: User = Depends(archive_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    if not confirmed:
+        return await receive_page(request, error="Подтвердите проверку полного состава отправления.", user=user, session=session)
+    try:
+        shipment = await PostgreSQLShipmentWorkflow(session).resolve_exception(
+            shipment_id=shipment_id, actor_id=user.id, resolution_note=resolution_note,
+        )
+        number = shipment.shipment_number
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        await session.refresh(user)
+        return await receive_page(request, error=str(exc), user=user, session=session)
+    except IntegrityError:
+        await session.rollback()
+        await session.refresh(user)
+        return await receive_page(request, error="Разрешение инцидента заблокировано ограничениями целостности. Проверьте состав.", user=user, session=session)
+    message = f"Инцидент по отправлению № {number} разрешён, отправление принято полностью."
+    return RedirectResponse(url=f"/receive?message={quote(message, safe='')}", status_code=303)
