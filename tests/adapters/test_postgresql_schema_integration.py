@@ -225,3 +225,75 @@ async def test_postgresql_rejects_transit_card_without_manifest_row():
                 await transaction.rollback()
     finally:
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_workflow_guard_triggers_and_request_fulfillment_link_exist():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        async with engine.connect() as connection:
+            triggers = await connection.execute(
+                text(
+                    """
+                    SELECT tgname
+                    FROM pg_trigger
+                    WHERE NOT tgisinternal
+                      AND tgrelid IN (
+                        'shipments'::regclass, 'shipment_boxes'::regclass,
+                        'shipment_cards'::regclass, 'cards'::regclass,
+                        'boxes'::regclass, 'box_card_memberships'::regclass,
+                        'box_cycles'::regclass, 'archive_requests'::regclass,
+                        'box_placements'::regclass, 'domain_events'::regclass
+                      )
+                    """
+                )
+            )
+            trigger_names = set(triggers.scalars())
+            columns = await connection.execute(
+                text(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'archive_requests'
+                    """
+                )
+            )
+            archive_request_columns = set(columns.scalars())
+            checks = await connection.execute(
+                text(
+                    """
+                    SELECT conname FROM pg_constraint
+                    WHERE conrelid = 'archive_requests'::regclass
+                    """
+                )
+            )
+            constraint_names = set(checks.scalars())
+
+        assert {
+            "trg_shipment_route_immutable",
+            "trg_shipment_boxes_draft_only",
+            "trg_shipment_cards_draft_only",
+            "trg_box_membership_mutation_guard",
+            "trg_cards_box_card_consistency",
+            "trg_boxes_box_card_consistency",
+            "trg_box_card_memberships_box_card_consistency",
+            "trg_box_cycles_box_card_consistency",
+            "trg_shipments_consistency",
+            "trg_shipment_boxes_consistency",
+            "trg_shipment_cards_consistency",
+            "trg_cards_shipment_consistency",
+            "trg_boxes_shipment_consistency",
+            "trg_archive_request_guard",
+            "trg_archive_placement_guard",
+            "trg_box_leaving_shelf_guard",
+            "trg_shipment_box_not_placed",
+            "trg_domain_events_append_only",
+        } <= trigger_names
+        assert "fulfillment_shipment_id" in archive_request_columns
+        assert "ck_archive_request_fulfillment" in constraint_names
+    finally:
+        await engine.dispose()
