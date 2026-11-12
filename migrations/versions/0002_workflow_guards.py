@@ -155,7 +155,7 @@ def upgrade() -> None:
     """)
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_guard_box_cycle_history()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
         IF TG_OP = 'DELETE' THEN
             RAISE EXCEPTION 'Историю циклов коробки нельзя удалять'
@@ -175,7 +175,7 @@ def upgrade() -> None:
         END IF;
         RETURN NEW;
     END;
-    $;
+    $$;
     """)
     op.execute("""
     CREATE TRIGGER trg_box_cycle_history_guard
@@ -550,12 +550,12 @@ def upgrade() -> None:
     """)
     op.execute("""
     CREATE OR REPLACE FUNCTION medarchive_reject_historical_delete()
-    RETURNS trigger LANGUAGE plpgsql AS $
+    RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
         RAISE EXCEPTION 'Исторические записи нельзя удалять; используйте корректирующую операцию'
             USING ERRCODE = '23514';
     END;
-    $;
+    $$;
     """)
     for table in ("cards", "boxes", "shipments", "archive_requests"):
         op.execute(f"""
