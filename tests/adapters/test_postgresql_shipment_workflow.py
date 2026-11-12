@@ -820,3 +820,25 @@ async def test_branch_to_central_and_central_to_branch_round_trip_preserves_box_
         "card.shipment_handed_over",
         "card.shipment_received",
     ]
+
+
+@pytest.mark.asyncio
+async def test_multiple_location_locks_are_acquired_in_stable_order():
+    workflow = PostgreSQLShipmentWorkflow(session=None)
+    first_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
+    second_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    acquired = []
+
+    async def fake_location(location_id):
+        acquired.append(location_id)
+        return Location(
+            id=location_id, kind="branch", branch_id=uuid.uuid4(),
+            name=str(location_id), is_active=True,
+        )
+
+    workflow._location = fake_location
+    first, second = await workflow._locations(first_id, second_id)
+
+    assert acquired == [second_id, first_id]
+    assert first.id == first_id
+    assert second.id == second_id
