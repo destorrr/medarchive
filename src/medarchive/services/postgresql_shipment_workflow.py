@@ -87,6 +87,7 @@ class PostgreSQLShipmentWorkflow:
         box = Box(
             box_number=f"BX-{uuid.uuid4().hex[:16].upper()}",
             current_location_id=location.id,
+            status="active",
             created_by=actor.id,
         )
         self.session.add(box)
