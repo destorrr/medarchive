@@ -6,15 +6,14 @@ from datetime import date
 import httpx
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
-    Branch, Card, Courier, Location, Shipment, ShipmentBox, ShipmentCard, User,
+    Branch, Card, Courier, Location, User,
 )
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_session
 from medarchive.main import create_app
-from medarchive.routers.postgresql_admin_pages import admin_only
 from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
 
 
@@ -52,10 +51,10 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
             kind="branch", branch_id=branch_id, name="Incident test branch",
             is_active=True,
         )
-        archive_location = await session.scalar(
-            select(Location).where(Location.kind == "archive", Location.is_active.is_(True))
+        archive_location = Location(
+            kind="archive", branch_id=None, name=f"Incident test archive {suffix}",
+            is_active=True,
         )
-        assert archive_location is not None
 
         admin = User(
             username=f"incident-admin-{suffix}", password_hash="test-hash",
@@ -75,7 +74,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
             full_name="Incident Reporter", role="archive", is_active=True,
         )
         courier = Courier(full_name=f"Incident Courier {suffix}", is_active=True)
-        session.add_all([branch, branch_location, admin, viewer, branch_user, archive_user, courier])
+        session.add_all([branch, branch_location, archive_location, admin, viewer, branch_user, archive_user, courier])
         await session.flush()
 
         card = Card(
