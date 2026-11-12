@@ -93,7 +93,7 @@ def test_box_maps_partial_index_for_current_shipment_lookups():
 def test_card_custody_check_matches_the_current_status_vocabulary():
     table = Base.metadata.tables["cards"]
     constraint = next(c for c in table.constraints if c.name == "cards_custody_status_check")
-    assert "'at_other'" in str(constraint.sqltext)
+    assert "'at_external_organization'" in str(constraint.sqltext)
     assert "'at_external_organization'" not in str(constraint.sqltext)
 
 
