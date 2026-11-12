@@ -67,6 +67,8 @@ class PostgreSQLShipmentWorkflow:
                 raise ShipmentWorkflowError("Карта не найдена в указанном месте или недоступна")
             if await self._active_membership(card.id) is not None:
                 raise ShipmentWorkflowError("Карта уже находится в другой активной коробке")
+            if await self._has_active_manifest_card(card.id):
+                raise ShipmentWorkflowError("Карта уже включена в активное отправление")
             if location.kind == "archive":
                 request = await self.session.scalar(
                     select(ArchiveRequest)
@@ -130,6 +132,8 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Карта не найдена в месте хранения коробки или недоступна")
         if await self._active_membership(card.id) is not None:
             raise ShipmentWorkflowError("Карта уже находится в активной коробке")
+        if await self._has_active_manifest_card(card.id):
+            raise ShipmentWorkflowError("Карта уже включена в активное отправление")
         if location.kind == "archive":
             request = await self.session.scalar(
                 select(ArchiveRequest)
@@ -236,13 +240,16 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Нельзя добавить пустую коробку в отправление")
         member_ids = [member.card_id for member in members]
         already_added = await self.session.scalar(
-            select(ShipmentCard.card_id).where(
-                ShipmentCard.shipment_id == shipment.id,
+            select(ShipmentCard.card_id)
+            .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+            .where(
                 ShipmentCard.card_id.in_(member_ids),
-            ).limit(1)
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .limit(1)
         )
         if already_added is not None:
-            raise ShipmentWorkflowError("Карта из коробки уже добавлена в отправление отдельно")
+            raise ShipmentWorkflowError("Карта из коробки уже включена в другое активное отправление")
         self.session.add(ShipmentBox(shipment_id=shipment.id, box_id=box.id))
         await self.session.flush()
 
@@ -540,6 +547,18 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Недостаточно прав для операции в этом месте")
         if location.kind == "branch" and user.branch_id != location.branch_id:
             raise ShipmentWorkflowError("Нет доступа к указанному филиалу")
+
+    async def _has_active_manifest_card(self, card_id: uuid.UUID) -> bool:
+        result = await self.session.scalar(
+            select(ShipmentCard.card_id)
+            .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+            .where(
+                ShipmentCard.card_id == card_id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .limit(1)
+        )
+        return result is not None
 
     async def _active_membership(self, card_id: uuid.UUID) -> BoxCardMembership | None:
         return await self.session.scalar(
