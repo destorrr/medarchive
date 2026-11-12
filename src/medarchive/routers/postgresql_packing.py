@@ -17,6 +17,8 @@ from medarchive.adapters.postgresql.models import (
     BoxCycle,
     Card,
     Location,
+    Shipment,
+    ShipmentBox,
     User,
 )
 from medarchive.dependencies import get_pg_session, require_pg_role
@@ -49,9 +51,19 @@ async def _packing_context(
     box = None
     cards: list[Card] = []
     if location is not None:
+        active_manifest_box = (
+            select(ShipmentBox.box_id)
+            .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
+            .where(
+                ShipmentBox.box_id == Box.id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .exists()
+        )
         statement = select(Box).where(
             Box.current_location_id == location.id,
             Box.status == "active",
+            ~active_manifest_box,
         )
         if box_id is not None:
             statement = statement.where(Box.id == box_id)
