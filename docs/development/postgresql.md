@@ -84,3 +84,28 @@ The guard migration is intentionally irreversible in the same way as the initial
 A card can return to the archive as a standalone item, not only inside a box. The card_placements table therefore records an individual card's shelf history separately from box_placements. Archive staff can place and retrieve individual cards; a card must be removed from its shelf before it can be packed into a box or included in an outbound shipment. Conversely, cards inside a box cannot also have individual shelf placements.
 
 When the last active card is removed from a box, its usage cycle is closed. Reusing that physical box starts the next numbered cycle; previous membership rows and cycle records remain intact.
+
+
+## PostgreSQL authentication (staged)
+
+The login form can now authenticate against PostgreSQL when explicitly selected:
+
+```bash
+export MEDARCHIVE_POSTGRES_ENABLED=true
+export MEDARCHIVE_AUTH_BACKEND=postgresql
+export MEDARCHIVE_DATABASE_URL='postgresql+asyncpg://...'
+export MEDARCHIVE_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export MEDARCHIVE_COOKIE_SECURE=true  # required behind HTTPS in production
+```
+
+The default `MEDARCHIVE_AUTH_BACKEND=sqlite` is intentionally retained until the remaining application routes and user administration have moved to PostgreSQL. PostgreSQL authentication requires `MEDARCHIVE_POSTGRES_ENABLED=true`.
+
+For a completely empty PostgreSQL `users` table, create the first administrator once:
+
+```bash
+medarchive-admin create-admin --username admin --full-name "Имя Фамилия"
+```
+
+The command prompts for the password twice, stores only a bcrypt hash, and refuses to run if any user already exists. A PostgreSQL advisory transaction lock serializes concurrent bootstrap attempts. There is no public registration endpoint and no default password. Do not use the local Docker credentials in production.
+
+The session cookie is HTTP-only and SameSite=Lax. Set `MEDARCHIVE_COOKIE_SECURE=true` whenever the application is served over HTTPS. The same signing secret must be used by all application instances.
