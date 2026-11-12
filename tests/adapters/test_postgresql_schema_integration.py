@@ -63,6 +63,7 @@ async def test_migrated_schema_contains_required_checks_and_logistics_indexes():
             "ck_box_cycle_dates",
             "ck_box_membership_dates",
             "ck_placement_dates",
+            "ck_card_placement_dates",
         } <= check_names
 
         assert {
@@ -77,6 +78,8 @@ async def test_migrated_schema_contains_required_checks_and_logistics_indexes():
             "uq_box_one_active_placement",
             "ix_domain_events_aggregate",
             "ix_domain_events_occurred_at",
+            "uq_card_one_active_placement",
+            "ix_card_placements_shelf",
         } <= index_names
     finally:
         await engine.dispose()
@@ -248,7 +251,8 @@ async def test_workflow_guard_triggers_and_request_fulfillment_link_exist():
                         'shipment_cards'::regclass, 'cards'::regclass,
                         'boxes'::regclass, 'box_card_memberships'::regclass,
                         'box_cycles'::regclass, 'archive_requests'::regclass,
-                        'box_placements'::regclass, 'domain_events'::regclass
+                        'box_placements'::regclass, 'card_placements'::regclass,
+                        'domain_events'::regclass
                       )
                     """
                 )
@@ -299,6 +303,11 @@ async def test_workflow_guard_triggers_and_request_fulfillment_link_exist():
             "trg_boxes_no_delete",
             "trg_shipments_no_delete",
             "trg_archive_requests_no_delete",
+            "trg_card_placement_guard",
+            "trg_card_leaving_shelf_guard",
+            "trg_shipment_card_not_placed",
+            "trg_box_membership_card_not_placed",
+            "trg_box_placement_cards_not_placed",
         } <= trigger_names
         assert "fulfillment_shipment_id" in archive_request_columns
         assert "ck_archive_request_fulfillment" in constraint_names
