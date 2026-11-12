@@ -72,19 +72,13 @@ async def test_branch_box_shipment_is_handed_over_and_received_atomically(pg_ses
         date_of_birth=__import__("datetime").date(1980, 1, 1),
         origin_branch_id=branch.id, current_location_id=branch_loc.id,
     )
-    box = Box(
-        box_number=f"BX-{uuid.uuid4().hex[:12]}", current_location_id=branch_loc.id,
-        created_by=branch_user.id,
-    )
-    pg_session.add_all([card, box])
+    pg_session.add(card)
     await pg_session.flush()
-    cycle = BoxCycle(box_id=box.id, cycle_number=1, started_by=branch_user.id)
-    pg_session.add(cycle)
-    await pg_session.flush()
-    pg_session.add(BoxCardMembership(box_cycle_id=cycle.id, card_id=card.id, added_by=branch_user.id))
-    await pg_session.flush()
-
     workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=branch_loc.id, actor_id=branch_user.id)
+    await workflow.add_card_to_box(
+        box_id=box.id, card_id=card.id, actor_id=branch_user.id,
+    )
     shipment = await workflow.create_draft(
         from_location_id=branch_loc.id, to_location_id=archive_loc.id,
         courier_id=courier.id, issued_by=branch_user.id,
