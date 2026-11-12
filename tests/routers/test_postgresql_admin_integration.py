@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from medarchive.adapters.postgresql.models import ArchiveShelf, Branch, Courier, Location, User
+from medarchive.adapters.postgresql.models import ArchiveShelf, Box, BoxPlacement, Branch, Courier, Location, User
 from medarchive.config import Config
 from medarchive.dependencies import get_pg_database
 from medarchive.main import create_app
@@ -444,6 +444,94 @@ async def test_courier_with_draft_shipment_cannot_be_deactivated():
         await connection.close()
         await database.close()
 
+
+
+@pytest.mark.asyncio
+async def test_shelf_with_active_box_placement_cannot_be_deactivated():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.services.postgresql_archive_workflow import PostgreSQLArchiveWorkflow
+
+    database = Database(DATABASE_URL)
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    shelf_id = None
+    box_id = None
+    actor_id = None
+    created_archive_id = None
+    try:
+        async with session.begin():
+            archive = await session.scalar(
+                select(Location).where(Location.kind == "archive")
+            )
+            if archive is None:
+                archive = Location(
+                    kind="archive", branch_id=None,
+                    name="Shelf placement guard archive", is_active=True,
+                )
+                session.add(archive)
+                await session.flush()
+                created_archive_id = archive.id
+
+            actor = User(
+                username=f"shelf-guard-{uuid.uuid4().hex[:12]}",
+                password_hash="test-hash",
+                full_name="Shelf Guard Actor",
+                role="archive",
+                is_active=True,
+            )
+            shelf = ArchiveShelf(
+                section_name=f"Guard-{uuid.uuid4().hex[:8]}",
+                shelf_name="Occupied shelf",
+                is_active=True,
+            )
+            session.add_all([actor, shelf])
+            await session.flush()
+            actor_id, shelf_id = actor.id, shelf.id
+
+            box = Box(
+                box_number=f"SG-{uuid.uuid4().hex[:12]}",
+                current_location_id=archive.id,
+                current_shipment_id=None,
+                status="active",
+                created_by=actor.id,
+            )
+            session.add(box)
+            await session.flush()
+            box_id = box.id
+
+            await PostgreSQLArchiveWorkflow(session).place_box(
+                box_id=box.id, shelf_id=shelf.id, actor_id=actor.id
+            )
+
+            with pytest.raises(ValueError, match="Сначала снимите все коробки и карты"):
+                await PostgreSQLAdminService(session).set_shelf_active(
+                    shelf.id, False
+                )
+
+            persisted_shelf = await session.get(ArchiveShelf, shelf.id)
+            placement = await session.scalar(
+                select(BoxPlacement).where(
+                    BoxPlacement.box_id == box.id,
+                    BoxPlacement.shelf_id == shelf.id,
+                    BoxPlacement.removed_at.is_(None),
+                )
+            )
+            assert persisted_shelf is not None and persisted_shelf.is_active is True
+            assert placement is not None
+    finally:
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
+        await database.close()
 
 
 @pytest.mark.asyncio
