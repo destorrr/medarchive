@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📋 Заявки центрального офиса</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<div class="card">
+    <h3>Активные заявки</h3>
+    {% if requests %}
+    <form method="post" action="/requests/fulfill">
+        <table class="data">
+            <thead><tr><th>Выбрать</th><th>№ карты</th><th>Пациент</th><th>Статус</th><th>Местонахождение / действие</th></tr></thead>
+            <tbody>
+            {% for item in requests %}<tr>
+                <td>{% if item.request.status == "new" %}<input type="checkbox" name="card_ids" value="{{ item.card.id }}">{% else %}—{% endif %}</td>
+                <td>{{ item.card.card_number }}</td><td>{{ item.card.full_name }}</td>
+                <td>{{ "Новая" if item.request.status == "new" else "Передана курьеру" }}</td>
+                <td>
+                    {% if item.box %}
+                        Коробка {{ item.box.box_number }}
+                        {% if item.box_placement %}· коробка на полке; <a href="/placement">снимите её с полки</a>
+                        {% else %}
+                            <form method="post" action="/requests/unpack-card">
+                                <input type="hidden" name="box_id" value="{{ item.box.id }}">
+                                <input type="hidden" name="card_id" value="{{ item.card.id }}">
+                                <button class="btn btn-secondary" type="submit">Извлечь карту из коробки</button>
+                            </form>
+                        {% endif %}
+                    {% elif item.card_placement %}
+                        На полке
+                        <form method="post" action="/placement/remove-card">
+                            <input type="hidden" name="card_id" value="{{ item.card.id }}">
+                            <button class="btn btn-secondary" type="submit">Снять с полки</button>
+                        </form>
+                    {% else %}Отдельно в архиве{% endif %}
+                </td>
+            </tr>{% endfor %}
+            </tbody>
+        </table>
+        <div class="form-group" style="margin-top:14px">
+            <label for="courier_id">Курьер для отправления в ЦО</label>
+            <select id="courier_id" name="courier_id" required>
+                <option value="">— Выберите курьера —</option>
+                {% for courier in couriers %}<option value="{{ courier.id }}">{{ courier.full_name }}</option>{% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary" type="submit">Передать выбранные карты в ЦО без коробки</button>
+    </form>
+    <div style="margin-top:18px">
+        <h4>Закрыть заявку как «карта не найдена»</h4>
+        {% for item in requests %}{% if item.request.status == "new" %}
+        <form method="post" action="/requests/not-found" style="display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap">
+            <input type="hidden" name="request_id" value="{{ item.request.id }}">
+            <span>{{ item.card.card_number }} · {{ item.card.full_name }}</span>
+            <input name="note" placeholder="Пояснение" required>
+            <button class="btn btn-secondary" type="submit">Не найдена</button>
+        </form>
+        {% endif %}{% endfor %}
+    </div>
+    {% else %}<p class="muted">Активных заявок центрального офиса нет.</p>{% endif %}
+</div>
+{% endblock %}
