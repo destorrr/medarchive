@@ -50,7 +50,8 @@ async def login(
         user = User.from_row(row)
 
     token = auth.create_session_token(user)
-    response = RedirectResponse(url="/dashboard", status_code=303)
+    destination = "/admin" if config.auth_backend == "postgresql" and user.role == "admin" else "/dashboard"
+    response = RedirectResponse(url=destination, status_code=303)
     response.set_cookie(
         "session",
         token,
