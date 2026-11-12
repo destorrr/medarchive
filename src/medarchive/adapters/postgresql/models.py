@@ -213,9 +213,13 @@ class Shipment(Base):
             name="ck_shipment_received_fields",
         ),
         CheckConstraint(
-            "(status = 'exception' AND exception_by IS NOT NULL AND exception_at IS NOT NULL "
+            "((status = 'exception' AND exception_by IS NOT NULL AND exception_at IS NOT NULL "
             "AND NULLIF(btrim(exception_note), '') IS NOT NULL) OR "
-            "(status <> 'exception' AND exception_by IS NULL AND exception_at IS NULL AND exception_note IS NULL)",
+            "(status = 'received' AND ((exception_by IS NULL AND exception_at IS NULL AND exception_note IS NULL) "
+            "OR (exception_by IS NOT NULL AND exception_at IS NOT NULL "
+            "AND NULLIF(btrim(exception_note), '') IS NOT NULL))) OR "
+            "(status NOT IN ('exception', 'received') AND exception_by IS NULL "
+            "AND exception_at IS NULL AND exception_note IS NULL))",
             name="ck_shipment_exception_fields",
         ),
         CheckConstraint(
