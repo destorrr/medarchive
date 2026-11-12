@@ -88,7 +88,7 @@ class Card(Base):
     __table_args__ = (
         CheckConstraint("status IN ('active', 'inactive', 'under_review')", name="cards_status_check"),
         CheckConstraint(
-            "custody_status IN ('available', 'at_court', 'at_insurance', 'at_other')",
+            "custody_status IN ('available', 'at_court', 'at_insurance', 'at_external_organization')",
             name="cards_custody_status_check",
         ),
         CheckConstraint(
