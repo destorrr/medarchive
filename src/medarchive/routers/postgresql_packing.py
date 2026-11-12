@@ -36,6 +36,8 @@ async def _packing_context(
     box_id: uuid.UUID | None = None,
     error: str | None = None,
     success: str | None = None,
+    pending_qr_payload: str | None = None,
+    pending_card_data: dict | None = None,
 ) -> dict:
     location = await session.scalar(
         select(Location).where(
@@ -90,6 +92,8 @@ async def _packing_context(
         "cards": cards,
         "error": error,
         "success": success,
+        "pending_qr_payload": pending_qr_payload,
+        "pending_card_data": pending_card_data,
     }
 
 
