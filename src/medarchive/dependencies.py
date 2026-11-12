@@ -11,6 +11,7 @@ from medarchive.adapters.postgresql.database import Database as PostgreSQLDataba
 from medarchive.adapters.postgresql.repositories import UserRepository
 from medarchive.adapters.postgresql.models import User as PostgreSQLUser
 from medarchive.services.auth_service import AuthService
+from medarchive.services.postgresql_auth_service import PostgreSQLAuthService
 from medarchive.domain.models import User
 from medarchive.domain.statuses import UserRole
 
@@ -29,14 +30,11 @@ def init_dependencies(config: Config) -> None:
 async def get_db() -> SQLiteDatabase:
     if _db is None:
         raise RuntimeError("Dependencies not initialized. Call init_dependencies first.")
-    # Идемпотентная инициализация: подключаемся при первом обращении,
-    # даже если startup-событие ещё не отработало (например, в тестах).
     await _db.init()
     return _db
 
 
 async def get_pg_database() -> PostgreSQLDatabase:
-    """Return the PostgreSQL pool when the staged adapter is enabled."""
     if _pg_db is None:
         raise RuntimeError(
             "PostgreSQL adapter is disabled. Set MEDARCHIVE_POSTGRES_ENABLED=true."
@@ -55,6 +53,13 @@ def get_auth() -> AuthService:
     if _auth is None:
         raise RuntimeError("Dependencies not initialized. Call init_dependencies first.")
     return _auth
+
+
+def get_pg_auth(
+    session: AsyncSession = Depends(get_pg_session),
+    credentials: AuthService = Depends(get_auth),
+) -> PostgreSQLAuthService:
+    return PostgreSQLAuthService(UserRepository(session), credentials)
 
 
 async def get_current_user(request: Request) -> User:
