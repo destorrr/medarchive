@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
     ArchiveRequest, ArchiveShelf, Box, BoxCardMembership, BoxCycle, Branch, Card,
-    Courier, DomainEvent, Location, ShipmentCard, User,
+    CardPlacement, Courier, DomainEvent, Location, ShipmentCard, User,
 )
 from medarchive.services.postgresql_archive_workflow import (
     ArchiveWorkflowError, PostgreSQLArchiveWorkflow,
@@ -449,3 +449,67 @@ async def test_archive_can_mark_requested_card_not_found_with_reason(pg_session)
     assert request.status == "not_found"
     assert request.fulfillment_shipment_id is None
     assert request.fulfilled_by == archive_user.id
+
+
+@pytest.mark.asyncio
+async def test_individual_archive_card_can_be_placed_retrieved_issued_and_returned(pg_session):
+    (
+        branch, _branch_loc, archive_loc, central_loc,
+        _branch_user, archive_user, central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Individually stored patient",
+        date_of_birth=__import__("datetime").date(1984, 9, 10),
+        origin_branch_id=branch.id, current_location_id=archive_loc.id, status="active",
+    )
+    shelf = ArchiveShelf(
+        section_name="B", shelf_name=f"S-{uuid.uuid4().hex[:8]}", is_active=True,
+    )
+    pg_session.add_all([card, shelf])
+    await pg_session.flush()
+
+    archive = PostgreSQLArchiveWorkflow(pg_session)
+    request = (await archive.create_requests(
+        card_ids=[card.id], actor_id=central_user.id,
+    ))[0]
+    first_placement = await archive.place_card(
+        card_id=card.id, shelf_id=shelf.id, actor_id=archive_user.id,
+    )
+    shipping = PostgreSQLShipmentWorkflow(pg_session)
+    outbound = await shipping.create_draft(
+        from_location_id=archive_loc.id, to_location_id=central_loc.id,
+        courier_id=courier.id, issued_by=archive_user.id,
+    )
+    with pytest.raises(DBAPIError):
+        async with pg_session.begin_nested():
+            await shipping.add_standalone_card(
+                shipment_id=outbound.id, card_id=card.id, actor_id=archive_user.id,
+            )
+
+    await archive.remove_card_from_shelf(card_id=card.id, actor_id=archive_user.id)
+    await shipping.add_standalone_card(
+        shipment_id=outbound.id, card_id=card.id, actor_id=archive_user.id,
+    )
+    await shipping.hand_over(shipment_id=outbound.id, actor_id=archive_user.id)
+    await shipping.receive(shipment_id=outbound.id, actor_id=central_user.id)
+    await pg_session.refresh(request)
+    assert request.status == "completed"
+    assert request.fulfillment_shipment_id == outbound.id
+
+    return_shipment = await shipping.create_draft(
+        from_location_id=central_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=central_user.id,
+    )
+    await shipping.add_standalone_card(
+        shipment_id=return_shipment.id, card_id=card.id, actor_id=central_user.id,
+    )
+    await shipping.hand_over(shipment_id=return_shipment.id, actor_id=central_user.id)
+    await shipping.receive(shipment_id=return_shipment.id, actor_id=archive_user.id)
+    returned_placement = await archive.place_card(
+        card_id=card.id, shelf_id=shelf.id, actor_id=archive_user.id,
+    )
+    await pg_session.refresh(first_placement)
+    assert first_placement.removed_at is not None
+    assert returned_placement.removed_at is None
+    assert returned_placement.id != first_placement.id
+    assert returned_placement.card_id == card.id
