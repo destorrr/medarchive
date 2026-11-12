@@ -35,7 +35,7 @@ The adapter is deliberately not wired into FastAPI dependencies yet: current rou
 
 ## Status
 
-This is the first infrastructure step, not a completed application migration. Before switching the app, add PostgreSQL integration tests for the schema and transaction invariants, replace SQLite repositories and integer domain IDs, and run the full router/service suite against PostgreSQL.
+This is still an infrastructure and service-layer milestone, not a completed application migration. Schema contract tests and the first shipment workflow integration tests are in place. Before switching the app, complete the remaining database guards and logistics workflows, replace SQLite repositories and integer domain IDs, and run the full router/service suite against PostgreSQL.
 
 ## ORM and repository foundation
 
@@ -56,6 +56,6 @@ The CI suite now includes read-only checks against the schema actually installed
 - a card can enter transit when its current shipment has the matching manifest row;
 - a card cannot point to a shipment without the matching manifest row once deferred constraints are checked.
 
-These tests roll back their fixture data and do not depend on SQLite. They validate relational constraints only; they do not yet prove the complete shipment use case. In particular, non-empty manifests, box/card membership consistency, immutability after handover, route authorization, and atomic whole-shipment receipt still require service-level logic, database triggers where appropriate, and broader workflow tests.
+These tests roll back their fixture data and do not depend on SQLite. The additional shipment workflow tests exercise whole-box branch-to-archive movement, archive-to-central fulfillment for individually requested cards and cards packed into a new archive box, plus the direct central-office-to-archive return. They validate service-level transitions and atomic state updates, but do not replace database guard triggers: direct-SQL protection for post-handover manifest/route immutability and all cross-row membership invariants remains outstanding.
 
 Alembic `target_metadata` remains intentionally disconnected until the complete metadata/DDL parity check is demonstrated. Do not enable autogenerate based only on these focused checks.
