@@ -20,7 +20,7 @@ def upgrade() -> None:
     """)
     op.execute("""
         ALTER TABLE cards
-        ADD CONSTRAINT ck_cards_custody_status
+        ADD CONSTRAINT cards_custody_status_check
         CHECK (custody_status IN (
             'available', 'at_court', 'at_insurance', 'at_other'
         ))
@@ -30,7 +30,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("""
         ALTER TABLE cards
-        DROP CONSTRAINT IF EXISTS ck_cards_custody_status
+        DROP CONSTRAINT IF EXISTS cards_custody_status_check
     """)
     op.execute("""
         UPDATE cards
