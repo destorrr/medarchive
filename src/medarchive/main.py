@@ -22,9 +22,10 @@ def create_app(config: Config | None = None) -> FastAPI:
     # Startup: init DB
     @app.on_event("startup")
     async def startup():
-        from medarchive.dependencies import get_db
-        db = await get_db()
-        await db.init()
+        if config.auth_backend == "sqlite":
+            from medarchive.dependencies import get_db
+            db = await get_db()
+            await db.init()
         if config.postgres_enabled:
             from medarchive.dependencies import get_pg_database
             pg_db = await get_pg_database()
@@ -53,57 +54,24 @@ def create_app(config: Config | None = None) -> FastAPI:
     from medarchive.routers.auth import router as auth_router
     app.include_router(auth_router)
 
-    # Packing router (Task 3)
-    try:
-        from medarchive.routers.packing import router as packing_router
-        app.include_router(packing_router)
-    except ImportError:
-        pass
-
-    # Archive router (Task 7: приёмка и размещение)
-    try:
-        from medarchive.routers.archive import router as archive_router
-        app.include_router(archive_router)
-    except ImportError:
-        pass
-
-    # Dashboard router imported later (Task 7)
-    try:
-        from medarchive.routers.dashboard import router as dashboard_router
-        app.include_router(dashboard_router)
-    except ImportError:
-        # Временный защищённый роут-заглушка: без сессии → редирект на /login.
-        # Исчезнет автоматически, когда появится routers/dashboard.py (Task 7).
-        @app.get("/dashboard")
-        async def dashboard_stub(request: Request):
-            try:
-                await get_current_user(request)
-            except HTTPException:
-                return RedirectResponse(url="/login", status_code=303)
-            return HTMLResponse("<h1>МедАрхив</h1><p>Дашборд появится в Task 7.</p>")
-
-    # PostgreSQL and legacy SQLite administration are separate UI/API stacks.
+    # Keep the PostgreSQL and legacy SQLite application surfaces separate.
     if config.auth_backend == "postgresql":
+        from medarchive.routers.postgresql_dashboard import router as pg_dashboard_router
         from medarchive.routers.postgresql_admin import router as pg_admin_router
         from medarchive.routers.postgresql_admin_pages import router as pg_admin_pages_router
+        app.include_router(pg_dashboard_router)
         app.include_router(pg_admin_router)
         app.include_router(pg_admin_pages_router)
     else:
-        from medarchive.routers.admin import router as admin_router
-        app.include_router(admin_router)
-
-    # Transfer router (Task 5)
-    try:
-        from medarchive.routers.transfer import router as transfer_router
-        app.include_router(transfer_router)
-    except ImportError:
-        pass
-
-    # Archive router (Task 7)
-    try:
+        from medarchive.routers.packing import router as packing_router
         from medarchive.routers.archive import router as archive_router
+        from medarchive.routers.dashboard import router as dashboard_router
+        from medarchive.routers.admin import router as admin_router
+        from medarchive.routers.transfer import router as transfer_router
+        app.include_router(packing_router)
         app.include_router(archive_router)
-    except ImportError:
-        pass
+        app.include_router(dashboard_router)
+        app.include_router(admin_router)
+        app.include_router(transfer_router)
 
     return app
