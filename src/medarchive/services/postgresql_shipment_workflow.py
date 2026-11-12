@@ -51,8 +51,8 @@ class PostgreSQLShipmentWorkflow:
         selected_ids = list(card_ids or [])
         if len(selected_ids) != len(set(selected_ids)):
             raise ShipmentWorkflowError("Одна и та же карта указана в коробке несколько раз")
-        if location.kind == "archive" and not selected_ids:
-            raise ShipmentWorkflowError("Архив может создавать коробку только для комплектации заявок ЦО")
+        if location.kind == "archive":
+            raise ShipmentWorkflowError("Архив не формирует коробки для выдачи карт ЦО; отправляйте карты отдельно")
 
         cards: list[Card] = []
         for card_id in selected_ids:
@@ -60,7 +60,7 @@ class PostgreSQLShipmentWorkflow:
                 select(Card).where(Card.id == card_id).with_for_update()
             )
             if (
-                card is None or card.status != "active"
+                card is None or card.status != "active" or card.custody_status != "available"
                 or card.current_location_id != location.id
                 or card.current_shipment_id is not None
             ):
@@ -127,7 +127,7 @@ class PostgreSQLShipmentWorkflow:
             select(Card).where(Card.id == card_id).with_for_update()
         )
         if (
-            card is None or card.status != "active"
+            card is None or card.status != "active" or card.custody_status != "available"
             or card.current_location_id != location.id
             or card.current_shipment_id is not None
         ):
@@ -136,6 +136,10 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Карта уже находится в активной коробке")
         if await self._has_active_manifest_card(card.id):
             raise ShipmentWorkflowError("Карта уже включена в активное отправление")
+        if location.kind == "archive":
+            raise ShipmentWorkflowError("Архив не упаковывает карты в коробки; отправляйте их отдельно")
+        if location.kind == "archive":
+            raise ShipmentWorkflowError("Архив не упаковывает карты в коробки; отправляйте их отдельно")
         if location.kind == "archive":
             request = await self.session.scalar(
                 select(ArchiveRequest)
@@ -275,7 +279,11 @@ class PostgreSQLShipmentWorkflow:
 
     async def add_box(self, *, shipment_id: uuid.UUID, box_id: uuid.UUID, actor_id: uuid.UUID) -> None:
         shipment, actor = await self._draft_and_actor(shipment_id, actor_id)
-        await self._authorize_location(actor, await self._location(shipment.from_location_id))
+        source = await self._location(shipment.from_location_id)
+        target = await self._location(shipment.to_location_id)
+        await self._authorize_location(actor, source)
+        if source.kind == "archive" and target.kind == "central_office":
+            raise ShipmentWorkflowError("По заявкам ЦО архив отправляет только отдельные карты, без коробок")
         box = await self.session.scalar(
             select(Box).where(Box.id == box_id).with_for_update()
         )
@@ -329,8 +337,8 @@ class PostgreSQLShipmentWorkflow:
         card = await self.session.scalar(
             select(Card).where(Card.id == card_id).with_for_update()
         )
-        if card is None or card.status != "active":
-            raise ShipmentWorkflowError("Карта не найдена или недоступна для отправки")
+        if card is None or card.status != "active" or card.custody_status != "available":
+            raise ShipmentWorkflowError("Карта не найдена, находится во внешней организации или недоступна для отправки")
         if card.current_location_id != shipment.from_location_id or card.current_shipment_id is not None:
             raise ShipmentWorkflowError("Карта не находится в месте отправления")
         membership = await self._active_membership(card.id)
@@ -367,6 +375,9 @@ class PostgreSQLShipmentWorkflow:
         )).all())
         if not boxes and not standalone_rows:
             raise ShipmentWorkflowError("Нельзя отправить пустое отправление")
+        target = await self._location(shipment.to_location_id)
+        if source.kind == "archive" and target.kind == "central_office" and boxes:
+            raise ShipmentWorkflowError("По заявкам ЦО архив отправляет только отдельные карты, без коробок")
 
         # Lock and validate every active member of every shipped box. Cards inside
         # boxes are represented in the manifest, but are not separate cargo units.
@@ -391,7 +402,7 @@ class PostgreSQLShipmentWorkflow:
                 card = await self.session.scalar(
                     select(Card).where(Card.id == membership.card_id).with_for_update()
                 )
-                if card is None or card.status != "active" or card.current_location_id != source.id or card.current_shipment_id is not None:
+                if card is None or card.status != "active" or card.custody_status != "available" or card.current_location_id != source.id or card.current_shipment_id is not None:
                     raise ShipmentWorkflowError("Карта в коробке изменила местонахождение или недоступна")
                 boxed_cards.append((card, box.id))
 
@@ -399,14 +410,13 @@ class PostgreSQLShipmentWorkflow:
             card = await self.session.scalar(
                 select(Card).where(Card.id == row.card_id).with_for_update()
             )
-            if card is None or card.status != "active" or card.current_location_id != source.id or card.current_shipment_id is not None:
+            if card is None or card.status != "active" or card.custody_status != "available" or card.current_location_id != source.id or card.current_shipment_id is not None:
                 raise ShipmentWorkflowError("Отдельная карта изменила местонахождение или недоступна")
             if await self._active_membership(card.id) is not None:
                 raise ShipmentWorkflowError("Нельзя отправить отдельно карту, находящуюся в коробке")
 
         # Archive issues to the central office are allowed only for cards covered
         # by active central-office requests. The request remains open until receipt.
-        target = await self._location(shipment.to_location_id)
         if source.kind == "archive" and target.kind == "central_office":
             card_ids = [card.id for card, _ in boxed_cards] + [row.card_id for row in standalone_rows]
             now = datetime.now(timezone.utc)
