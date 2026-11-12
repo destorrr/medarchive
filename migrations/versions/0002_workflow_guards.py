@@ -353,8 +353,8 @@ def upgrade() -> None:
                   AND from_location_id = (SELECT id FROM locations WHERE kind = 'archive')
                   AND to_location_id = (SELECT id FROM locations WHERE kind = 'central_office');
                 IF fulfillment_status IS NULL OR
-                   (NEW.status = 'in_progress' AND fulfillment_status NOT IN ('in_transit', 'received')) OR
-                   (NEW.status = 'completed' AND fulfillment_status <> 'received') THEN
+                   (NEW.status = 'in_progress' AND fulfillment_status NOT IN ('draft', 'in_transit')) OR
+                   (NEW.status = 'completed' AND fulfillment_status NOT IN ('in_transit', 'received')) THEN
                     RAISE EXCEPTION 'Заявка связана с некорректным отправлением архив → ЦО'
                         USING ERRCODE = '23514';
                 END IF;
