@@ -25,9 +25,11 @@ async def pg_session():
     engine = create_async_engine(DATABASE_URL)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as session:
-        async with session.begin():
+        transaction = await session.begin()
+        try:
             yield session
-            # All test data is rolled back by the enclosing transaction.
+        finally:
+            await transaction.rollback()
     await engine.dispose()
 
 
