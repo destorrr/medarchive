@@ -285,6 +285,39 @@ async def placement_page(
     )
 
 
+@router.post("/placement/new-internal-box")
+async def create_internal_box(
+    request: Request,
+    card_ids: list[uuid.UUID] = Form(...),
+    user: User = Depends(archive_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        archive = await _archive_location(session)
+        if archive is None:
+            raise ValueError("Архивная локация не настроена")
+        box = await PostgreSQLShipmentWorkflow(session).create_box(
+            location_id=archive.id, actor_id=user.id, card_ids=card_ids
+        )
+        number = box.box_number
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        await session.refresh(user)
+        return await placement_page(request, error=str(exc), user=user, session=session)
+    except IntegrityError:
+        await session.rollback()
+        await session.refresh(user)
+        return await placement_page(
+            request, error="Не удалось создать внутреннюю коробку. Проверьте выбранные карты.",
+            user=user, session=session,
+        )
+    message = f"Внутренняя коробка {number} создана."
+    return RedirectResponse(
+        url=f"/placement?message={quote(message, safe='')}", status_code=303
+    )
+
+
 @router.post("/placement/box")
 async def place_box(
     request: Request,
