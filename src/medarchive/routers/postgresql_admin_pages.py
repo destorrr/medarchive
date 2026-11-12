@@ -43,6 +43,8 @@ def _context(request: Request, user: User, **extra):
             {"url": "/admin", "label": "⚙️ Справочники"},
             {"url": "/admin/branches", "label": "🏢 Филиалы"},
             {"url": "/admin/users", "label": "👤 Пользователи"},
+            {"url": "/admin/couriers", "label": "🚚 Курьеры"},
+            {"url": "/admin/sections", "label": "🗂 Секции / Полки"},
         ],
     }
     ctx.update(extra)
@@ -248,3 +250,112 @@ async def users_edit(
         await session.rollback()
         raise
     return _redirect("/admin/users")
+
+
+@router.get("/admin/couriers")
+async def couriers_page(
+    request: Request,
+    user: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    couriers = await PostgreSQLAdminService(session).list_couriers()
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/postgresql_couriers.html",
+        context=_context(request, user, couriers=couriers),
+    )
+
+
+@router.post("/admin/couriers")
+async def couriers_create(
+    full_name: str = Form(...),
+    phone: str = Form(""),
+    _: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        await PostgreSQLAdminService(session).create_courier(
+            full_name=full_name, phone=phone
+        )
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _redirect("/admin/couriers")
+
+
+@router.post("/admin/couriers/{courier_id}/status")
+async def couriers_status(
+    courier_id: uuid.UUID,
+    is_active: bool = Form(...),
+    _: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        await PostgreSQLAdminService(session).set_courier_active(
+            courier_id, is_active
+        )
+        await session.commit()
+    except LookupError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _redirect("/admin/couriers")
+
+
+@router.get("/admin/sections")
+async def shelves_page(
+    request: Request,
+    user: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    shelves = await PostgreSQLAdminService(session).list_shelves()
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/postgresql_shelves.html",
+        context=_context(request, user, shelves=shelves),
+    )
+
+
+@router.post("/admin/sections")
+async def shelves_create(
+    section_name: str = Form(...),
+    shelf_name: str = Form(...),
+    _: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        await PostgreSQLAdminService(session).create_shelf(
+            section_name=section_name, shelf_name=shelf_name
+        )
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Такая полка уже существует") from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _redirect("/admin/sections")
+
+
+@router.post("/admin/sections/{shelf_id}/status")
+async def shelves_status(
+    shelf_id: uuid.UUID,
+    is_active: bool = Form(...),
+    _: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        await PostgreSQLAdminService(session).set_shelf_active(
+            shelf_id, is_active
+        )
+        await session.commit()
+    except LookupError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _redirect("/admin/sections")
