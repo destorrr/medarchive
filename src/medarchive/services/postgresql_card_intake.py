@@ -62,6 +62,8 @@ class PostgreSQLCardIntakeService:
             raise CardIntakeError("В QR-коде отсутствует ФИО пациента")
         try:
             birth_date = date.fromisoformat(birth_date_raw)
+            if birth_date.isoformat() != birth_date_raw:
+                raise ValueError("non-canonical date")
         except ValueError as exc:
             raise CardIntakeError("Дата рождения в QR-коде должна быть в формате ГГГГ-ММ-ДД") from exc
 
@@ -69,6 +71,10 @@ class PostgreSQLCardIntakeService:
             select(Card).where(Card.card_number == card_number).with_for_update()
         )
         if existing is not None:
+            if existing.full_name != full_name or existing.date_of_birth != birth_date:
+                raise CardIntakeError(
+                    "Номер карты уже зарегистрирован с другими персональными данными"
+                )
             if (
                 existing.status != "active"
                 or existing.current_location_id != branch_location.id
