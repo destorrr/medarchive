@@ -383,6 +383,11 @@ async def test_database_freezes_route_and_manifest_after_handover(pg_session):
             event.payload = {"tampered": True}
             await pg_session.flush()
 
+    with pytest.raises(DBAPIError):
+        async with pg_session.begin_nested():
+            await pg_session.delete(event)
+            await pg_session.flush()
+
 
 @pytest.mark.asyncio
 async def test_central_office_can_request_archive_cards_and_archive_can_repack_them(pg_session):
