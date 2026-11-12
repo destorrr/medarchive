@@ -14,6 +14,7 @@ from medarchive.adapters.postgresql.models import (
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_session
 from medarchive.main import create_app
+from medarchive.services.postgresql_bootstrap import ensure_system_locations
 from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
 
 
@@ -41,6 +42,12 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
 
         app.dependency_overrides[get_pg_session] = session_override
 
+        await ensure_system_locations(session)
+        archive_location = await session.scalar(
+            select(Location).where(Location.kind == "archive")
+        )
+        assert archive_location is not None
+
         suffix = uuid.uuid4().hex
         branch_id = uuid.uuid4()
         branch = Branch(
@@ -51,11 +58,6 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
             kind="branch", branch_id=branch_id, name="Incident test branch",
             is_active=True,
         )
-        archive_location = Location(
-            kind="archive", branch_id=None, name=f"Incident test archive {suffix}",
-            is_active=True,
-        )
-
         admin = User(
             username=f"incident-admin-{suffix}", password_hash="test-hash",
             full_name="Incident Admin", role="admin", is_active=True,
@@ -74,7 +76,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
             full_name="Incident Reporter", role="archive", is_active=True,
         )
         courier = Courier(full_name=f"Incident Courier {suffix}", is_active=True)
-        session.add_all([branch, branch_location, archive_location, admin, viewer, branch_user, archive_user, courier])
+        session.add_all([branch, branch_location, admin, viewer, branch_user, archive_user, courier])
         await session.flush()
 
         card = Card(
