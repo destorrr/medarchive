@@ -51,6 +51,6 @@ def test_user_role_branch_binding_validation(role, branch_id, valid):
 
 def test_postgresql_admin_routes_are_registered():
     app = create_app(Config(postgres_enabled=True, auth_backend="postgresql", secret_key="test-secret-key"))
-    paths = {route.path for route in app.routes}
+    paths = set(app.openapi()["paths"])
     assert "/api/admin/branches" in paths
     assert "/api/admin/users" in paths
