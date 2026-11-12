@@ -88,6 +88,15 @@ class Card(Base):
     __table_args__ = (
         CheckConstraint("status IN ('active', 'inactive', 'under_review')", name="cards_status_check"),
         CheckConstraint(
+            "custody_status IN ('available', 'at_court', 'at_insurance', 'at_external_organization')",
+            name="cards_custody_status_check",
+        ),
+        CheckConstraint(
+            "(custody_status = 'available' AND external_since IS NULL) OR "
+            "(custody_status <> 'available' AND external_since IS NOT NULL)",
+            name="ck_card_external_custody_fields",
+        ),
+        CheckConstraint(
             "(current_location_id IS NOT NULL AND current_shipment_id IS NULL) OR "
             "(current_location_id IS NULL AND current_shipment_id IS NOT NULL)",
             name="ck_card_exactly_one_location",
@@ -110,6 +119,10 @@ class Card(Base):
     current_location_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("locations.id", ondelete="RESTRICT"))
     current_shipment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("shipments.id", ondelete="RESTRICT", deferrable=True, initially="DEFERRED"))
     status: Mapped[str] = mapped_column(Text, server_default=text("'active'"))
+    custody_status: Mapped[str] = mapped_column(Text, server_default=text("'available'"))
+    external_organization: Mapped[str | None] = mapped_column(Text)
+    external_comment: Mapped[str | None] = mapped_column(Text)
+    external_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
