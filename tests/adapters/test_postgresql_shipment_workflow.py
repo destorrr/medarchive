@@ -625,7 +625,7 @@ async def test_central_office_external_custody_keeps_card_on_balance_and_blocks_
 
 
 @pytest.mark.asyncio
-async def test_central_office_external_custody_uses_at_other_and_returns_to_balance(pg_session):
+async def test_central_office_external_custody_uses_at_external_organization_and_returns_to_balance(pg_session):
     (
         branch, _branch_loc, _archive_loc, central_loc,
         _branch_user, _archive_user, central_user, _courier,
@@ -645,12 +645,12 @@ async def test_central_office_external_custody_uses_at_other_and_returns_to_bala
     await workflow.mark_external(
         card_id=card.id,
         actor_id=central_user.id,
-        custody_status="at_other",
+        custody_status="at_external_organization",
         organization="Внешняя организация",
         comment="Временная передача",
     )
     await pg_session.refresh(card)
-    assert card.custody_status == "at_other"
+    assert card.custody_status == "at_external_organization"
     assert card.current_location_id == central_loc.id
     assert card.external_organization == "Внешняя организация"
 
