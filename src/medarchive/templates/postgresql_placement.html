@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🗂 Размещение в архиве</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<div class="card">
+    <h3>Коробки без размещения</h3>
+    {% if boxes and shelves %}
+    <table class="data"><thead><tr><th>Коробка</th><th>Разместить на полке</th></tr></thead><tbody>
+    {% for box in boxes %}<tr><td>{{ box.box_number }}</td><td>
+        <form method="post" action="/placement/box">
+            <input type="hidden" name="box_id" value="{{ box.id }}">
+            <select name="shelf_id" required><option value="">— Полка —</option>
+                {% for shelf in shelves %}<option value="{{ shelf.id }}">{{ shelf.section_name }} / {{ shelf.shelf_name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">Разместить</button>
+        </form>
+    </td></tr>{% endfor %}
+    </tbody></table>
+    {% elif boxes %}<p class="muted">Сначала администратор должен настроить архивные полки.</p>
+    {% else %}<p class="muted">Нет коробок, ожидающих размещения.</p>{% endif %}
+</div>
+<div class="card">
+    <h3>Отдельные карты без размещения</h3>
+    {% if cards and shelves %}
+    <table class="data"><thead><tr><th>№ карты</th><th>ФИО</th><th>Разместить на полке</th></tr></thead><tbody>
+    {% for card in cards %}<tr><td>{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>
+        <form method="post" action="/placement/card">
+            <input type="hidden" name="card_id" value="{{ card.id }}">
+            <select name="shelf_id" required><option value="">— Полка —</option>
+                {% for shelf in shelves %}<option value="{{ shelf.id }}">{{ shelf.section_name }} / {{ shelf.shelf_name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">Разместить</button>
+        </form>
+    </td></tr>{% endfor %}
+    </tbody></table>
+    {% elif cards %}<p class="muted">Сначала администратор должен настроить архивные полки.</p>
+    {% else %}<p class="muted">Нет отдельных карт, ожидающих размещения.</p>{% endif %}
+</div>
+<div class="card">
+    <h3>Коробки на полках</h3>
+    {% if placed_boxes %}
+    <table class="data"><thead><tr><th>Коробка</th><th>Место</th><th>Действие</th></tr></thead><tbody>
+    {% for box, placement, shelf in placed_boxes %}<tr>
+        <td>{{ box.box_number }}</td><td>{{ shelf.section_name }} / {{ shelf.shelf_name }}</td><td>
+            <form method="post" action="/placement/remove-box">
+                <input type="hidden" name="box_id" value="{{ box.id }}">
+                <button class="btn btn-secondary" type="submit">Снять с полки</button>
+            </form>
+        </td>
+    </tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Размещённых коробок пока нет.</p>{% endif %}
+</div>
+<div class="card">
+    <h3>Отдельные карты на полках</h3>
+    {% if placed_cards %}
+    <table class="data"><thead><tr><th>№ карты</th><th>ФИО</th><th>Место</th><th>Действие</th></tr></thead><tbody>
+    {% for card, placement, shelf in placed_cards %}<tr>
+        <td>{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>{{ shelf.section_name }} / {{ shelf.shelf_name }}</td><td>
+            <form method="post" action="/placement/remove-card">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <button class="btn btn-secondary" type="submit">Снять с полки</button>
+            </form>
+        </td>
+    </tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Отдельных карт на полках пока нет.</p>{% endif %}
+</div>
+{% endblock %}
