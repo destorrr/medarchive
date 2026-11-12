@@ -303,7 +303,7 @@ async def test_receipt_is_blocked_without_changing_transit_state_when_box_manife
     # Simulate an inconsistent membership record; ordinary receipt must stop.
     membership.removed_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
     await pg_session.flush()
-    with pytest.raises(ShipmentWorkflowError, match="состав"):
+    with pytest.raises(ShipmentWorkflowError, match="Состав"):
         await workflow.receive(shipment_id=shipment.id, actor_id=archive_user.id)
 
     await pg_session.refresh(shipment)
