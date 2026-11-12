@@ -57,9 +57,11 @@ def create_app(config: Config | None = None) -> FastAPI:
     # Keep the PostgreSQL and legacy SQLite application surfaces separate.
     if config.auth_backend == "postgresql":
         from medarchive.routers.postgresql_dashboard import router as pg_dashboard_router
+        from medarchive.routers.postgresql_packing import router as pg_packing_router
         from medarchive.routers.postgresql_admin import router as pg_admin_router
         from medarchive.routers.postgresql_admin_pages import router as pg_admin_pages_router
         app.include_router(pg_dashboard_router)
+        app.include_router(pg_packing_router)
         app.include_router(pg_admin_router)
         app.include_router(pg_admin_pages_router)
     else:
