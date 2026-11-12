@@ -5,6 +5,7 @@ PostgreSQL service started by CI. Each test removes its own rows afterwards.
 """
 import os
 import uuid
+from datetime import date
 
 import httpx
 import pytest
@@ -669,4 +670,91 @@ async def test_admin_html_courier_shelf_forms_and_validation_on_postgresql():
                     await session.delete(shelf)
             await session.commit()
         app.dependency_overrides.clear()
+        await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_admin_service_rejects_deactivating_shelf_with_active_card_placement():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+
+    database = Database(DATABASE_URL)
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    try:
+        async with session.begin():
+            branch = Branch(
+                code=f"SH-{uuid.uuid4().hex[:10]}",
+                name="Shelf guard test branch",
+                is_active=True,
+            )
+            session.add(branch)
+            await session.flush()
+            branch_location = Location(
+                kind="branch", branch_id=branch.id,
+                name=branch.name, is_active=True,
+            )
+            archive_actor = User(
+                username=f"shelf-guard-{uuid.uuid4().hex[:12]}",
+                password_hash="test-hash",
+                full_name="Shelf Guard Actor",
+                role="archive",
+                branch_id=None,
+                is_active=True,
+            )
+            shelf = ArchiveShelf(
+                section_name=f"Guard {uuid.uuid4().hex[:8]}",
+                shelf_name="A-01",
+                is_active=True,
+            )
+            session.add_all([branch_location, archive_actor, shelf])
+            await session.flush()
+
+            archive = await session.scalar(
+                select(Location).where(Location.kind == "archive")
+            )
+            if archive is None:
+                archive = Location(
+                    kind="archive", branch_id=None,
+                    name="Test Archive", is_active=True,
+                )
+                session.add(archive)
+                await session.flush()
+
+            card = Card(
+                card_number=f"GUARD-{uuid.uuid4().hex[:12]}",
+                full_name="Shelf Guard Patient",
+                date_of_birth=date(1980, 1, 1),
+                origin_branch_id=branch.id,
+                current_location_id=archive.id,
+                current_shipment_id=None,
+                created_by=archive_actor.id,
+            )
+            session.add(card)
+            await session.flush()
+            session.add(CardPlacement(
+                card_id=card.id,
+                shelf_id=shelf.id,
+                placed_by=archive_actor.id,
+            ))
+            await session.flush()
+
+            with pytest.raises(ValueError, match="Сначала снимите все коробки и карты"):
+                await PostgreSQLAdminService(session).set_shelf_active(
+                    shelf.id, False
+                )
+            assert shelf.is_active is True
+    finally:
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
         await database.close()
