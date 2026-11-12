@@ -109,6 +109,15 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
                 assert employee.password_hash != "Integration-Password-2026"
                 assert employee.password_hash
 
+            # A branch employee can use the dashboard but cannot call admin APIs.
+            from medarchive.dependencies import get_auth
+            employee_session = get_auth().create_session_token(employee)
+            client.cookies.set("session", employee_session)
+            response = await client.get("/dashboard")
+            assert response.status_code == 200
+            response = await client.get("/api/admin/branches")
+            assert response.status_code == 403
+
             # Block the account by submitting the edit form without its checkbox.
             response = await client.post(
                 f"/admin/users/{user_id}/edit",
@@ -122,6 +131,10 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
             async with database.session_factory() as session:
                 employee = await session.get(User, user_id)
                 assert employee is not None and employee.is_active is False
+
+            # Deactivation invalidates already-issued sessions immediately.
+            response = await client.get("/dashboard")
+            assert response.status_code == 401
 
             # Restore the same account.
             response = await client.post(
@@ -137,6 +150,10 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
             async with database.session_factory() as session:
                 employee = await session.get(User, user_id)
                 assert employee is not None and employee.is_active is True
+
+            # Restoring the account makes the same valid session usable again.
+            response = await client.get("/dashboard")
+            assert response.status_code == 200
 
             # An active employee prevents branch deactivation.
             response = await client.post(
