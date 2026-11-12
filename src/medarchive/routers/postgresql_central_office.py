@@ -198,12 +198,22 @@ async def central_packing_page(
     location = await _central_location(session)
     boxes, cards, box_items = [], [], []
     if location is not None:
+        active_manifest_box = (
+            select(ShipmentBox.box_id)
+            .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
+            .where(
+                ShipmentBox.box_id == Box.id,
+                Shipment.status.in_(("draft", "in_transit")),
+            )
+            .exists()
+        )
         boxes = list((
             await session.scalars(
                 select(Box).where(
                     Box.current_location_id == location.id,
                     Box.status == "active",
                     Box.current_shipment_id.is_(None),
+                    ~active_manifest_box,
                 ).order_by(Box.created_at.desc())
             )
         ).all())
