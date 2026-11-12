@@ -317,8 +317,176 @@ async def test_workflow_guard_triggers_and_request_fulfillment_link_exist():
             "trg_boxes_received_manifest",
             "trg_shipment_transition_metadata_immutable",
             "trg_archive_request_transition_metadata_immutable",
+            "trg_cards_previous_shipment_pointer",
+            "trg_boxes_previous_shipment_pointer",
         } <= trigger_names
         assert "fulfillment_shipment_id" in archive_request_columns
         assert "ck_archive_request_fulfillment" in constraint_names
+    finally:
+        await engine.dispose()
+
+
+
+@pytest.mark.asyncio
+async def test_postgresql_preserves_exception_metadata_when_shipment_is_received():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                card_id, shipment_id = await _seed_transit_card(connection)
+                shipment = (
+                    await connection.execute(
+                        text("SELECT issued_by, to_location_id FROM shipments WHERE id = :id"),
+                        {"id": shipment_id},
+                    )
+                ).one()
+                actor_id, target_location_id = shipment
+                await connection.execute(
+                    text("""
+                        INSERT INTO shipment_cards (shipment_id, card_id, box_id)
+                        VALUES (:shipment_id, :card_id, NULL)
+                    """),
+                    {"shipment_id": shipment_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE cards
+                        SET current_location_id = NULL, current_shipment_id = :shipment_id
+                        WHERE id = :card_id
+                    """),
+                    {"shipment_id": shipment_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE shipments
+                        SET status = 'in_transit', handed_over_at = now()
+                        WHERE id = :id
+                    """),
+                    {"id": shipment_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE shipments
+                        SET status = 'exception', exception_by = :actor_id,
+                            exception_at = now(), exception_note = 'Тестовый инцидент'
+                        WHERE id = :id
+                    """),
+                    {"id": shipment_id, "actor_id": actor_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE cards
+                        SET current_location_id = :target_id, current_shipment_id = NULL
+                        WHERE id = :card_id
+                    """),
+                    {"target_id": target_location_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE shipments
+                        SET status = 'received', received_by = :actor_id, received_at = now()
+                        WHERE id = :id
+                    """),
+                    {"id": shipment_id, "actor_id": actor_id},
+                )
+                await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+                result = await connection.execute(
+                    text("""
+                        SELECT status, exception_by, exception_note
+                        FROM shipments WHERE id = :id
+                    """),
+                    {"id": shipment_id},
+                )
+                status, exception_by, exception_note = result.one()
+                assert status == "received"
+                assert exception_by == actor_id
+                assert exception_note == "Тестовый инцидент"
+            finally:
+                await transaction.rollback()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_postgresql_rejects_reassigning_card_from_an_unreceived_shipment():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    engine = create_async_engine(DATABASE_URL)
+    try:
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                card_id, previous_shipment_id = await _seed_transit_card(connection)
+                previous = (
+                    await connection.execute(
+                        text("""
+                            SELECT from_location_id, to_location_id, courier_id, issued_by
+                            FROM shipments WHERE id = :id
+                        """),
+                        {"id": previous_shipment_id},
+                    )
+                ).one()
+                await connection.execute(
+                    text("""
+                        INSERT INTO shipment_cards (shipment_id, card_id, box_id)
+                        VALUES (:shipment_id, :card_id, NULL)
+                    """),
+                    {"shipment_id": previous_shipment_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE cards
+                        SET current_location_id = NULL, current_shipment_id = :shipment_id
+                        WHERE id = :card_id
+                    """),
+                    {"shipment_id": previous_shipment_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE shipments
+                        SET status = 'in_transit', handed_over_at = now()
+                        WHERE id = :id
+                    """),
+                    {"id": previous_shipment_id},
+                )
+
+                new_shipment_id = uuid.uuid4()
+                await connection.execute(
+                    text("""
+                        INSERT INTO shipments
+                            (id, from_location_id, to_location_id, courier_id, issued_by)
+                        VALUES (:id, :source, :target, :courier, :actor)
+                    """),
+                    {
+                        "id": new_shipment_id,
+                        "source": previous.from_location_id,
+                        "target": previous.to_location_id,
+                        "courier": previous.courier_id,
+                        "actor": previous.issued_by,
+                    },
+                )
+                await connection.execute(
+                    text("""
+                        INSERT INTO shipment_cards (shipment_id, card_id, box_id)
+                        VALUES (:shipment_id, :card_id, NULL)
+                    """),
+                    {"shipment_id": new_shipment_id, "card_id": card_id},
+                )
+                await connection.execute(
+                    text("""
+                        UPDATE cards SET current_shipment_id = :new_shipment_id
+                        WHERE id = :card_id
+                    """),
+                    {"new_shipment_id": new_shipment_id, "card_id": card_id},
+                )
+                with pytest.raises(IntegrityError):
+                    await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+            finally:
+                await transaction.rollback()
     finally:
         await engine.dispose()
