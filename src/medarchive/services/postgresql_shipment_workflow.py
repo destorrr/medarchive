@@ -604,7 +604,11 @@ class PostgreSQLShipmentWorkflow:
         return user
 
     async def _location(self, location_id: uuid.UUID) -> Location:
-        location = await self.session.get(Location, location_id)
+        # A location row is the serialization point shared with admin branch
+        # deactivation. Lock it before any inventory or shipment mutation.
+        location = await self.session.scalar(
+            select(Location).where(Location.id == location_id).with_for_update()
+        )
         if location is None or not location.is_active:
             raise ShipmentWorkflowError("Место хранения не найдено или неактивно")
         return location
