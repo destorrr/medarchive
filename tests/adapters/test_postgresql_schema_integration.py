@@ -73,7 +73,7 @@ async def test_migrated_schema_contains_required_checks_and_logistics_indexes():
             "ix_cards_current_location",
             "ix_cards_current_shipment",
             "ix_boxes_current_location",
-            "uq_box_one_active_shipment",
+            "ix_boxes_current_shipment",
             "ix_shipments_route_status",
             "uq_card_one_active_box",
             "uq_card_one_active_archive_request",
