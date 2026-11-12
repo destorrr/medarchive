@@ -179,11 +179,13 @@ async def receive_confirm(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await receive_page(
             request, error=str(exc), user=user, session=session
         )
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         return await receive_page(
             request,
             error="Приёмка заблокирована ограничениями целостности. Проверьте состав отправления.",
@@ -298,9 +300,11 @@ async def place_box(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await placement_page(request, error=str(exc), user=user, session=session)
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         return await placement_page(
             request, error="Коробка уже размещена или полка занята.", user=user, session=session
         )
@@ -322,9 +326,11 @@ async def place_card(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await placement_page(request, error=str(exc), user=user, session=session)
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         return await placement_page(
             request, error="Карта уже размещена или полка занята.", user=user, session=session
         )
@@ -345,6 +351,7 @@ async def remove_box_from_shelf(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await placement_page(request, error=str(exc), user=user, session=session)
     return RedirectResponse("/placement?message=Коробка+снята+с+полки", status_code=303)
 
@@ -363,6 +370,7 @@ async def remove_card_from_shelf(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await placement_page(request, error=str(exc), user=user, session=session)
     return RedirectResponse("/placement?message=Карта+снята+с+полки", status_code=303)
 
@@ -441,6 +449,7 @@ async def archive_request_not_found(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await archive_requests_page(
             request, error=str(exc), user=user, session=session
         )
@@ -462,11 +471,13 @@ async def unpack_requested_card(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await archive_requests_page(
             request, error=str(exc), user=user, session=session
         )
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         return await archive_requests_page(
             request,
             error="Сначала снимите коробку с архивной полки.",
@@ -508,11 +519,13 @@ async def fulfill_archive_requests(
         await session.commit()
     except ValueError as exc:
         await session.rollback()
+        await session.refresh(user)
         return await archive_requests_page(
             request, error=str(exc), user=user, session=session
         )
     except IntegrityError:
         await session.rollback()
+        await session.refresh(user)
         return await archive_requests_page(
             request,
             error="Отправка заблокирована: проверьте полки, коробки и состав заявок.",
