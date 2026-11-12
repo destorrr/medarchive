@@ -62,6 +62,8 @@ def test_orm_maps_all_value_checks_and_full_text_index():
         "boxes_status_check",
         "ck_box_exactly_one_location",
         "shipments_status_check",
+        "box_cycles_cycle_number_check",
+        "archive_requests_status_check",
     }
     actual_checks = {
         constraint.name
@@ -75,3 +77,12 @@ def test_orm_maps_all_value_checks_and_full_text_index():
     full_text = next(index for index in indexes if index.name == "ix_cards_full_name")
     assert full_text.dialect_options["postgresql"]["using"] == "gin"
     assert "to_tsvector('simple', full_name)" in str(full_text.expressions[0])
+
+
+
+def test_box_maps_active_shipment_partial_unique_index():
+    indexes = Base.metadata.tables["boxes"].indexes
+    active_shipment = next(index for index in indexes if index.name == "uq_box_one_active_shipment")
+    assert active_shipment.unique is True
+    assert [column.name for column in active_shipment.columns] == ["current_shipment_id", "id"]
+    assert str(active_shipment.dialect_options["postgresql"]["where"]) == "current_shipment_id IS NOT NULL"
