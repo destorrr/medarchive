@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
@@ -156,7 +156,18 @@ class PostgreSQLShipmentWorkflow:
             .with_for_update()
         )
         if cycle is None:
-            raise ShipmentWorkflowError("У коробки нет открытого цикла")
+            last_number = await self.session.scalar(
+                select(func.max(BoxCycle.cycle_number)).where(BoxCycle.box_id == box.id)
+            )
+            cycle = BoxCycle(
+                box_id=box.id, cycle_number=(last_number or 0) + 1,
+                started_by=actor.id,
+            )
+            self.session.add(cycle)
+            await self.session.flush()
+            await self._event("box.cycle_started", "box", box.id, actor.id, {
+                "cycle_id": str(cycle.id), "cycle_number": cycle.cycle_number,
+            })
         self.session.add(BoxCardMembership(
             box_cycle_id=cycle.id, card_id=card.id, added_by=actor.id,
         ))
@@ -202,6 +213,19 @@ class PostgreSQLShipmentWorkflow:
         membership.removed_at = now
         membership.removed_by = actor.id
         await self.session.flush()
+        remaining = await self.session.scalar(
+            select(BoxCardMembership.id).where(
+                BoxCardMembership.box_cycle_id == cycle.id,
+                BoxCardMembership.removed_at.is_(None),
+            ).limit(1)
+        )
+        if remaining is None:
+            cycle.ended_at = now
+            cycle.ended_by = actor.id
+            await self.session.flush()
+            await self._event("box.cycle_closed", "box", box.id, actor.id, {
+                "cycle_id": str(cycle.id), "cycle_number": cycle.cycle_number,
+            })
         await self._event("card.removed_from_box", "card", card.id, actor.id, {
             "box_id": str(box.id), "location_id": str(location.id),
         })
