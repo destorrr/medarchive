@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
     ArchiveRequest, ArchiveShelf, Box, BoxPlacement, Card, CardPlacement,
-    BoxCardMembership, BoxCycle, DomainEvent, Location, User,
+    BoxCardMembership, BoxCycle, DomainEvent, Location, Shipment, ShipmentCard, User,
 )
 
 
@@ -58,6 +58,17 @@ class PostgreSQLArchiveWorkflow:
             )
             if active is not None:
                 raise ArchiveWorkflowError("На эту карту уже есть активная заявка")
+            active_manifest = await self.session.scalar(
+                select(ShipmentCard.card_id)
+                .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
+                .where(
+                    ShipmentCard.card_id == card.id,
+                    Shipment.status.in_(("draft", "in_transit")),
+                )
+                .limit(1)
+            )
+            if active_manifest is not None:
+                raise ArchiveWorkflowError("Карта уже включена в активное отправление")
             cards.append(card)
 
         requests = [
