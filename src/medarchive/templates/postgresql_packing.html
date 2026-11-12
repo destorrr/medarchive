@@ -4,6 +4,26 @@
 {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
 {% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
 
+{% if pending_card_data %}
+<div class="card">
+    <h3 style="margin-bottom:10px">Новая карта ещё не зарегистрирована</h3>
+    <p>Проверьте данные из QR-кода. До подтверждения запись в МедАрхиве не создаётся.</p>
+    <table class="data" style="margin:12px 0">
+        <tbody>
+            <tr><th>Номер карты</th><td>{{ pending_card_data.card_number }}</td></tr>
+            <tr><th>ФИО пациента</th><td>{{ pending_card_data.full_name }}</td></tr>
+            <tr><th>Дата рождения</th><td>{{ pending_card_data.birth_date }}</td></tr>
+            {% if pending_card_data.phone %}<tr><th>Телефон</th><td>{{ pending_card_data.phone }}</td></tr>{% endif %}
+        </tbody>
+    </table>
+    <form method="post" action="/packing/confirm-card">
+        <input type="hidden" name="box_id" value="{{ box.id }}">
+        <input type="hidden" name="qr_payload" value="{{ pending_qr_payload }}">
+        <button class="btn btn-primary" type="submit">Подтвердить регистрацию и добавить в коробку</button>
+    </form>
+</div>
+{% endif %}
+
 {% if not box %}
 <div class="card">
     <p>Создайте новую коробку, чтобы начать упаковку медицинских карт.</p>
