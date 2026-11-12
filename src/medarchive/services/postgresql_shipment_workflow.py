@@ -233,7 +233,9 @@ class PostgreSQLShipmentWorkflow:
         if (source.kind, target.kind) not in allowed_routes:
             raise ShipmentWorkflowError("Такой маршрут отправления не разрешён")
         await self._authorize_location(actor, source)
-        courier = await self.session.get(Courier, courier_id)
+        courier = await self.session.scalar(
+            select(Courier).where(Courier.id == courier_id).with_for_update()
+        )
         if courier is None or not courier.is_active:
             raise ShipmentWorkflowError("Курьер не найден или неактивен")
 
