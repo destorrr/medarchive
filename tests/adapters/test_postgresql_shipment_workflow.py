@@ -182,7 +182,7 @@ async def test_archive_cannot_send_unrequested_card_to_central_office(pg_session
 
 
 @pytest.mark.asyncio
-async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_box(pg_session):
+async def test_archive_issues_standalone_cards_and_central_office_boxes_them_for_return(pg_session):
     (
         branch, _branch_loc, archive_loc, central_loc,
         _branch_user, archive_user, central_user, courier,
@@ -205,16 +205,20 @@ async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_
     await pg_session.flush()
 
     workflow = PostgreSQLShipmentWorkflow(pg_session)
-    box = await workflow.create_box(
-        location_id=archive_loc.id,
-        actor_id=archive_user.id,
-        card_ids=[card.id for card in cards],
-    )
+    with pytest.raises(ShipmentWorkflowError, match="не формирует коробки"):
+        await workflow.create_box(
+            location_id=archive_loc.id, actor_id=archive_user.id,
+            card_ids=[card.id for card in cards],
+        )
+
     outbound = await workflow.create_draft(
         from_location_id=archive_loc.id, to_location_id=central_loc.id,
         courier_id=courier.id, issued_by=archive_user.id,
     )
-    await workflow.add_box(shipment_id=outbound.id, box_id=box.id, actor_id=archive_user.id)
+    for card in cards:
+        await workflow.add_standalone_card(
+            shipment_id=outbound.id, card_id=card.id, actor_id=archive_user.id,
+        )
     await workflow.hand_over(shipment_id=outbound.id, actor_id=archive_user.id)
     await workflow.receive(shipment_id=outbound.id, actor_id=central_user.id)
 
@@ -224,7 +228,11 @@ async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_
         assert card.current_location_id == central_loc.id
         assert request.status == "completed"
 
-    # The same physical box can be reused for the return route after receipt.
+    # Central office creates the box, packs cards, and sends the box to archive.
+    box = await workflow.create_box(
+        location_id=central_loc.id, actor_id=central_user.id,
+        card_ids=[card.id for card in cards],
+    )
     return_shipment = await workflow.create_draft(
         from_location_id=central_loc.id, to_location_id=archive_loc.id,
         courier_id=courier.id, issued_by=central_user.id,
@@ -241,7 +249,6 @@ async def test_archive_can_pack_multiple_requested_cards_and_central_can_return_
         await pg_session.refresh(card)
         assert card.current_location_id == archive_loc.id
         assert card.current_shipment_id is None
-
 
 @pytest.mark.asyncio
 async def test_admin_cannot_perform_ordinary_logistics(pg_session):
