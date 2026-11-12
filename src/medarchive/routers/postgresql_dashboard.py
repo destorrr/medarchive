@@ -25,7 +25,7 @@ from medarchive.adapters.postgresql.models import (
     ShipmentCard,
     User,
 )
-from medarchive.dependencies import get_pg_current_user, get_pg_session, require_pg_role
+from medarchive.dependencies import get_pg_session, require_pg_role
 from medarchive.adapters.postgresql.repositories import CardRepository
 
 
@@ -110,7 +110,7 @@ async def postgresql_dashboard(
             )
         )
 
-    if scope_location_id is None:
+    if user.role not in {"branch", "central_office", "archive"}:
         total_cards = await _count(session, Card)
         cards_placed = 0
         if archive_id is not None:
@@ -140,6 +140,13 @@ async def postgresql_dashboard(
         open_requests_query = select(func.count()).select_from(ArchiveRequest).where(
             ArchiveRequest.status.in_(("new", "in_progress"))
         )
+    elif scope_location_id is None:
+        total_cards = 0
+        cards_placed = 0
+        cards_in_branch = 0
+        cards_in_transit = 0
+        total_boxes = 0
+        open_requests_query = select(func.count()).select_from(ArchiveRequest).where(False)
     else:
         cards_at_location = int(
             await session.scalar(
@@ -202,20 +209,23 @@ async def postgresql_dashboard(
     open_requests = int(await session.scalar(open_requests_query) or 0)
 
     events_query = select(DomainEvent).order_by(DomainEvent.occurred_at.desc())
-    if scope_location_id is not None:
-        visible_card_ids = select(Card.id).where(Card.current_location_id == scope_location_id)
-        visible_shipment_ids = select(Shipment.id).where(
-            or_(
-                Shipment.from_location_id == scope_location_id,
-                Shipment.to_location_id == scope_location_id,
+    if user.role in {"branch", "central_office", "archive"}:
+        if scope_location_id is None:
+            events_query = events_query.where(False)
+        else:
+            visible_card_ids = select(Card.id).where(Card.current_location_id == scope_location_id)
+            visible_shipment_ids = select(Shipment.id).where(
+                or_(
+                    Shipment.from_location_id == scope_location_id,
+                    Shipment.to_location_id == scope_location_id,
+                )
             )
-        )
-        events_query = events_query.where(
-            or_(
-                (DomainEvent.aggregate_type == "card") & DomainEvent.aggregate_id.in_(visible_card_ids),
-                (DomainEvent.aggregate_type == "shipment") & DomainEvent.aggregate_id.in_(visible_shipment_ids),
+            events_query = events_query.where(
+                or_(
+                    (DomainEvent.aggregate_type == "card") & DomainEvent.aggregate_id.in_(visible_card_ids),
+                    (DomainEvent.aggregate_type == "shipment") & DomainEvent.aggregate_id.in_(visible_shipment_ids),
+                )
             )
-        )
     events = list((await session.scalars(events_query.limit(5))).all())
     card_ids = {
         event.aggregate_id for event in events if event.aggregate_type == "card"
