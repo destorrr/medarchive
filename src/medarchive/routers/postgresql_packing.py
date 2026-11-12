@@ -125,23 +125,25 @@ async def create_box(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        async with session.begin():
-            location = await session.scalar(
-                select(Location).where(
-                    Location.kind == "branch",
-                    Location.branch_id == user.branch_id,
-                    Location.is_active.is_(True),
-                )
+        location = await session.scalar(
+            select(Location).where(
+                Location.kind == "branch",
+                Location.branch_id == user.branch_id,
+                Location.is_active.is_(True),
             )
-            if location is None:
-                raise ValueError("Для филиала не настроено активное место хранения")
-            box = await PostgreSQLShipmentWorkflow(session).create_box(
-                location_id=location.id, actor_id=user.id
-            )
-            box_id = box.id
+        )
+        if location is None:
+            raise ValueError("Для филиала не настроено активное место хранения")
+        box = await PostgreSQLShipmentWorkflow(session).create_box(
+            location_id=location.id, actor_id=user.id
+        )
+        box_id = box.id
+        await session.commit()
     except ValueError as exc:
+        await session.rollback()
         return await _render_packing(request, user, session, error=str(exc))
     except IntegrityError:
+        await session.rollback()
         return await _render_packing(
             request, user, session,
             error="Не удалось создать коробку из-за конфликта данных. Повторите попытку.",
@@ -158,18 +160,20 @@ async def scan_card(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        async with session.begin():
-            card, created = await PostgreSQLCardIntakeService(session).register_from_qr(
-                payload=qr_payload, actor_id=user.id
-            )
-            await PostgreSQLShipmentWorkflow(session).add_card_to_box(
-                box_id=box_id, card_id=card.id, actor_id=user.id
-            )
+        card, created = await PostgreSQLCardIntakeService(session).register_from_qr(
+            payload=qr_payload, actor_id=user.id
+        )
+        await PostgreSQLShipmentWorkflow(session).add_card_to_box(
+            box_id=box_id, card_id=card.id, actor_id=user.id
+        )
+        await session.commit()
     except ValueError as exc:
+        await session.rollback()
         return await _render_packing(
             request, user, session, box_id=box_id, error=str(exc)
         )
     except IntegrityError:
+        await session.rollback()
         return await _render_packing(
             request, user, session, box_id=box_id,
             error="Карта с таким номером уже обрабатывается или нарушено ограничение БД.",
@@ -189,11 +193,12 @@ async def remove_card(
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        async with session.begin():
-            await PostgreSQLShipmentWorkflow(session).remove_card_from_box(
-                box_id=box_id, card_id=card_id, actor_id=user.id
-            )
+        await PostgreSQLShipmentWorkflow(session).remove_card_from_box(
+            box_id=box_id, card_id=card_id, actor_id=user.id
+        )
+        await session.commit()
     except ValueError as exc:
+        await session.rollback()
         return await _render_packing(
             request, user, session, box_id=box_id, error=str(exc)
         )
