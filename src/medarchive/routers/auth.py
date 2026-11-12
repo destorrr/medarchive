@@ -1,10 +1,11 @@
 """Роутер аутентификации: логин/логаут."""
 from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import RedirectResponse
-from medarchive.dependencies import get_db, get_auth, get_pg_auth
+from medarchive.dependencies import get_db, get_auth, get_pg_database
 from medarchive.adapters.sqlite.database import Database
 from medarchive.services.auth_service import AuthService
 from medarchive.services.postgresql_auth_service import PostgreSQLAuthService
+from medarchive.adapters.postgresql.repositories import UserRepository
 
 router = APIRouter()
 
@@ -21,11 +22,13 @@ async def login(
     password: str = Form(...),
     db: Database = Depends(get_db),
     auth: AuthService = Depends(get_auth),
-    pg_auth: PostgreSQLAuthService = Depends(get_pg_auth),
 ):
     config = request.app.state.config
     if config.auth_backend == "postgresql":
-        user = await pg_auth.authenticate(username, password)
+        pg_db = await get_pg_database()
+        async with pg_db.session_factory() as pg_session:
+            pg_auth = PostgreSQLAuthService(UserRepository(pg_session), auth)
+            user = await pg_auth.authenticate(username, password)
         if user is None:
             return request.app.state.templates.TemplateResponse(
                 request,
