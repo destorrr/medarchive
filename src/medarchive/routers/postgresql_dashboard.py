@@ -10,9 +10,14 @@ from fastapi.responses import RedirectResponse
 
 from medarchive.adapters.postgresql.models import (
     ArchiveRequest,
+    ArchiveShelf,
     Box,
+    BoxCardMembership,
+    BoxCycle,
+    BoxPlacement,
     Branch,
     Card,
+    CardPlacement,
     DomainEvent,
     Location,
     Shipment,
@@ -21,6 +26,7 @@ from medarchive.adapters.postgresql.models import (
     User,
 )
 from medarchive.dependencies import get_pg_current_user, get_pg_session, require_pg_role
+from medarchive.adapters.postgresql.repositories import CardRepository
 
 
 router = APIRouter()
@@ -48,6 +54,8 @@ EVENT_LABELS = {
 def _dashboard_context(request: Request, user: User, branch_name: str | None) -> dict:
     role_label = ROLE_LABELS.get(user.role, "Пользователь")
     menu_items = [{"url": "/dashboard", "label": "📊 Панель управления"}]
+    if user.role in {"archive", "viewer", "admin", "central_office"}:
+        menu_items.append({"url": "/search", "label": "🔍 Поиск"})
     if user.role == "admin":
         menu_items.append({"url": "/admin", "label": "⚙️ Администрирование"})
     return {
@@ -250,3 +258,187 @@ async def postgresql_dashboard(
     return request.app.state.templates.TemplateResponse(
         request=request, name="dashboard.html", context=ctx
     )
+
+
+def _card_status(card: Card, location_kind: str | None) -> tuple[str, str]:
+    if card.custody_status != "available":
+        labels = {
+            "at_court": ("В суде", "badge-pending_return"),
+            "at_insurance": ("В страховой", "badge-pending_return"),
+            "at_external_organization": ("Во внешней организации", "badge-pending_return"),
+        }
+        return labels.get(card.custody_status, (card.custody_status, "badge-pending_return"))
+    if card.current_shipment_id is not None:
+        return "В пути", "badge-in_transit"
+    if location_kind == "archive":
+        return "В архиве", "badge-placed"
+    if location_kind == "branch":
+        return "В филиале", "badge-in_branch"
+    if location_kind == "central_office":
+        return "В ЦО", "badge-in_box"
+    return card.status, "badge-in_branch"
+
+
+async def _search_context(
+    session: AsyncSession, user: User, query: str | None
+) -> dict:
+    query = (query or "").strip()
+    cards_out: list[dict] = []
+    boxes_out: list[dict] = []
+    if not query:
+        return {"query": query, "cards": cards_out, "boxes": boxes_out}
+
+    location_id = None
+    if user.role == "archive":
+        location_id = await session.scalar(
+            select(Location.id).where(Location.kind == "archive")
+        )
+    elif user.role == "central_office":
+        location_id = await session.scalar(
+            select(Location.id).where(Location.kind == "central_office")
+        )
+
+    matched_cards = await CardRepository(session).search(query, limit=50)
+    if location_id is not None:
+        matched_cards = [
+            card for card in matched_cards
+            if card.current_location_id == location_id
+        ]
+    card_ids = [card.id for card in matched_cards]
+    locations_by_id = {
+        item.id: item for item in (await session.scalars(select(Location))).all()
+    }
+
+    membership_rows = []
+    if card_ids:
+        membership_rows = list((
+            await session.execute(
+                select(BoxCardMembership, Box, BoxPlacement, ArchiveShelf)
+                .join(BoxCycle, BoxCycle.id == BoxCardMembership.box_cycle_id)
+                .join(Box, Box.id == BoxCycle.box_id)
+                .outerjoin(
+                    BoxPlacement,
+                    (BoxPlacement.box_id == Box.id) & BoxPlacement.removed_at.is_(None),
+                )
+                .outerjoin(ArchiveShelf, ArchiveShelf.id == BoxPlacement.shelf_id)
+                .where(
+                    BoxCardMembership.card_id.in_(card_ids),
+                    BoxCardMembership.removed_at.is_(None),
+                    BoxCycle.ended_at.is_(None),
+                )
+            )
+        )).all()
+    memberships_by_card = {}
+    for membership, box, placement, shelf in membership_rows:
+        memberships_by_card[membership.card_id] = {
+            "box_number": box.box_number,
+            "place": f"{shelf.section_name} / {shelf.shelf_name}" if shelf else None,
+        }
+
+    card_placements = {}
+    if card_ids:
+        rows = list((
+            await session.execute(
+                select(CardPlacement, ArchiveShelf)
+                .join(ArchiveShelf, ArchiveShelf.id == CardPlacement.shelf_id)
+                .where(
+                    CardPlacement.card_id.in_(card_ids),
+                    CardPlacement.removed_at.is_(None),
+                )
+            )
+        )).all()
+        card_placements = {
+            placement.card_id: f"{shelf.section_name} / {shelf.shelf_name}"
+            for placement, shelf in rows
+        }
+
+    for card in matched_cards:
+        location = locations_by_id.get(card.current_location_id)
+        status_label, status_badge = _card_status(
+            card, location.kind if location else None
+        )
+        membership = memberships_by_card.get(card.id, {})
+        cards_out.append({
+            "id": str(card.id),
+            "full_name": card.full_name,
+            "status_label": status_label,
+            "status_badge": status_badge,
+            "box_number": membership.get("box_number"),
+            "place": membership.get("place") or card_placements.get(card.id)
+            or (location.name if location else ("В пути" if card.current_shipment_id else None)),
+            "stale": [],
+        })
+
+    box_statement = (
+        select(Box, func.count(BoxCardMembership.id), BoxPlacement, ArchiveShelf)
+        .outerjoin(BoxCycle, (BoxCycle.box_id == Box.id) & BoxCycle.ended_at.is_(None))
+        .outerjoin(
+            BoxCardMembership,
+            (BoxCardMembership.box_cycle_id == BoxCycle.id)
+            & BoxCardMembership.removed_at.is_(None),
+        )
+        .outerjoin(
+            BoxPlacement,
+            (BoxPlacement.box_id == Box.id) & BoxPlacement.removed_at.is_(None),
+        )
+        .outerjoin(ArchiveShelf, ArchiveShelf.id == BoxPlacement.shelf_id)
+        .where(Box.box_number.ilike(f"%{query}%"))
+        .group_by(Box.id, BoxPlacement.id, ArchiveShelf.id)
+        .order_by(Box.box_number)
+        .limit(50)
+    )
+    for box, card_count, placement, shelf in (await session.execute(box_statement)).all():
+        if location_id is not None and box.current_location_id != location_id:
+            continue
+        location = locations_by_id.get(box.current_location_id)
+        boxes_out.append({
+            "id": str(box.id),
+            "box_number": box.box_number,
+            "status_label": "Активна" if box.status == "active" else box.status,
+            "status_badge": "badge-ready" if box.status == "active" else "badge-lost",
+            "card_count": int(card_count or 0),
+            "place": (
+                f"{shelf.section_name} / {shelf.shelf_name}" if shelf
+                else location.name if location
+                else ("В пути" if box.current_shipment_id else None)
+            ),
+        })
+    return {"query": query, "cards": cards_out, "boxes": boxes_out}
+
+
+@router.get("/search")
+async def postgresql_search_page(
+    request: Request,
+    query: str | None = None,
+    user: User = Depends(require_pg_role("archive", "central_office", "viewer", "admin")),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    ctx = _dashboard_context(request, user, None)
+    ctx.update(await _search_context(session, user, query))
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="search.html", context=ctx
+    )
+
+
+@router.get("/search/results")
+async def postgresql_search_results(
+    request: Request,
+    query: str | None = None,
+    user: User = Depends(require_pg_role("archive", "central_office", "viewer", "admin")),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    ctx = await _search_context(session, user, query)
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="search_fragment.html", context=ctx
+    )
+
+
+@router.post("/search")
+async def postgresql_search_submit(
+    query: str,
+    user: User = Depends(require_pg_role("archive", "central_office", "viewer", "admin")),
+):
+    from urllib.parse import quote
+    from fastapi.responses import RedirectResponse
+
+    return RedirectResponse(url=f"/search?query={quote(query)}", status_code=303)
