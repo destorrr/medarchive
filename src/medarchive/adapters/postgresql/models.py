@@ -35,7 +35,7 @@ class Branch(Base):
 class Location(Base):
     __tablename__ = "locations"
     __table_args__ = (
-        CheckConstraint("kind IN ('branch', 'central_office', 'archive')", name="ck_location_kind"),
+        CheckConstraint("kind IN ('branch', 'central_office', 'archive')", name="locations_kind_check"),
         CheckConstraint(
             "(kind = 'branch' AND branch_id IS NOT NULL) OR (kind <> 'branch' AND branch_id IS NULL)",
             name="ck_location_branch_binding",
@@ -55,7 +55,7 @@ class Location(Base):
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
-        CheckConstraint("role IN ('branch', 'central_office', 'archive', 'admin', 'viewer')", name="ck_user_role"),
+        CheckConstraint("role IN ('branch', 'central_office', 'archive', 'admin', 'viewer')", name="users_role_check"),
         CheckConstraint(
             "(role = 'branch' AND branch_id IS NOT NULL) OR (role <> 'branch' AND branch_id IS NULL)",
             name="ck_user_branch_binding",
@@ -86,7 +86,7 @@ class Courier(Base):
 class Card(Base):
     __tablename__ = "cards"
     __table_args__ = (
-        CheckConstraint("status IN ('active', 'inactive', 'under_review')", name="ck_card_status"),
+        CheckConstraint("status IN ('active', 'inactive', 'under_review')", name="cards_status_check"),
         CheckConstraint(
             "(current_location_id IS NOT NULL AND current_shipment_id IS NULL) OR "
             "(current_location_id IS NULL AND current_shipment_id IS NOT NULL)",
@@ -118,7 +118,7 @@ class Card(Base):
 class Box(Base):
     __tablename__ = "boxes"
     __table_args__ = (
-        CheckConstraint("status IN ('active', 'written_off', 'under_review')", name="ck_box_status"),
+        CheckConstraint("status IN ('active', 'written_off', 'under_review')", name="boxes_status_check"),
         CheckConstraint(
             "(current_location_id IS NOT NULL AND current_shipment_id IS NULL) OR "
             "(current_location_id IS NULL AND current_shipment_id IS NOT NULL)",
@@ -181,7 +181,7 @@ class Shipment(Base):
     __table_args__ = (
         CheckConstraint(
             "status IN ('draft', 'in_transit', 'received', 'exception', 'cancelled')",
-            name="ck_shipment_status",
+            name="shipments_status_check",
         ),
         CheckConstraint("from_location_id <> to_location_id", name="ck_shipment_distinct_locations"),
         CheckConstraint(
