@@ -304,7 +304,7 @@ def upgrade() -> None:
     for table in ("cards", "boxes"):
         op.execute(f"""
         CREATE CONSTRAINT TRIGGER trg_{table}_shipment_consistency
-        AFTER UPDATE OF current_location_id, current_shipment_id ON {table}
+        AFTER UPDATE ON {table}
         DEFERRABLE INITIALLY DEFERRED
         FOR EACH ROW EXECUTE FUNCTION medarchive_assert_shipment_consistency()
         """)
