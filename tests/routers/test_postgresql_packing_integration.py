@@ -24,10 +24,6 @@ from medarchive.main import create_app
 
 DATABASE_URL = os.getenv("MEDARCHIVE_DATABASE_URL")
 
-async def _yield_session(session):
-    yield session
-
-
 @pytest.mark.asyncio
 async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_history():
     if not DATABASE_URL:
@@ -49,7 +45,10 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
         expire_on_commit=False,
         join_transaction_mode="create_savepoint",
     )
-    app.dependency_overrides[get_pg_session] = lambda: _yield_session(session)
+    async def session_override():
+        yield session
+
+    app.dependency_overrides[get_pg_session] = session_override
     branch_id = uuid.uuid4()
     actor_id = uuid.uuid4()
     branch = Branch(
