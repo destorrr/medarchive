@@ -66,9 +66,10 @@ def upgrade() -> None:
                     USING ERRCODE = '23514';
             END IF;
         END IF;
-        RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
     END;
-    $$;
+    $;
     """)
     for table in ("shipment_boxes", "shipment_cards"):
         op.execute(f"""
@@ -101,9 +102,10 @@ def upgrade() -> None:
             RAISE EXCEPTION 'Состав коробки нельзя менять во время отправления или размещения на полке'
                 USING ERRCODE = '23514';
         END IF;
-        RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
     END;
-    $$;
+    $;
     """)
     op.execute("""
     CREATE TRIGGER trg_box_membership_mutation_guard
@@ -390,7 +392,12 @@ def upgrade() -> None:
             FROM boxes b JOIN locations l ON l.id = b.current_location_id
             WHERE b.id = NEW.box_id AND b.current_shipment_id IS NULL AND b.status = 'active';
             SELECT is_active INTO shelf_active FROM archive_shelves WHERE id = NEW.shelf_id;
-            IF location_kind IS DISTINCT FROM 'archive' OR shelf_active IS DISTINCT FROM true THEN
+            IF location_kind IS DISTINCT FROM 'archive' OR shelf_active IS DISTINCT FROM true
+               OR NOT EXISTS (
+                    SELECT 1 FROM box_cycles bc
+                    JOIN box_card_memberships m ON m.box_cycle_id = bc.id
+                    WHERE bc.box_id = NEW.box_id AND bc.ended_at IS NULL AND m.removed_at IS NULL
+               ) THEN
                 RAISE EXCEPTION 'Размещать можно только активную коробку, находящуюся в архиве, на активной полке'
                     USING ERRCODE = '23514';
             END IF;
