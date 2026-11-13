@@ -11,8 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
+    Box,
     BoxCardMembership,
     Branch,
+    DomainEvent,
     Card,
     Location,
     User,
@@ -156,6 +158,20 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
             assert card is not None
             assert card.current_location_id == location.id
             assert card.origin_branch_id == branch_id
+
+            # Once the final card is removed, the now-empty box can be written off.
+            client.cookies.set("session", token)
+            written_off = await client.post(
+                "/packing/write-off-box", data={"box_id": str(box_id)}
+            )
+            assert written_off.status_code == 303
+            box = await session.get(Box, box_id)
+            assert box is not None and box.status == "written_off"
+            event = await session.scalar(select(DomainEvent).where(
+                DomainEvent.event_type == "box.written_off",
+                DomainEvent.aggregate_id == box_id,
+            ))
+            assert event is not None
     finally:
         app.dependency_overrides.clear()
         await session.rollback()
