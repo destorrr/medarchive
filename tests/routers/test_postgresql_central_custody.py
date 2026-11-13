@@ -107,9 +107,11 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
 
     try:
         async with session.begin():
-            session.add_all([branch, central, archive, actor, archive_actor, courier, empty_box])
+            # Persist locations before the box that references the Central
+            # Office location; SQLAlchemy has no ORM relationship to order these.
+            session.add_all([branch, central, archive, actor, archive_actor, courier])
             await session.flush()
-            session.add(card)
+            session.add_all([empty_box, card])
 
         token = get_auth().create_session_token(actor)
         transport = httpx.ASGITransport(app=app)
