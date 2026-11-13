@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
     ArchiveShelf, Box, BoxCardMembership, BoxCycle, BoxPlacement, Branch,
-    Card, CardPlacement, Courier, Location, User,
+    Card, CardPlacement, Courier, Location, Shipment, User,
 )
 from medarchive.config import Config
 from medarchive.dependencies import get_pg_database
@@ -436,6 +436,22 @@ async def test_courier_with_draft_shipment_cannot_be_deactivated():
                 to_location_id=target.id,
                 courier_id=courier.id,
                 issued_by=actor.id,
+            )
+            with pytest.raises(ValueError, match="активными отправлениями"):
+                await PostgreSQLAdminService(session).set_courier_active(
+                    courier.id, False
+                )
+
+            shipment = await session.scalar(
+                select(Shipment).where(Shipment.courier_id == courier.id)
+            )
+            assert shipment is not None
+            workflow = PostgreSQLShipmentWorkflow(session)
+            await workflow.hand_over(shipment_id=shipment.id, actor_id=actor.id)
+            await workflow.register_exception(
+                shipment_id=shipment.id,
+                actor_id=actor.id,
+                note="Тестовый инцидент: отправление ещё не принято",
             )
             with pytest.raises(ValueError, match="активными отправлениями"):
                 await PostgreSQLAdminService(session).set_courier_active(
