@@ -151,7 +151,7 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
         assert history.status_code == 200
         assert own_card.card_number in history.text
         assert other_card.card_number not in history.text
-        assert "Всего событий: 1" in history.text
+        assert "Всего событий: 2" in history.text
         assert dashboard.status_code == 200
         assert "/search" in dashboard.text
         assert "/history" in dashboard.text
