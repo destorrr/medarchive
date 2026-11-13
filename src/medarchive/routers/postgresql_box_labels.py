@@ -71,5 +71,13 @@ async def box_label_page(
             "location": location,
             "qr_data_uri": _qr_data_uri(payload),
             "qr_payload": payload,
+            "username": user.username,
+            "user_login": user.username,
+            "user_full_name": user.full_name or user.username,
+            "user_initials": "".join(part[0] for part in (user.full_name or "").split()[:2]).upper() or user.username[:1].upper(),
+            "user_branch": location.name,
+            "user_role_pill": {"branch": "Филиал", "central_office": "Центральный офис", "archive": "Архив", "admin": "Администратор"}.get(user.role, user.role),
+            "role_label": {"branch": "Филиал", "central_office": "Центральный офис", "archive": "Архив", "admin": "Администратор"}.get(user.role, user.role),
+            "menu_items": [],
         },
     )
