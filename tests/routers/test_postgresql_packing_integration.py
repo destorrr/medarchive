@@ -129,6 +129,8 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
             )
             assert scanned.status_code == 200
             assert "Новая карта ещё не зарегистрирована" in scanned.text
+            assert 'href="/search"' in scanned.text
+            assert 'href="/history"' in scanned.text
             assert await session.scalar(
                 select(Card.id).where(Card.card_number == qr["card_number"])
             ) is None
