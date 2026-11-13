@@ -156,6 +156,11 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Коробка не найдена или не находится в постоянной локации")
         location = await self._location(box.current_location_id)
         await self._authorize_location(actor, location)
+        placement = await self.session.scalar(select(BoxPlacement.id).where(
+            BoxPlacement.box_id == box.id, BoxPlacement.removed_at.is_(None)
+        ).limit(1))
+        if placement is not None:
+            raise ShipmentWorkflowError("Сначала снимите коробку с архивной полки")
         if await self._has_active_manifest_box(box.id):
             raise ShipmentWorkflowError("Коробка уже включена в активное отправление")
         card = await self.session.scalar(
@@ -212,6 +217,11 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Коробка не найдена или недоступна")
         location = await self._location(box.current_location_id)
         await self._authorize_location(actor, location)
+        placement = await self.session.scalar(select(BoxPlacement.id).where(
+            BoxPlacement.box_id == box.id, BoxPlacement.removed_at.is_(None)
+        ).limit(1))
+        if placement is not None:
+            raise ShipmentWorkflowError("Сначала снимите коробку с архивной полки")
         if await self._has_active_manifest_box(box.id):
             raise ShipmentWorkflowError("Нельзя менять состав коробки в активном отправлении")
         cycle = await self.session.scalar(
