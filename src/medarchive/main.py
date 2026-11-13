@@ -1,4 +1,6 @@
 """Точка входа FastAPI-приложения."""
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -10,18 +12,9 @@ def create_app(config: Config | None = None) -> FastAPI:
     if config is None:
         config = Config()
 
-    app = FastAPI(title="МедАрхив", version="0.1.0")
-    app.state.config = config
-
-    # Jinja2 templates
-    app.state.templates = Jinja2Templates(directory="src/medarchive/templates")
-
-    # Init dependencies
-    init_dependencies(config)
-
-    # Startup: init DB
-    @app.on_event("startup")
-    async def startup():
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # Startup: initialize the configured database backend.
         if config.auth_backend == "sqlite":
             from medarchive.dependencies import get_db
             db = await get_db()
@@ -35,24 +28,34 @@ def create_app(config: Config | None = None) -> FastAPI:
                 async with session.begin():
                     await ensure_system_locations(session)
 
-    # Shutdown: close DB (safe — no hang on cleanup errors)
-    @app.on_event("shutdown")
-    async def shutdown():
-        import medarchive.dependencies as dependencies
-        if dependencies._db is not None:
-            try:
-                db = dependencies._db
-                dependencies._db = None  # prevent double-close
-                await db.close()
-            except Exception:
-                pass
-        if dependencies._pg_db is not None:
-            try:
-                pg_db = dependencies._pg_db
-                dependencies._pg_db = None  # allow clean app re-initialization
-                await pg_db.close()
-            except Exception:
-                pass
+        try:
+            yield
+        finally:
+            # Shutdown: close database resources, allowing clean app re-initialization.
+            import medarchive.dependencies as dependencies
+            if dependencies._db is not None:
+                try:
+                    db = dependencies._db
+                    dependencies._db = None
+                    await db.close()
+                except Exception:
+                    pass
+            if dependencies._pg_db is not None:
+                try:
+                    pg_db = dependencies._pg_db
+                    dependencies._pg_db = None
+                    await pg_db.close()
+                except Exception:
+                    pass
+
+    app = FastAPI(title="МедАрхив", version="0.1.0", lifespan=lifespan)
+    app.state.config = config
+
+    # Jinja2 templates
+    app.state.templates = Jinja2Templates(directory="src/medarchive/templates")
+
+    # Init dependencies
+    init_dependencies(config)
 
     # Routers
     from medarchive.routers.auth import router as auth_router
