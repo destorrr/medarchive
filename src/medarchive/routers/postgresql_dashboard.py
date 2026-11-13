@@ -45,8 +45,23 @@ EVENT_LABELS = {
     "shipment.received": "Отправление принято",
     "archive_request.created": "Создана заявка в архив",
     "archive_request.not_found": "Карта не найдена в архиве",
+    "box.created": "Создана коробка",
+    "box.cycle_started": "Начат новый цикл коробки",
+    "box.cycle_closed": "Цикл коробки закрыт",
     "box.placed_in_archive": "Коробка размещена в архиве",
+    "box.removed_from_archive_shelf": "Коробка снята с архивной полки",
+    "box.written_off": "Коробка списана",
+    "card.added_to_box": "Карта добавлена в коробку",
+    "card.removed_from_box": "Карта извлечена из коробки",
     "card.placed_in_archive": "Карта размещена в архиве",
+    "card.removed_from_archive_shelf": "Карта снята с архивной полки",
+    "card.shipment_handed_over": "Карта передана курьеру",
+    "card.shipment_received": "Карта принята получателем",
+    "box.shipment_handed_over": "Коробка передана курьеру",
+    "box.shipment_received": "Коробка принята получателем",
+    "shipment.created": "Создано отправление",
+    "shipment.exception_registered": "Зарегистрирован инцидент отправления",
+    "shipment.exception_resolved": "Инцидент отправления разрешён",
     "card.external_custody_started": "Карта передана внешней организации",
     "card.external_custody_returned": "Карта возвращена в ЦО",
 }
@@ -528,9 +543,6 @@ async def postgresql_history_page(
             except (TypeError, ValueError):
                 pass
 
-    cards = {item.id: item for item in (await session.scalars(
-        select(Card).where(Card.id.in_(card_ids))
-    )).all()} if card_ids else {}
     boxes = {item.id: item for item in (await session.scalars(
         select(Box).where(Box.id.in_(box_ids))
     )).all()} if box_ids else {}
@@ -540,6 +552,10 @@ async def postgresql_history_page(
     archive_requests = {item.id: item for item in (await session.scalars(
         select(ArchiveRequest).where(ArchiveRequest.id.in_(request_ids))
     )).all()} if request_ids else {}
+    card_ids.update(item.card_id for item in archive_requests.values())
+    cards = {item.id: item for item in (await session.scalars(
+        select(Card).where(Card.id.in_(card_ids))
+    )).all()} if card_ids else {}
     actors = {item.id: item for item in (await session.scalars(
         select(User).where(User.id.in_(actor_ids))
     )).all()} if actor_ids else {}
