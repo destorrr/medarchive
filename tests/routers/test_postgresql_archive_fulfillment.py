@@ -202,8 +202,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert in_transit_card.current_shipment_id == shipment_id
 
             client.cookies.set("session", central_token)
-            central_receive = await client.get(
-            )
+            central_receive = await client.get("/central/receive")
             assert central_receive.status_code == 200
             assert requested_card.card_number in central_receive.text
 
