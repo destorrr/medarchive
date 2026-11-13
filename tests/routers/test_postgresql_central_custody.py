@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
-    Box, BoxCardMembership, Branch, Card, Courier, DomainEvent, Location, Shipment, User,
+    ArchiveShelf, Box, BoxCardMembership, BoxPlacement, Branch, Card, Courier, DomainEvent, Location, Shipment, ShipmentBox, User,
 )
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_database, get_pg_session
@@ -87,6 +87,11 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         id=uuid.uuid4(), kind="archive", branch_id=None,
         name="Custody Archive", is_active=True,
     )
+    archive_shelf = ArchiveShelf(
+        id=uuid.uuid4(), section_name="C", shelf_name=f"CUSTODY-{uuid.uuid4().hex[:6]}",
+        qr_code=f"CUSTODY-SHELF-{uuid.uuid4().hex[:8]}", is_active=True,
+    )
+    shelf_id = archive_shelf.id
     courier = Courier(
         id=uuid.uuid4(), full_name="Custody Workflow Courier", is_active=True,
     )
@@ -115,7 +120,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         async with session.begin():
             # Persist locations before the box that references the Central
             # Office location; SQLAlchemy has no ORM relationship to order these.
-            session.add_all([branch, central, archive, actor, archive_actor, courier])
+            session.add_all([branch, central, archive, archive_shelf, actor, archive_actor, courier])
             await session.flush()
             session.add_all([empty_box, card])
 
@@ -251,6 +256,86 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert "Отметить передачу" in returned_page.text
             assert "Вернуть на баланс ЦО" not in returned_page.text
             assert "Test External Organization" not in returned_page.text
+
+        # After the physical return, the card becomes eligible for normal
+        # Central Office packing and can travel to the archive in a box.
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            client.cookies.set("session", token)
+            available_packing = await client.get("/central/packing")
+            assert available_packing.status_code == 200
+            assert card.card_number in available_packing.text
+            packed = await client.post(
+                "/central/packing/add-card",
+                data={"box_id": str(empty_box_id), "card_id": str(card_id)},
+            )
+            assert packed.status_code == 303
+            await session.refresh(card)
+            active_membership = await session.scalar(
+                select(BoxCardMembership).where(
+                    BoxCardMembership.card_id == card_id,
+                    BoxCardMembership.removed_at.is_(None),
+                )
+            )
+            assert active_membership is not None
+            assert card.current_location_id == central_id
+            assert card.current_shipment_id is None
+            assert card.custody_status == "available"
+            dispatched = await client.post(
+                "/central/transfer/confirm",
+                data={
+                    "box_id": str(empty_box_id),
+                    "to_location_id": str(archive_id),
+                    "courier_id": str(courier_id),
+                    "card_ids": [],
+                },
+            )
+            assert dispatched.status_code == 303
+            shipment = await session.scalar(
+                select(Shipment).where(
+                    Shipment.from_location_id == central_id,
+                    Shipment.to_location_id == archive_id,
+                    Shipment.status == "in_transit",
+                )
+            )
+            assert shipment is not None
+            assert await session.scalar(
+                select(ShipmentBox.box_id).where(
+                    ShipmentBox.shipment_id == shipment.id
+                )
+            ) == empty_box_id
+            client.cookies.set("session", archive_token)
+            incoming = await client.get("/receive")
+            assert incoming.status_code == 200
+            assert card.card_number in incoming.text
+            receipt = await client.post(
+                "/receive/confirm",
+                data={"shipment_id": str(shipment.id), "confirmed": "true"},
+            )
+            assert receipt.status_code == 303
+            placed = await client.post(
+                "/placement/box",
+                data={"box_id": str(empty_box_id), "shelf_id": str(shelf_id)},
+            )
+            assert placed.status_code == 303
+        await session.refresh(card)
+        await session.refresh(empty_box)
+        await session.refresh(shipment)
+        assert card.current_location_id == archive_id
+        assert card.current_shipment_id is None
+        assert card.custody_status == "available"
+        assert empty_box.current_location_id == archive_id
+        assert empty_box.current_shipment_id is None
+        assert shipment.status == "received"
+        final_placement = await session.scalar(
+            select(BoxPlacement).where(
+                BoxPlacement.box_id == empty_box_id,
+                BoxPlacement.removed_at.is_(None),
+            )
+        )
+        assert final_placement is not None
+        assert final_placement.shelf_id == shelf_id
+        assert final_placement.placed_by == archive_actor_id
 
         events = list((
             await session.scalars(
