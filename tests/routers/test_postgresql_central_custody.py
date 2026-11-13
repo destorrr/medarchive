@@ -120,6 +120,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             session.add_all([empty_box, card])
 
         token = get_auth().create_session_token(actor)
+        archive_token = get_auth().create_session_token(archive_actor)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             client.cookies.set("session", token)
@@ -207,7 +208,6 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert await session.scalar(select(Shipment.id)) is None
 
             # Archive staff must not be able to manage Central Office custody.
-            archive_token = get_auth().create_session_token(type("TokenUser", (), {"id": archive_actor_id})())
             client.cookies.set("session", archive_token)
             forbidden_page = await client.get("/central/custody")
             forbidden_mark = await client.post(
