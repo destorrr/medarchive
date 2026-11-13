@@ -110,6 +110,14 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
         "birth_date": "1981-06-07",
         "phone": "+70000000000",
     }, ensure_ascii=False)
+    second_card_number = f"FLOW-SECOND-{uuid.uuid4().hex[:10]}"
+    second_qr_payload = json.dumps({
+        "version": 1,
+        "card_number": second_card_number,
+        "full_name": "Second Full Flow Test Patient",
+        "birth_date": "1982-08-09",
+        "phone": "+70000000001",
+    }, ensure_ascii=False)
 
     try:
         async with session.begin():
@@ -151,6 +159,25 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             card_id = card.id
 
             client.cookies.set("session", branch_token)
+            second_scanned = await client.post(
+                "/packing/scan-card",
+                data={"box_id": str(branch_box_id), "qr_payload": second_qr_payload},
+            )
+            assert second_scanned.status_code == 200
+            assert "Second Full Flow Test Patient" in second_scanned.text
+            client.cookies.set("session", branch_token)
+            second_confirmed = await client.post(
+                "/packing/confirm-card",
+                data={"box_id": str(branch_box_id), "qr_payload": second_qr_payload},
+            )
+            assert second_confirmed.status_code == 303
+            second_card = await session.scalar(
+                select(Card).where(Card.card_number == second_card_number)
+            )
+            assert second_card is not None
+            second_card_id = second_card.id
+
+            client.cookies.set("session", branch_token)
             branch_dispatch = await client.post(
                 "/transfer/confirm",
                 data={
@@ -181,25 +208,46 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert archive_receipt.status_code == 303
             await session.refresh(card)
             branch_box = await session.get(Box, branch_box_id)
+            await session.refresh(second_card)
             assert card.current_location_id == archive_location.id
             assert card.current_shipment_id is None
+            assert second_card.current_location_id == archive_location.id
+            assert second_card.current_shipment_id is None
             assert branch_box is not None
             assert branch_box.current_location_id == archive_location.id
+            branch_box_members = list((await session.scalars(
+                select(BoxCardMembership).where(
+                    BoxCardMembership.box_cycle_id.in_(
+                        select(BoxCycle.id).where(BoxCycle.box_id == branch_box_id)
+                    ),
+                    BoxCardMembership.removed_at.is_(None),
+                )
+            )).all())
+            assert {membership.card_id for membership in branch_box_members} == {
+                card_id, second_card_id,
+            }
 
-            # The archive extracts the requested card before unboxed fulfillment.
+            # The archive extracts both requested cards before unboxed fulfillment.
             client.cookies.set("session", archive_token)
             extracted = await client.post(
                 "/placement/remove-card-from-box",
                 data={"box_id": str(branch_box_id), "card_id": str(card_id)},
             )
             assert extracted.status_code == 303
-            active_membership = await session.scalar(
-                select(BoxCardMembership).where(
-                    BoxCardMembership.card_id == card_id,
-                    BoxCardMembership.removed_at.is_(None),
-                )
+            client.cookies.set("session", archive_token)
+            second_extracted = await client.post(
+                "/placement/remove-card-from-box",
+                data={"box_id": str(branch_box_id), "card_id": str(second_card_id)},
             )
-            assert active_membership is None
+            assert second_extracted.status_code == 303
+            for extracted_card_id in (card_id, second_card_id):
+                active_membership = await session.scalar(
+                    select(BoxCardMembership).where(
+                        BoxCardMembership.card_id == extracted_card_id,
+                        BoxCardMembership.removed_at.is_(None),
+                    )
+                )
+                assert active_membership is None
 
             client.cookies.set("session", central_token)
             search = await client.get(
@@ -210,7 +258,7 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             client.cookies.set("session", central_token)
             request_created = await client.post(
                 "/requests/create",
-                data={"card_ids": str(card_id)},
+                data={"card_ids": [str(card_id), str(second_card_id)]},
             )
             assert request_created.status_code == 303
 
@@ -218,17 +266,24 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             fulfilled = await client.post(
                 "/requests/fulfill",
                 data={
-                    "card_ids": [str(card_id)],
+                    "card_ids": [str(card_id), str(second_card_id)],
                     "courier_id": str(courier.id),
                 },
             )
             assert fulfilled.status_code == 303
-            archive_request = await session.scalar(
-                select(ArchiveRequest).where(ArchiveRequest.card_id == card_id)
+            archive_requests = list((await session.scalars(
+                select(ArchiveRequest).where(
+                    ArchiveRequest.card_id.in_([card_id, second_card_id])
+                )
+            )).all())
+            assert len(archive_requests) == 2
+            assert all(request.status == "in_progress" for request in archive_requests)
+            assert all(request.fulfilled_by == archive_actor.id for request in archive_requests)
+            archive_request = next(request for request in archive_requests if request.card_id == card_id)
+            second_archive_request = next(
+                request for request in archive_requests if request.card_id == second_card_id
             )
-            assert archive_request is not None
-            assert archive_request.status == "in_progress"
-            assert archive_request.fulfilled_by == archive_actor.id
+            assert archive_request.fulfillment_shipment_id == second_archive_request.fulfillment_shipment_id
             archive_to_central = await session.get(
                 Shipment, archive_request.fulfillment_shipment_id
             )
@@ -241,14 +296,13 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
                     ShipmentBox.shipment_id == archive_to_central.id
                 )
             ) is None
-            unboxed_manifest = await session.scalar(
+            unboxed_manifest = list((await session.scalars(
                 select(ShipmentCard).where(
                     ShipmentCard.shipment_id == archive_to_central.id,
-                    ShipmentCard.card_id == card_id,
                 )
-            )
-            assert unboxed_manifest is not None
-            assert unboxed_manifest.box_id is None
+            )).all())
+            assert {item.card_id for item in unboxed_manifest} == {card_id, second_card_id}
+            assert all(item.box_id is None for item in unboxed_manifest)
 
             client.cookies.set("session", central_token)
             central_receipt = await client.post(
@@ -260,16 +314,20 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             )
             assert central_receipt.status_code == 303
             await session.refresh(card)
-            await session.refresh(archive_request)
+            await session.refresh(second_card)
+            for request in archive_requests:
+                await session.refresh(request)
             assert card.current_location_id == central_location.id
             assert card.current_shipment_id is None
-            assert archive_request.status == "completed"
+            assert second_card.current_location_id == central_location.id
+            assert second_card.current_shipment_id is None
+            assert all(request.status == "completed" for request in archive_requests)
 
-            # Central Office packs the card into its own box and returns that box to the archive.
+            # Central Office packs both cards into its own box and returns that box to the archive.
             client.cookies.set("session", central_token)
             central_box_response = await client.post(
                 "/central/packing/new-box",
-                data={"card_ids": [str(card_id)]},
+                data={"card_ids": [str(card_id), str(second_card_id)]},
             )
             assert central_box_response.status_code == 303
             central_box = await session.scalar(
@@ -280,15 +338,19 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             )
             assert central_box is not None
             central_box_id = central_box.id
-            central_box_membership = await session.scalar(
+            central_box_memberships = list((await session.scalars(
                 select(BoxCardMembership).where(
-                    BoxCardMembership.card_id == card_id,
+                    BoxCardMembership.card_id.in_([card_id, second_card_id]),
                     BoxCardMembership.removed_at.is_(None),
                 )
-            )
-            assert central_box_membership is not None
-            cycle = await session.get(BoxCycle, central_box_membership.box_cycle_id)
-            assert cycle is not None and cycle.ended_at is None
+            )).all())
+            assert {membership.card_id for membership in central_box_memberships} == {
+                card_id, second_card_id,
+            }
+            cycle_ids = {membership.box_cycle_id for membership in central_box_memberships}
+            assert len(cycle_ids) == 1
+            cycle = await session.get(BoxCycle, next(iter(cycle_ids)))
+            assert cycle is not None and cycle.box_id == central_box_id and cycle.ended_at is None
 
             client.cookies.set("session", central_token)
             central_dispatch = await client.post(
@@ -348,11 +410,39 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert active_placement.placed_by == archive_actor.id
 
         await session.refresh(card)
+        await session.refresh(second_card)
         await session.refresh(central_box)
         assert card.current_location_id == archive_location.id
         assert card.current_shipment_id is None
+        assert second_card.current_location_id == archive_location.id
+        assert second_card.current_shipment_id is None
         assert central_box.current_location_id == archive_location.id
         assert central_box.current_shipment_id is None
+        final_memberships = list((await session.scalars(
+            select(BoxCardMembership).where(
+                BoxCardMembership.card_id.in_([card_id, second_card_id]),
+                BoxCardMembership.removed_at.is_(None),
+            )
+        )).all())
+        assert {membership.card_id for membership in final_memberships} == {
+            card_id, second_card_id,
+        }
+        assert {membership.box_cycle_id for membership in final_memberships} == {cycle.id}
+        final_manifest_cards = list((await session.scalars(
+            select(ShipmentCard).where(ShipmentCard.shipment_id == central_to_archive.id)
+        )).all())
+        assert {item.card_id for item in final_manifest_cards} == {card_id, second_card_id}
+        assert all(item.box_id == central_box_id for item in final_manifest_cards)
+        assert branch_box.current_location_id == archive_location.id
+        assert branch_box.current_shipment_id is None
+        assert not (await session.scalars(
+            select(BoxCardMembership).where(
+                BoxCardMembership.box_cycle_id.in_(
+                    select(BoxCycle.id).where(BoxCycle.box_id == branch_box_id)
+                ),
+                BoxCardMembership.removed_at.is_(None),
+            )
+        )).all()
         assert central_box.created_by == central_actor.id
         assert (await session.get(Shipment, branch_shipment.id)).status == "received"
         assert (await session.get(Shipment, archive_to_central.id)).status == "received"
