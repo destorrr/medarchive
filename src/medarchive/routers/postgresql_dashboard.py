@@ -527,7 +527,7 @@ async def postgresql_search_results(
 @router.post("/search")
 async def postgresql_search_submit(
     query: str,
-    user: User = Depends(require_pg_role("archive", "central_office", "viewer", "admin")),
+    user: User = Depends(require_pg_role("branch", "archive", "central_office", "viewer", "admin")),
 ):
     from urllib.parse import quote
     from fastapi.responses import RedirectResponse
@@ -539,7 +539,7 @@ async def postgresql_search_submit(
 async def postgresql_history_page(
     request: Request,
     page: int = 1,
-    user: User = Depends(require_pg_role("archive", "central_office", "viewer", "admin")),
+    user: User = Depends(require_pg_role("branch", "archive", "central_office", "viewer", "admin")),
     session: AsyncSession = Depends(get_pg_session),
 ):
     page = max(1, page)
