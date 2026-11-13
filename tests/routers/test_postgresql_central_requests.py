@@ -93,25 +93,29 @@ async def test_postgresql_central_office_creates_archive_card_request():
         token = get_auth().create_session_token(actor)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            client.cookies.set("session", token)
             search = await client.get(
                 "/requests/new",
                 params={"query": card.card_number},
-                cookies={"session": token},
             )
             assert search.status_code == 200
             assert card.card_number in search.text
 
+            client.cookies.set("session", token)
             created = await client.post(
                 "/requests/create",
                 data={"card_ids": str(card.id)},
-                cookies={"session": token},
             )
             assert created.status_code == 303
 
-            central_receive = await client.get("/central/receive", cookies={"session": token})
-            central_packing = await client.get("/central/packing", cookies={"session": token})
-            central_transfer = await client.get("/central/transfer", cookies={"session": token})
-            central_custody = await client.get("/central/custody", cookies={"session": token})
+            client.cookies.set("session", token)
+            central_receive = await client.get("/central/receive")
+            client.cookies.set("session", token)
+            central_packing = await client.get("/central/packing")
+            client.cookies.set("session", token)
+            central_transfer = await client.get("/central/transfer")
+            client.cookies.set("session", token)
+            central_custody = await client.get("/central/custody")
             assert central_receive.status_code == 200
             assert "Приёмка отправлений в ЦО" in central_receive.text
             assert central_packing.status_code == 200
