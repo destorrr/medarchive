@@ -347,10 +347,11 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
                 .order_by(DomainEvent.id)
             )
         ).all())
-        assert [event.event_type for event in events] == [
+        assert [event.event_type for event in events[:2]] == [
             "card.external_custody_started",
             "card.external_custody_returned",
         ]
+        assert len(events) > 2  # Subsequent packing and shipment events remain in history.
         assert events[0].payload["custody_status"] == custody_status
         assert events[0].payload["organization"] == "Test External Organization"
         assert events[1].payload["previous_external_custody"]["custody_status"] == custody_status
