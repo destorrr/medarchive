@@ -152,8 +152,9 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
         branch_id=None,
         is_active=True,
     )
+    central_actor_id = uuid.uuid4()
     central_actor = User(
-        id=uuid.uuid4(),
+        id=central_actor_id,
         username=f"central-place-{uuid.uuid4().hex[:12]}",
         password_hash="test-only-hash",
         full_name="Central Placement Requester",
@@ -258,7 +259,7 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
                 )
             with pytest.raises(ArchiveWorkflowError, match="снимите карту с архивной полки"):
                 await PostgreSQLArchiveWorkflow(session).create_requests(
-                    card_ids=[card_id], actor_id=central_actor.id
+                    card_ids=[card_id], actor_id=central_actor_id
                 )
             assert await session.scalar(
                 select(CardPlacement.id).where(
