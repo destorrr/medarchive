@@ -57,6 +57,7 @@ def _context(request: Request, user: User, **extra) -> dict:
         "menu_items": [
             {"url": "/dashboard", "label": "📊 Панель управления"},
             {"url": "/search", "label": "🔍 Поиск"},
+            {"url": "/history", "label": "📜 Журнал движений"},
             {"url": "/requests/new", "label": "📋 Запросить карты из архива"},
             {"url": "/central/receive", "label": "📥 Приёмка"},
             {"url": "/central/packing", "label": "📦 Упаковка"},
