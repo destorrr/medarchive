@@ -93,8 +93,9 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         id=uuid.uuid4(), box_number=f"BX-CU-{uuid.uuid4().hex[:10].upper()}",
         current_location_id=central.id, status="active", created_by=actor.id,
     )
+    card_id = uuid.uuid4()
     card = Card(
-        id=uuid.uuid4(),
+        id=card_id,
         card_number=f"CU-{uuid.uuid4().hex[:10]}",
         full_name="Custody Test Patient",
         date_of_birth=date(1982, 3, 4),
@@ -126,7 +127,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             marked = await client.post(
                 "/central/custody/mark",
                 data={
-                    "card_id": str(card.id),
+                    "card_id": str(card_id),
                     "custody_status": custody_status,
                     "organization": "Test External Organization",
                     "comment": "Передано по акту № 17",
@@ -163,7 +164,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             client.cookies.set("session", token)
             add_to_box = await client.post(
                 "/central/packing/add-card",
-                data={"box_id": str(empty_box.id), "card_id": str(card.id)},
+                data={"box_id": str(empty_box.id), "card_id": str(card_id)},
             )
             assert add_to_box.status_code == 200
             assert "Карта не найдена в месте хранения коробки или недоступна" in add_to_box.text
@@ -171,7 +172,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             client.cookies.set("session", token)
             create_box_with_external_card = await client.post(
                 "/central/packing/new-box",
-                data={"card_ids": str(card.id)},
+                data={"card_ids": str(card_id)},
             )
             assert create_box_with_external_card.status_code == 200
             assert "Карта передана во внешнюю организацию и недоступна для внутреннего перемещения" in create_box_with_external_card.text
@@ -180,7 +181,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             dispatch_external_card = await client.post(
                 "/central/transfer/confirm",
                 data={
-                    "card_ids": str(card.id),
+                    "card_ids": str(card_id),
                     "to_location_id": str(archive.id),
                     "courier_id": str(courier.id),
                 },
@@ -194,7 +195,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert card.custody_status == custody_status
             assert await session.scalar(
                 select(BoxCardMembership.id).where(
-                    BoxCardMembership.card_id == card.id,
+                    BoxCardMembership.card_id == card_id,
                     BoxCardMembership.removed_at.is_(None),
                 )
             ) is None
@@ -207,13 +208,13 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             forbidden_mark = await client.post(
                 "/central/custody/mark",
                 data={
-                    "card_id": str(card.id),
+                    "card_id": str(card_id),
                     "custody_status": "at_court",
                     "organization": "Unauthorized",
                 },
             )
             forbidden_return = await client.post(
-                "/central/custody/return", data={"card_id": str(card.id)}
+                "/central/custody/return", data={"card_id": str(card_id)}
             )
             assert forbidden_page.status_code == 403
             assert forbidden_mark.status_code == 403
@@ -223,7 +224,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             returned = await client.post(
                 "/central/custody/return",
                 data={
-                    "card_id": str(card.id),
+                    "card_id": str(card_id),
                     "comment": "Возвращена по акту № 18",
                 },
             )
@@ -251,7 +252,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
                 select(DomainEvent)
                 .where(
                     DomainEvent.aggregate_type == "card",
-                    DomainEvent.aggregate_id == card.id,
+                    DomainEvent.aggregate_id == card_id,
                 )
                 .order_by(DomainEvent.id)
             )
