@@ -1125,3 +1125,20 @@ async def test_placed_archive_box_must_be_removed_from_shelf_before_write_off(pg
     with pytest.raises(ShipmentWorkflowError, match="снимите коробку"):
         await workflow.write_off_box(box_id=box.id, actor_id=archive_user.id)
     await pg_session.refresh(box); assert box.status == "active"
+
+
+
+@pytest.mark.asyncio
+async def test_box_emptied_by_removing_last_card_can_be_written_off(pg_session):
+    branch, branch_loc, _archive, _central, branch_user, *_ = await seed_locations(pg_session)
+    card = Card(card_number=f"C-{uuid.uuid4().hex}", full_name="Patient",
+        date_of_birth=__import__("datetime").date(1980, 1, 1),
+        origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active")
+    pg_session.add(card); await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=branch_loc.id, actor_id=branch_user.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=branch_user.id)
+    await workflow.remove_card_from_box(box_id=box.id, card_id=card.id, actor_id=branch_user.id)
+    await workflow.write_off_box(box_id=box.id, actor_id=branch_user.id)
+    await pg_session.refresh(box)
+    assert box.status == "written_off"
