@@ -1217,7 +1217,15 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
                 role="branch", branch_id=branch.id, is_active=True,
             )
             courier = Courier(full_name="Branch Shipment Test Courier", is_active=True)
-            session.add_all([source, actor, courier])
+            central_actor = User(
+                username=f"central-shipment-{uuid.uuid4().hex[:12]}",
+                password_hash="test-hash",
+                full_name="Central Shipment Test Actor",
+                role="central_office",
+                branch_id=None,
+                is_active=True,
+            )
+            session.add_all([source, actor, courier, central_actor])
             await session.flush()
             target = await session.scalar(
                 select(Location).where(
@@ -1267,12 +1275,12 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
             await session.flush()
 
             await workflow.add_standalone_card(
-                shipment_id=shipment.id, card_id=card.id, actor_id=actor.id
+                shipment_id=shipment.id, card_id=card.id, actor_id=central_actor.id
             )
-            await workflow.hand_over(shipment_id=shipment.id, actor_id=actor.id)
+            await workflow.hand_over(shipment_id=shipment.id, actor_id=central_actor.id)
             await workflow.register_exception(
                 shipment_id=shipment.id,
-                actor_id=actor.id,
+                actor_id=central_actor.id,
                 note="Отправление ожидает разрешения инцидента",
             )
             with pytest.raises(ValueError, match="незавершённые отправления"):
