@@ -65,9 +65,12 @@ async def test_postgresql_archive_pages_render_with_archive_role():
         token = get_auth().create_session_token(actor)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            receive = await client.get("/receive", cookies={"session": token})
-            placement = await client.get("/placement", cookies={"session": token})
-            requests = await client.get("/requests", cookies={"session": token})
+            client.cookies.set("session", token)
+            receive = await client.get("/receive")
+            client.cookies.set("session", token)
+            placement = await client.get("/placement")
+            client.cookies.set("session", token)
+            requests = await client.get("/requests")
 
         assert receive.status_code == 200
         assert "Приёмка отправлений" in receive.text
