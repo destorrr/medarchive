@@ -148,6 +148,9 @@ async def test_postgresql_central_office_creates_archive_card_request():
             assert "Отправка из центрального офиса" in central_transfer.text
             assert central_custody.status_code == 200
             assert "Внешнее хранение карт" in central_custody.text
+            for page in (central_receive, central_packing, central_transfer, central_custody):
+                assert 'href="/search"' in page.text
+                assert 'href="/history"' in page.text
 
             # Archive staff may fulfil requests, but cannot create them on behalf of CO.
             client.cookies.set("session", get_auth().create_session_token(archive_actor))
