@@ -77,10 +77,13 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
 
     try:
         async with session.begin():
-            session.add_all([
-                branch, other_branch, branch_location, other_location, actor,
-                own_card, other_card,
-            ])
+            # Flush referenced rows first: these models intentionally use
+            # explicit foreign-key IDs without ORM relationships.
+            session.add_all([branch, other_branch])
+            await session.flush()
+            session.add_all([branch_location, other_location, actor])
+            await session.flush()
+            session.add_all([own_card, other_card])
             await session.flush()
             session.add_all([
                 DomainEvent(
