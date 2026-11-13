@@ -377,12 +377,11 @@ async def _search_context(
                 Shipment.to_location_id == location_id,
             ),
         )
+        visible_shipment_ids = set((await session.scalars(visible_shipments)).all())
         matched_cards = [
             card for card in matched_cards
             if card.current_location_id == location_id
-            or card.current_shipment_id in (
-                await session.scalars(visible_shipments)
-            ).all()
+            or card.current_shipment_id in visible_shipment_ids
         ]
     card_ids = [card.id for card in matched_cards]
     locations_by_id = {
@@ -516,7 +515,7 @@ async def postgresql_search_page(
 async def postgresql_search_results(
     request: Request,
     query: str | None = None,
-    user: User = Depends(require_pg_role("archive", "central_office", "viewer", "admin")),
+    user: User = Depends(require_pg_role("branch", "archive", "central_office", "viewer", "admin")),
     session: AsyncSession = Depends(get_pg_session),
 ):
     ctx = await _search_context(session, user, query)
