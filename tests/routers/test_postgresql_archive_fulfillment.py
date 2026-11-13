@@ -23,6 +23,10 @@ from medarchive.adapters.postgresql.models import (
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_database, get_pg_session
 from medarchive.main import create_app
+from medarchive.services.postgresql_shipment_workflow import (
+    PostgreSQLShipmentWorkflow,
+    ShipmentWorkflowError,
+)
 
 
 DATABASE_URL = os.getenv("MEDARCHIVE_DATABASE_URL")
@@ -164,6 +168,39 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert all(row.status == "new" for row in request_rows)
             assert all(row.fulfillment_shipment_id is None for row in request_rows)
             assert await session.scalar(select(Shipment.id)) is None
+
+            # The archive may use internal storage boxes, but it must never
+            # dispatch a transport box to Central Office: fulfillment is unboxed.
+            workflow = PostgreSQLShipmentWorkflow(session)
+            archive_box = await workflow.create_box(
+                location_id=archive_location_id,
+                actor_id=archive_actor_id,
+                card_ids=[unrequested_card_id],
+            )
+            forbidden_box_shipment = await workflow.create_draft(
+                from_location_id=archive_location_id,
+                to_location_id=central_location_id,
+                courier_id=courier_id,
+                issued_by=archive_actor_id,
+            )
+            await workflow.add_box(
+                shipment_id=forbidden_box_shipment.id,
+                box_id=archive_box.id,
+                actor_id=archive_actor_id,
+            )
+            with pytest.raises(
+                ShipmentWorkflowError,
+                match="архив отправляет только отдельные карты, без коробок",
+            ):
+                await workflow.hand_over(
+                    shipment_id=forbidden_box_shipment.id,
+                    actor_id=archive_actor_id,
+                )
+            assert forbidden_box_shipment.status == "draft"
+            assert archive_box.current_location_id == archive_location_id
+            assert archive_box.current_shipment_id is None
+            assert unrequested_card.current_location_id == archive_location_id
+            assert unrequested_card.current_shipment_id is None
 
             client.cookies.set("session", archive_token)
             dispatched = await client.post(
