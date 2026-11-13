@@ -83,6 +83,22 @@ async def test_postgresql_archive_pages_render_with_archive_role():
         for page in (receive, placement, requests):
             assert 'href="/search"' in page.text
             assert 'href="/history"' in page.text
+
+        viewer = User(
+            id=uuid.uuid4(), username=f"archive-viewer-{uuid.uuid4().hex[:12]}",
+            password_hash="test-only-hash", full_name="Archive Read Only",
+            role="viewer", branch_id=None, is_active=True,
+        )
+        session.add(viewer)
+        await session.flush()
+        viewer_token = get_auth().create_session_token(viewer)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            denied_receive = await client.post("/receive/confirm", data={"shipment_id": str(uuid.uuid4()), "confirmed": "true"}, cookies={"session": viewer_token})
+            denied_placement = await client.post("/placement/card", data={"card_id": str(uuid.uuid4()), "shelf_id": str(uuid.uuid4())}, cookies={"session": viewer_token})
+            denied_fulfilment = await client.post("/requests/fulfill", data={"card_ids": str(uuid.uuid4()), "courier_id": str(uuid.uuid4())}, cookies={"session": viewer_token})
+        assert denied_receive.status_code == 403
+        assert denied_placement.status_code == 403
+        assert denied_fulfilment.status_code == 403
     finally:
         app.dependency_overrides.clear()
         await session.rollback()
