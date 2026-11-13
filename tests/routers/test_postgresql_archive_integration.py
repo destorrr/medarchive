@@ -174,7 +174,7 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
             page = await client.get("/placement")
             assert page.status_code == 200
             assert card.card_number in page.text
-            assert "A-PLACEMENT / Shelf-01" not in page.text
+            assert "Отдельных карт на полках пока нет." in page.text
 
             client.cookies.set("session", token)
             placed = await client.post(
