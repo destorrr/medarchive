@@ -73,6 +73,15 @@ async def test_postgresql_central_office_creates_archive_card_request():
         branch_id=None,
         is_active=True,
     )
+    archive_actor = User(
+        id=uuid.uuid4(),
+        username=f"archive-request-{uuid.uuid4().hex[:10]}",
+        password_hash="test-only-hash",
+        full_name="Archive Request Operator",
+        role="archive",
+        branch_id=None,
+        is_active=True,
+    )
     card = Card(
         id=uuid.uuid4(),
         card_number=f"REQ-{uuid.uuid4().hex[:10]}",
@@ -86,7 +95,7 @@ async def test_postgresql_central_office_creates_archive_card_request():
     )
     try:
         async with session.begin():
-            session.add_all([branch, archive, central_location, actor])
+            session.add_all([branch, archive, central_location, actor, archive_actor])
             await session.flush()
             session.add(card)
 
@@ -124,6 +133,25 @@ async def test_postgresql_central_office_creates_archive_card_request():
             assert "Отправка из центрального офиса" in central_transfer.text
             assert central_custody.status_code == 200
             assert "Внешнее хранение карт" in central_custody.text
+
+            # Archive staff may fulfil requests, but cannot create them on behalf of CO.
+            client.cookies.set("session", get_auth().create_session_token(archive_actor))
+            forbidden_search = await client.get("/requests/new", params={"query": card.card_number})
+            forbidden_create = await client.post(
+                "/requests/create", data={"card_ids": str(card.id)}
+            )
+            assert forbidden_search.status_code == 403
+            assert forbidden_create.status_code == 403
+
+            # Conversely, CO cannot access the archive fulfilment queue or dispatch endpoint.
+            client.cookies.set("session", token)
+            forbidden_queue = await client.get("/requests")
+            forbidden_fulfilment = await client.post(
+                "/requests/fulfill",
+                data={"card_ids": str(card.id), "courier_id": str(uuid.uuid4())},
+            )
+            assert forbidden_queue.status_code == 403
+            assert forbidden_fulfilment.status_code == 403
 
         request_row = await session.scalar(
             select(ArchiveRequest).where(ArchiveRequest.card_id == card.id)
