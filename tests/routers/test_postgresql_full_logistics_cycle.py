@@ -164,8 +164,7 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert branch_shipment.status == "in_transit"
 
             client.cookies.set("session", archive_token)
-            archive_incoming = await client.get(
-            )
+            archive_incoming = await client.get("/receive")
             assert archive_incoming.status_code == 200
             assert card_number in archive_incoming.text
             client.cookies.set("session", archive_token)
