@@ -1038,6 +1038,74 @@ async def test_qr_intake_waits_for_branch_deactivation_location_lock():
 
 
 @pytest.mark.asyncio
+async def test_branch_with_active_box_inventory_cannot_be_deactivated():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+
+    database = Database(DATABASE_URL)
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    try:
+        async with session.begin():
+            branch = Branch(
+                code=f"AB-{uuid.uuid4().hex[:10]}",
+                name="Active box inventory branch",
+                is_active=True,
+            )
+            session.add(branch)
+            await session.flush()
+            location = Location(
+                kind="branch", branch_id=branch.id,
+                name=branch.name, is_active=True,
+            )
+            actor = User(
+                username=f"active-box-{uuid.uuid4().hex[:12]}",
+                password_hash="test-hash",
+                full_name="Active Box Test Actor",
+                role="branch",
+                branch_id=branch.id,
+                is_active=True,
+            )
+            session.add_all([location, actor])
+            await session.flush()
+            box = Box(
+                box_number=f"AB-BOX-{uuid.uuid4().hex[:10]}",
+                current_location_id=location.id,
+                current_shipment_id=None,
+                status="active",
+                created_by=actor.id,
+            )
+            session.add(box)
+            await session.flush()
+
+            actor.is_active = False
+            await session.flush()
+            with pytest.raises(
+                ValueError, match="на его балансе остаются карты или коробки"
+            ):
+                await PostgreSQLAdminService(session).set_branch_active(
+                    branch.id, False
+                )
+            assert branch.is_active is True
+            assert location.is_active is True
+            assert box.status == "active"
+            assert box.current_location_id == location.id
+    finally:
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
+        await database.close()
+
+
+@pytest.mark.asyncio
 async def test_branch_can_be_deactivated_after_its_empty_box_is_written_off():
     if not DATABASE_URL:
         pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
