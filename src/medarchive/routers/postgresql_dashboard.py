@@ -572,12 +572,19 @@ async def postgresql_history_page(
                     Shipment.to_location_id == scope_location_id,
                 )
             )
-            visible_cards = select(Card.id).where(
-                or_(
-                    Card.current_location_id == scope_location_id,
-                    Card.current_shipment_id.in_(visible_shipments),
+            if user.role == "branch":
+                # A branch retains access to the audit trail of cards it
+                # originally registered, even after they leave its premises.
+                visible_cards = select(Card.id).where(
+                    Card.origin_branch_id == user.branch_id
                 )
-            )
+            else:
+                visible_cards = select(Card.id).where(
+                    or_(
+                        Card.current_location_id == scope_location_id,
+                        Card.current_shipment_id.in_(visible_shipments),
+                    )
+                )
             visible_boxes = select(Box.id).where(
                 or_(
                     Box.current_location_id == scope_location_id,
