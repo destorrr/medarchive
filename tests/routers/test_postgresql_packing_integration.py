@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from medarchive.adapters.postgresql.models import (
     Box,
     BoxCardMembership,
+    BoxCycle,
     Branch,
     DomainEvent,
     Card,
@@ -184,8 +185,38 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
             assert card.current_location_id == location.id
             assert card.origin_branch_id == branch_id
 
-            # Once the final card is removed, the now-empty box can be written off.
+            # Reuse the same empty box: the next scan must open a new cycle,
+            # while the previous membership remains in the audit history.
             client.cookies.set("session", token)
+            reused = await client.post(
+                "/packing/scan-card",
+                data={"box_id": str(box_id), "qr_payload": json.dumps(qr, ensure_ascii=False)},
+            )
+            assert reused.status_code == 303
+            cycles = list((await session.scalars(
+                select(BoxCycle).where(BoxCycle.box_id == box_id).order_by(BoxCycle.cycle_number)
+            )).all())
+            assert [cycle.cycle_number for cycle in cycles] == [1, 2]
+            assert cycles[0].ended_at is not None
+            assert cycles[1].ended_at is None
+            memberships = list((await session.scalars(
+                select(BoxCardMembership)
+                .where(BoxCardMembership.card_id == card_id)
+                .order_by(BoxCardMembership.added_at)
+            )).all())
+            assert len(memberships) == 2
+            assert memberships[0].removed_at is not None
+            assert memberships[1].removed_at is None
+            assert memberships[0].box_cycle_id == cycles[0].id
+            assert memberships[1].box_cycle_id == cycles[1].id
+
+            # Remove the card again; only then is the box eligible for write-off.
+            client.cookies.set("session", token)
+            removed_again = await client.post(
+                "/packing/remove-card",
+                data={"box_id": str(box_id), "card_id": str(card_id)},
+            )
+            assert removed_again.status_code == 303
             written_off = await client.post(
                 "/packing/write-off-box", data={"box_id": str(box_id)}
             )
