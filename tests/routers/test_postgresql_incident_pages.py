@@ -6,6 +6,7 @@ from datetime import date
 import httpx
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
@@ -16,7 +17,7 @@ from medarchive.dependencies import get_auth, get_pg_session
 from medarchive.main import create_app
 from medarchive.services.postgresql_bootstrap import ensure_system_locations
 from medarchive.services.postgresql_shipment_workflow import (
-    PostgreSQLShipmentWorkflow, ShipmentWorkflowError,
+    PostgreSQLShipmentWorkflow,
 )
 
 
@@ -177,17 +178,22 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     ShipmentCard.card_id == card.id,
                 ))
                 assert manifest_row is not None
-                await session.delete(manifest_row)
-                await session.flush()
-                with pytest.raises(ShipmentWorkflowError, match="состав отправления"):
-                    await workflow.resolve_exception(
-                        shipment_id=shipment_id,
-                        actor_id=archive_user.id,
-                        resolution_note="Попытка принять неполный манифест",
-                    )
+                # PostgreSQL rejects any attempt to alter a handed-over
+                # manifest, so an incomplete manifest cannot be introduced
+                # between incident registration and resolution.
+                with pytest.raises(IntegrityError, match="Состав отправления можно менять только в черновике"):
+                    async with session.begin_nested():
+                        await session.delete(manifest_row)
+                        await session.flush()
+
                 await session.refresh(shipment)
                 await session.refresh(card)
                 await session.refresh(box)
+                persisted_manifest = await session.scalar(select(ShipmentCard).where(
+                    ShipmentCard.shipment_id == shipment_id,
+                    ShipmentCard.card_id == card.id,
+                ))
+                assert persisted_manifest is not None
                 assert shipment.status == "exception"
                 assert card.current_shipment_id == shipment_id
                 assert box.current_shipment_id == shipment_id
@@ -197,12 +203,6 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     DomainEvent.event_type == "shipment.exception_resolved",
                     DomainEvent.aggregate_id == shipment_id,
                 )) is None
-
-                # Restore the exact manifest item, then resolve normally.
-                session.add(ShipmentCard(
-                    shipment_id=shipment_id, card_id=card.id, box_id=box.id,
-                ))
-                await session.flush()
 
                 resolved = await client.post(
                     "/receive/resolve",
