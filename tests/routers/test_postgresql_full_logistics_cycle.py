@@ -120,8 +120,7 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             # The branch creates a transport box and registers the card from its QR.
             client.cookies.set("session", branch_token)
-            created_box = await client.post(
-            )
+            created_box = await client.post("/packing/new-box")
             assert created_box.status_code == 303
             branch_box_id = uuid.UUID(
                 parse_qs(urlparse(created_box.headers["location"]).query)["box_id"][0]
