@@ -62,6 +62,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
     archive_actor_id = uuid.uuid4()
     courier_id = uuid.uuid4()
     requested_card_id = uuid.uuid4()
+    second_requested_card_id = uuid.uuid4()
     unrequested_card_id = uuid.uuid4()
 
     branch = Branch(
@@ -112,6 +113,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
         )
 
     requested_card = make_card(requested_card_id, "REQ-AF")
+    second_requested_card = make_card(second_requested_card_id, "REQ-AF-2")
     unrequested_card = make_card(unrequested_card_id, "NO-REQ-AF")
 
     try:
@@ -120,7 +122,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
                 branch, archive, central, central_actor, archive_actor, courier,
             ])
             await session.flush()
-            session.add_all([requested_card, unrequested_card])
+            session.add_all([requested_card, second_requested_card, unrequested_card])
 
         central_token = get_auth().create_session_token(central_actor)
         archive_token = get_auth().create_session_token(archive_actor)
@@ -138,7 +140,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             client.cookies.set("session", central_token)
             created = await client.post(
                 "/requests/create",
-                data={"card_ids": str(requested_card_id)},
+                data={"card_ids": [str(requested_card_id), str(second_requested_card_id)]},
             )
             assert created.status_code == 303
 
@@ -153,33 +155,37 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             )
             assert rejected.status_code == 200
             assert "свободная активная заявка ЦО" in rejected.text
-            request_row = await session.scalar(
-                select(ArchiveRequest).where(ArchiveRequest.card_id == requested_card_id)
-            )
-            assert request_row is not None
-            assert request_row.status == "new"
-            assert request_row.fulfillment_shipment_id is None
+            request_rows = list((await session.scalars(
+                select(ArchiveRequest).where(
+                    ArchiveRequest.card_id.in_([requested_card_id, second_requested_card_id])
+                )
+            )).all())
+            assert len(request_rows) == 2
+            assert all(row.status == "new" for row in request_rows)
+            assert all(row.fulfillment_shipment_id is None for row in request_rows)
             assert await session.scalar(select(Shipment.id)) is None
 
             client.cookies.set("session", archive_token)
             dispatched = await client.post(
                 "/requests/fulfill",
                 data={
-                    "card_ids": [str(requested_card_id)],
+                    "card_ids": [str(requested_card_id), str(second_requested_card_id)],
                     "courier_id": str(courier_id),
                 },
             )
             assert dispatched.status_code == 303
 
-            request_row = await session.scalar(
-                select(ArchiveRequest).where(ArchiveRequest.card_id == requested_card_id)
-            )
-            assert request_row is not None
-            assert request_row.status == "in_progress"
-            assert request_row.fulfillment_shipment_id is not None
-            # The fulfiller is the archive operator who handed the card to the courier.
-            assert request_row.fulfilled_by == archive_actor_id
-            shipment_id = request_row.fulfillment_shipment_id
+            request_rows = list((await session.scalars(
+                select(ArchiveRequest).where(
+                    ArchiveRequest.card_id.in_([requested_card_id, second_requested_card_id])
+                )
+            )).all())
+            assert len(request_rows) == 2
+            assert all(row.status == "in_progress" for row in request_rows)
+            assert len({row.fulfillment_shipment_id for row in request_rows}) == 1
+            assert all(row.fulfilled_by == archive_actor_id for row in request_rows)
+            shipment_id = request_rows[0].fulfillment_shipment_id
+            assert shipment_id is not None
 
             shipment = await session.get(Shipment, shipment_id)
             assert shipment is not None
@@ -189,24 +195,25 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert await session.scalar(
                 select(ShipmentBox.box_id).where(ShipmentBox.shipment_id == shipment_id)
             ) is None
-            manifest_row = await session.scalar(
-                select(ShipmentCard).where(
-                    ShipmentCard.shipment_id == shipment_id,
-                    ShipmentCard.card_id == requested_card_id,
-                )
-            )
-            assert manifest_row is not None
-            assert manifest_row.box_id is None
+            manifest_rows = list((await session.scalars(
+                select(ShipmentCard).where(ShipmentCard.shipment_id == shipment_id)
+            )).all())
+            assert {row.card_id for row in manifest_rows} == {
+                requested_card_id, second_requested_card_id,
+            }
+            assert all(row.box_id is None for row in manifest_rows)
 
-            in_transit_card = await session.get(Card, requested_card_id)
-            assert in_transit_card is not None
-            assert in_transit_card.current_location_id is None
-            assert in_transit_card.current_shipment_id == shipment_id
+            for card_id in (requested_card_id, second_requested_card_id):
+                in_transit_card = await session.get(Card, card_id)
+                assert in_transit_card is not None
+                assert in_transit_card.current_location_id is None
+                assert in_transit_card.current_shipment_id == shipment_id
 
             client.cookies.set("session", central_token)
             central_receive = await client.get("/central/receive")
             assert central_receive.status_code == 200
             assert requested_card.card_number in central_receive.text
+            assert second_requested_card.card_number in central_receive.text
 
             client.cookies.set("session", central_token)
             received = await client.post(
@@ -216,16 +223,22 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert received.status_code == 303
 
             shipment = await session.get(Shipment, shipment_id)
-            request_row = await session.get(ArchiveRequest, request_row.id)
-            card = await session.get(Card, requested_card_id)
+            completed_requests = list((await session.scalars(
+                select(ArchiveRequest).where(
+                    ArchiveRequest.card_id.in_([requested_card_id, second_requested_card_id])
+                )
+            )).all())
             assert shipment is not None and shipment.status == "received"
-            assert request_row is not None and request_row.status == "completed"
-            assert request_row.fulfilled_by == archive_actor_id
-            assert request_row.completed_at is not None
-            assert card is not None
-            assert card.current_location_id == central_location_id
-            assert card.current_shipment_id is None
-            assert card.custody_status == "available"
+            assert len(completed_requests) == 2
+            assert all(row.status == "completed" for row in completed_requests)
+            assert all(row.fulfilled_by == archive_actor_id for row in completed_requests)
+            assert all(row.completed_at is not None for row in completed_requests)
+            for card_id in (requested_card_id, second_requested_card_id):
+                card = await session.get(Card, card_id)
+                assert card is not None
+                assert card.current_location_id == central_location_id
+                assert card.current_shipment_id is None
+                assert card.custody_status == "available"
 
             # The unrelated card remains in the archive and was never dispatched.
             untouched_card = await session.get(Card, unrequested_card_id)
