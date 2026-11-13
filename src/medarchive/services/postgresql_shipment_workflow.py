@@ -780,7 +780,7 @@ class PostgreSQLShipmentWorkflow:
             .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
             .where(
                 ShipmentBox.box_id == box_id,
-                Shipment.status.in_(("draft", "in_transit")),
+                Shipment.status.in_(("draft", "in_transit", "exception")),
             )
             .limit(1)
         ) is not None
