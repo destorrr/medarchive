@@ -65,6 +65,7 @@ def create_app(config: Config | None = None) -> FastAPI:
     if config.auth_backend == "postgresql":
         from medarchive.routers.postgresql_dashboard import router as pg_dashboard_router
         from medarchive.routers.postgresql_packing import router as pg_packing_router
+        from medarchive.routers.postgresql_box_labels import router as pg_box_labels_router
         from medarchive.routers.postgresql_branch import router as pg_branch_router
         from medarchive.routers.postgresql_transfer import router as pg_transfer_router
         from medarchive.routers.postgresql_archive import router as pg_archive_router
@@ -73,6 +74,7 @@ def create_app(config: Config | None = None) -> FastAPI:
         from medarchive.routers.postgresql_admin_pages import router as pg_admin_pages_router
         app.include_router(pg_dashboard_router)
         app.include_router(pg_packing_router)
+        app.include_router(pg_box_labels_router)
         app.include_router(pg_branch_router)
         app.include_router(pg_transfer_router)
         app.include_router(pg_archive_router)
