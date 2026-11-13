@@ -95,7 +95,8 @@ class PostgreSQLAdminService:
             )
             boxes = await self.session.scalar(
                 select(func.count()).select_from(Box).where(
-                    Box.current_location_id == location_id
+                    Box.current_location_id == location_id,
+                    Box.status == "active",
                 )
             )
             active_shipments = await self.session.scalar(
