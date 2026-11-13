@@ -150,6 +150,11 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
         id=shelf_id, section_name="A-PLACEMENT", shelf_name="Shelf-01",
         qr_code=f"QR-{uuid.uuid4().hex}", is_active=True,
     )
+    inactive_shelf_id = uuid.uuid4()
+    inactive_shelf = ArchiveShelf(
+        id=inactive_shelf_id, section_name="Z-INACTIVE", shelf_name="Shelf-99",
+        qr_code=f"QR-{uuid.uuid4().hex}", is_active=False,
+    )
     card = Card(
         id=card_id,
         card_number=f"ARCH-PLACE-{uuid.uuid4().hex[:10]}",
@@ -164,7 +169,7 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
 
     try:
         async with session.begin():
-            session.add_all([branch, archive, actor, shelf])
+            session.add_all([branch, archive, actor, shelf, inactive_shelf])
             await session.flush()
             session.add(card)
 
@@ -177,12 +182,41 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
             assert card.card_number in page.text
             assert "Отдельных карт на полках пока нет." in page.text
 
+            # Inactive storage locations must be rejected without creating
+            # a placement or audit event.
+            client.cookies.set("session", token)
+            inactive_attempt = await client.post(
+                "/placement/card",
+                data={"card_id": str(card_id), "shelf_id": str(inactive_shelf_id)},
+            )
+            assert inactive_attempt.status_code == 200
+            assert "неактивна" in inactive_attempt.text
+            assert await session.scalar(
+                select(CardPlacement.id).where(CardPlacement.card_id == card_id)
+            ) is None
+            assert await session.scalar(
+                select(DomainEvent.id).where(
+                    DomainEvent.aggregate_type == "card",
+                    DomainEvent.aggregate_id == card_id,
+                )
+            ) is None
+
             client.cookies.set("session", token)
             placed = await client.post(
                 "/placement/card",
                 data={"card_id": str(card_id), "shelf_id": str(shelf_id)},
             )
             assert placed.status_code == 303
+
+            # A second active placement must be rejected and leave the
+            # original placement and event history untouched.
+            client.cookies.set("session", token)
+            duplicate_attempt = await client.post(
+                "/placement/card",
+                data={"card_id": str(card_id), "shelf_id": str(shelf_id)},
+            )
+            assert duplicate_attempt.status_code == 200
+            assert "Карта уже размещена на архивной полке" in duplicate_attempt.text
 
             placement_rows = list((await session.scalars(
                 select(CardPlacement).where(CardPlacement.card_id == card_id)
