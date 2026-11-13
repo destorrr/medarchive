@@ -162,3 +162,140 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
         await session.close()
         await connection.close()
         await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_postgresql_archive_and_central_history_are_scoped_to_current_location():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="postgres-location-history-scope-secret",
+    ))
+    database = await get_pg_database()
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+
+    async def session_override():
+        yield session
+
+    app.dependency_overrides[get_pg_session] = session_override
+
+    branch_id = uuid.uuid4()
+    archive_actor = User(
+        id=uuid.uuid4(),
+        username=f"archive-history-{uuid.uuid4().hex[:12]}",
+        password_hash="test-only-hash",
+        full_name="Archive History Actor",
+        role="archive",
+        is_active=True,
+    )
+    central_actor = User(
+        id=uuid.uuid4(),
+        username=f"central-history-{uuid.uuid4().hex[:12]}",
+        password_hash="test-only-hash",
+        full_name="Central History Actor",
+        role="central_office",
+        is_active=True,
+    )
+    branch = Branch(
+        id=branch_id, code=f"HS-{uuid.uuid4().hex[:8]}", name="History Scope Branch"
+    )
+    branch_location = Location(
+        id=uuid.uuid4(), kind="branch", branch_id=branch_id,
+        name="History Scope Branch", is_active=True,
+    )
+    archive_location = Location(
+        id=uuid.uuid4(), kind="archive", branch_id=None,
+        name="History Scope Archive", is_active=True,
+    )
+    central_location = Location(
+        id=uuid.uuid4(), kind="central_office", branch_id=None,
+        name="History Scope Central", is_active=True,
+    )
+    archive_card = Card(
+        id=uuid.uuid4(), card_number=f"ARCH-HIST-{uuid.uuid4().hex[:8]}",
+        full_name="Archive Scoped Patient", date_of_birth=date(1980, 1, 1),
+        origin_branch_id=branch_id, current_location_id=archive_location.id,
+    )
+    central_card = Card(
+        id=uuid.uuid4(), card_number=f"CO-HIST-{uuid.uuid4().hex[:8]}",
+        full_name="Central Scoped Patient", date_of_birth=date(1981, 2, 2),
+        origin_branch_id=branch_id, current_location_id=central_location.id,
+    )
+    branch_card = Card(
+        id=uuid.uuid4(), card_number=f"BR-HIST-{uuid.uuid4().hex[:8]}",
+        full_name="Branch Only Patient", date_of_birth=date(1982, 3, 3),
+        origin_branch_id=branch_id, current_location_id=branch_location.id,
+    )
+
+    try:
+        async with session.begin():
+            session.add(branch)
+            await session.flush()
+            session.add_all([
+                branch_location, archive_location, central_location,
+                archive_actor, central_actor,
+            ])
+            await session.flush()
+            session.add_all([archive_card, central_card, branch_card])
+            await session.flush()
+            session.add_all([
+                DomainEvent(
+                    event_type="card.placed_in_archive",
+                    aggregate_type="card", aggregate_id=archive_card.id,
+                    actor_user_id=archive_actor.id,
+                    payload={"to_location_id": str(archive_location.id)},
+                ),
+                DomainEvent(
+                    event_type="card.received_at_central_office",
+                    aggregate_type="card", aggregate_id=central_card.id,
+                    actor_user_id=central_actor.id,
+                    payload={"to_location_id": str(central_location.id)},
+                ),
+                DomainEvent(
+                    event_type="card.registered",
+                    aggregate_type="card", aggregate_id=branch_card.id,
+                    actor_user_id=central_actor.id,
+                    payload={"to_location_id": str(branch_location.id)},
+                ),
+            ])
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            client.cookies.set(
+                "session", get_auth().create_session_token(archive_actor)
+            )
+            archive_history = await client.get("/history")
+            client.cookies.set(
+                "session", get_auth().create_session_token(central_actor)
+            )
+            central_history = await client.get("/history")
+
+        assert archive_history.status_code == 200
+        assert archive_card.card_number in archive_history.text
+        assert central_card.card_number not in archive_history.text
+        assert branch_card.card_number not in archive_history.text
+        assert "Всего событий: 1" in archive_history.text
+
+        assert central_history.status_code == 200
+        assert central_card.card_number in central_history.text
+        assert archive_card.card_number not in central_history.text
+        assert branch_card.card_number not in central_history.text
+        assert "Всего событий: 1" in central_history.text
+    finally:
+        app.dependency_overrides.clear()
+        await session.rollback()
+        await outer_transaction.rollback()
+        await session.close()
+        await connection.close()
+        await database.close()
