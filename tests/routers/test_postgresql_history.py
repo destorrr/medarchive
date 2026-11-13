@@ -57,7 +57,7 @@ async def test_postgresql_history_is_available_and_paginated():
                     event_type="box.written_off",
                     aggregate_type="box",
                     aggregate_id=uuid.uuid4(),
-                    actor_user_id=actor.id,
+                    actor_user_id=None,
                     payload={"box_number": f"BX-HISTORY-{index}"},
                 )
                 for index in range(51)
