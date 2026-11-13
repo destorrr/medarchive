@@ -62,7 +62,10 @@ def _dashboard_context(request: Request, user: User, branch_name: str | None) ->
         ])
         menu_items.append({"url": "/transfer", "label": "🚚 Передача курьеру"})
     if user.role in {"archive", "viewer", "admin", "central_office"}:
-        menu_items.append({"url": "/search", "label": "🔍 Поиск"})
+        menu_items.extend([
+            {"url": "/search", "label": "🔍 Поиск"},
+            {"url": "/history", "label": "📜 Журнал движений"},
+        ])
     if user.role == "central_office":
         menu_items.extend([
             {"url": "/requests/new", "label": "📋 Запросить карты из архива"},
@@ -484,3 +487,122 @@ async def postgresql_search_submit(
     from fastapi.responses import RedirectResponse
 
     return RedirectResponse(url=f"/search?query={quote(query)}", status_code=303)
+
+
+@router.get("/history")
+async def postgresql_history_page(
+    request: Request,
+    page: int = 1,
+    user: User = Depends(require_pg_role("archive", "central_office", "viewer", "admin")),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    page = max(1, page)
+    page_size = 50
+    total = int(await session.scalar(select(func.count(DomainEvent.id))) or 0)
+    events = list((await session.scalars(
+        select(DomainEvent)
+        .order_by(DomainEvent.occurred_at.desc(), DomainEvent.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )).all())
+
+    card_ids = {event.aggregate_id for event in events if event.aggregate_type == "card"}
+    box_ids = {event.aggregate_id for event in events if event.aggregate_type == "box"}
+    shipment_ids = {event.aggregate_id for event in events if event.aggregate_type == "shipment"}
+    request_ids = {event.aggregate_id for event in events if event.aggregate_type == "archive_request"}
+    actor_ids = {event.actor_user_id for event in events if event.actor_user_id is not None}
+    location_ids, shelf_ids = set(), set()
+    for event in events:
+        payload = event.payload or {}
+        for key in ("from_location_id", "to_location_id", "location_id"):
+            value = payload.get(key)
+            if value:
+                try:
+                    location_ids.add(uuid.UUID(str(value)))
+                except (TypeError, ValueError):
+                    pass
+        value = payload.get("shelf_id")
+        if value:
+            try:
+                shelf_ids.add(uuid.UUID(str(value)))
+            except (TypeError, ValueError):
+                pass
+
+    cards = {item.id: item for item in (await session.scalars(
+        select(Card).where(Card.id.in_(card_ids))
+    )).all()} if card_ids else {}
+    boxes = {item.id: item for item in (await session.scalars(
+        select(Box).where(Box.id.in_(box_ids))
+    )).all()} if box_ids else {}
+    shipments = {item.id: item for item in (await session.scalars(
+        select(Shipment).where(Shipment.id.in_(shipment_ids))
+    )).all()} if shipment_ids else {}
+    archive_requests = {item.id: item for item in (await session.scalars(
+        select(ArchiveRequest).where(ArchiveRequest.id.in_(request_ids))
+    )).all()} if request_ids else {}
+    actors = {item.id: item for item in (await session.scalars(
+        select(User).where(User.id.in_(actor_ids))
+    )).all()} if actor_ids else {}
+    locations = {item.id: item.name for item in (await session.scalars(
+        select(Location).where(Location.id.in_(location_ids))
+    )).all()} if location_ids else {}
+    shelves = {item.id: f"{item.section_name} / {item.shelf_name}" for item in (
+        await session.scalars(select(ArchiveShelf).where(ArchiveShelf.id.in_(shelf_ids)))
+    ).all()} if shelf_ids else {}
+
+    history_items = []
+    for event in events:
+        payload = event.payload or {}
+        if event.aggregate_type == "card":
+            card = cards.get(event.aggregate_id)
+            subject = f"{card.card_number} · {card.full_name}" if card else "Медицинская карта"
+        elif event.aggregate_type == "box":
+            box = boxes.get(event.aggregate_id)
+            subject = box.box_number if box else payload.get("box_number", "Коробка")
+        elif event.aggregate_type == "shipment":
+            shipment = shipments.get(event.aggregate_id)
+            subject = f"Отправление № {shipment.shipment_number}" if shipment else "Отправление"
+        elif event.aggregate_type == "archive_request":
+            archive_request = archive_requests.get(event.aggregate_id)
+            card = cards.get(archive_request.card_id) if archive_request else None
+            subject = f"Заявка: {card.card_number}" if card else "Заявка в архив"
+        else:
+            subject = event.aggregate_type
+        from_id = payload.get("from_location_id")
+        to_id = payload.get("to_location_id") or payload.get("location_id")
+        try:
+            from_id = uuid.UUID(str(from_id)) if from_id else None
+        except (TypeError, ValueError):
+            from_id = None
+        try:
+            to_id = uuid.UUID(str(to_id)) if to_id else None
+        except (TypeError, ValueError):
+            to_id = None
+        destination = locations.get(to_id) if to_id else None
+        if payload.get("shelf_id"):
+            try:
+                destination = shelves.get(uuid.UUID(str(payload["shelf_id"])), destination)
+            except (TypeError, ValueError):
+                pass
+        if payload.get("organization"):
+            destination = payload["organization"]
+        history_items.append({
+            "timestamp": event.occurred_at,
+            "subject": subject,
+            "action": EVENT_LABELS.get(event.event_type, event.event_type),
+            "from_location": locations.get(from_id) if from_id else None,
+            "to_location": destination,
+            "actor": actors[event.actor_user_id].full_name if event.actor_user_id in actors else "—",
+        })
+
+    ctx = _dashboard_context(request, user, None)
+    ctx.update({
+        "history_items": history_items,
+        "page": page,
+        "has_previous": page > 1,
+        "has_next": page * page_size < total,
+        "total_events": total,
+    })
+    return request.app.state.templates.TemplateResponse(
+        request=request, name="postgresql_history.html", context=ctx
+    )
