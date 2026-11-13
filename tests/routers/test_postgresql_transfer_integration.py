@@ -70,6 +70,9 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
         assert "Передача курьеру" in response.text
         assert "Нет коробок, готовых к отправке" in response.text
         assert "Transfer Integration Branch" in response.text
+        for page in (response, receive_response):
+            assert 'href="/search"' in page.text
+            assert 'href="/history"' in page.text
     finally:
         async with database.session_factory() as session:
             await session.execute(
