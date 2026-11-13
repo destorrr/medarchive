@@ -64,6 +64,10 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
         id=uuid.uuid4(), kind="branch", branch_id=other_branch_id,
         name="Other Branch", is_active=True,
     )
+    archive_location = Location(
+        id=uuid.uuid4(), kind="archive", branch_id=None,
+        name="Central Archive", is_active=True,
+    )
     own_card = Card(
         id=uuid.uuid4(), card_number=f"BS-CARD-{uuid.uuid4().hex[:8]}",
         full_name="Scoped Patient", date_of_birth=date(1980, 1, 2),
@@ -73,6 +77,11 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
         id=uuid.uuid4(), card_number=f"BO-CARD-{uuid.uuid4().hex[:8]}",
         full_name="Hidden Patient", date_of_birth=date(1981, 2, 3),
         origin_branch_id=other_branch_id, current_location_id=other_location.id,
+    )
+    archived_own_card = Card(
+        id=uuid.uuid4(), card_number=f"BS-ARCH-{uuid.uuid4().hex[:8]}",
+        full_name="Archived Scoped Patient", date_of_birth=date(1983, 4, 5),
+        origin_branch_id=branch_id, current_location_id=archive_location.id,
     )
     # More than 50 matching cards at another branch must not crowd out
     # an authorized result before the location predicate is applied.
@@ -94,9 +103,9 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
             # explicit foreign-key IDs without ORM relationships.
             session.add_all([branch, other_branch])
             await session.flush()
-            session.add_all([branch_location, other_location, actor])
+            session.add_all([branch_location, other_location, archive_location, actor])
             await session.flush()
-            session.add_all([own_card, other_card, *other_matching_cards])
+            session.add_all([own_card, other_card, archived_own_card, *other_matching_cards])
             await session.flush()
             session.add_all([
                 DomainEvent(
@@ -110,6 +119,15 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
                     aggregate_type="card", aggregate_id=other_card.id,
                     actor_user_id=actor.id,
                     payload={"from_location_id": str(other_location.id)},
+                ),
+                DomainEvent(
+                    event_type="card.placed_in_archive",
+                    aggregate_type="card", aggregate_id=archived_own_card.id,
+                    actor_user_id=actor.id,
+                    payload={
+                        "from_location_id": str(branch_location.id),
+                        "to_location_id": str(archive_location.id),
+                    },
                 ),
             ])
 
