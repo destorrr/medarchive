@@ -72,6 +72,8 @@ def _dashboard_context(request: Request, user: User, branch_name: str | None) ->
     menu_items = [{"url": "/dashboard", "label": "📊 Панель управления"}]
     if user.role == "branch":
         menu_items.extend([
+            {"url": "/search", "label": "🔍 Поиск"},
+            {"url": "/history", "label": "📜 Журнал движений"},
             {"url": "/branch/receive", "label": "📥 Приёмка"},
             {"url": "/packing", "label": "📦 Упаковка коробки"},
         ])
@@ -343,7 +345,15 @@ async def _search_context(
         return {"query": query, "cards": cards_out, "boxes": boxes_out}
 
     location_id = None
-    if user.role == "archive":
+    if user.role == "branch":
+        location_id = await session.scalar(
+            select(Location.id).where(
+                Location.kind == "branch",
+                Location.branch_id == user.branch_id,
+                Location.is_active.is_(True),
+            )
+        )
+    elif user.role == "archive":
         location_id = await session.scalar(
             select(Location.id).where(
                 Location.kind == "archive", Location.is_active.is_(True)
@@ -355,14 +365,24 @@ async def _search_context(
                 Location.kind == "central_office", Location.is_active.is_(True)
             )
         )
-    if user.role in {"archive", "central_office"} and location_id is None:
+    if user.role in {"branch", "archive", "central_office"} and location_id is None:
         return {"query": query, "cards": cards_out, "boxes": boxes_out}
 
     matched_cards = await CardRepository(session).search(query, limit=50)
     if location_id is not None:
+        visible_shipments = select(Shipment.id).where(
+            Shipment.status == "in_transit",
+            or_(
+                Shipment.from_location_id == location_id,
+                Shipment.to_location_id == location_id,
+            ),
+        )
         matched_cards = [
             card for card in matched_cards
             if card.current_location_id == location_id
+            or card.current_shipment_id in (
+                await session.scalars(visible_shipments)
+            ).all()
         ]
     card_ids = [card.id for card in matched_cards]
     locations_by_id = {
@@ -447,9 +467,21 @@ async def _search_context(
         .order_by(Box.box_number)
         .limit(50)
     )
+    if location_id is not None:
+        visible_box_shipments = select(Shipment.id).where(
+            Shipment.status == "in_transit",
+            or_(
+                Shipment.from_location_id == location_id,
+                Shipment.to_location_id == location_id,
+            ),
+        )
+        box_statement = box_statement.where(
+            or_(
+                Box.current_location_id == location_id,
+                Box.current_shipment_id.in_(visible_box_shipments),
+            )
+        )
     for box, card_count, placement, shelf in (await session.execute(box_statement)).all():
-        if location_id is not None and box.current_location_id != location_id:
-            continue
         location = locations_by_id.get(box.current_location_id)
         boxes_out.append({
             "id": str(box.id),
@@ -470,7 +502,7 @@ async def _search_context(
 async def postgresql_search_page(
     request: Request,
     query: str | None = None,
-    user: User = Depends(require_pg_role("archive", "central_office", "viewer", "admin")),
+    user: User = Depends(require_pg_role("branch", "archive", "central_office", "viewer", "admin")),
     session: AsyncSession = Depends(get_pg_session),
 ):
     ctx = _dashboard_context(request, user, None)
@@ -513,9 +545,68 @@ async def postgresql_history_page(
 ):
     page = max(1, page)
     page_size = 50
-    total = int(await session.scalar(select(func.count(DomainEvent.id))) or 0)
+    event_filters = []
+    if user.role in {"branch", "central_office", "archive"}:
+        if user.role == "branch":
+            scope_location_id = await session.scalar(
+                select(Location.id).where(
+                    Location.kind == "branch",
+                    Location.branch_id == user.branch_id,
+                    Location.is_active.is_(True),
+                )
+            )
+        else:
+            scope_location_id = await session.scalar(
+                select(Location.id).where(
+                    Location.kind == user.role, Location.is_active.is_(True)
+                )
+            )
+        if scope_location_id is not None:
+            visible_shipments = select(Shipment.id).where(
+                or_(
+                    Shipment.from_location_id == scope_location_id,
+                    Shipment.to_location_id == scope_location_id,
+                )
+            )
+            visible_cards = select(Card.id).where(
+                or_(
+                    Card.current_location_id == scope_location_id,
+                    Card.current_shipment_id.in_(visible_shipments),
+                )
+            )
+            visible_boxes = select(Box.id).where(
+                or_(
+                    Box.current_location_id == scope_location_id,
+                    Box.current_shipment_id.in_(visible_shipments),
+                )
+            )
+            visible_requests = select(ArchiveRequest.id).where(
+                or_(
+                    ArchiveRequest.card_id.in_(visible_cards),
+                    ArchiveRequest.fulfillment_shipment_id.in_(visible_shipments),
+                )
+            )
+            event_filters = [
+                (DomainEvent.aggregate_type == "card")
+                & DomainEvent.aggregate_id.in_(visible_cards),
+                (DomainEvent.aggregate_type == "box")
+                & DomainEvent.aggregate_id.in_(visible_boxes),
+                (DomainEvent.aggregate_type == "shipment")
+                & DomainEvent.aggregate_id.in_(visible_shipments),
+                (DomainEvent.aggregate_type == "archive_request")
+                & DomainEvent.aggregate_id.in_(visible_requests),
+            ]
+        else:
+            event_filters = [False]
+    history_filter = or_(*event_filters) if event_filters else None
+    history_query = select(DomainEvent)
+    count_query = select(func.count(DomainEvent.id))
+    if history_filter is not None:
+        history_query = history_query.where(history_filter)
+        count_query = count_query.where(history_filter)
+    total = int(await session.scalar(count_query) or 0)
     events = list((await session.scalars(
-        select(DomainEvent)
+        history_query
         .order_by(DomainEvent.occurred_at.desc(), DomainEvent.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
