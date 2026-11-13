@@ -80,6 +80,9 @@ async def test_postgresql_archive_pages_render_with_archive_role():
         assert requests.status_code == 200
         assert "Заявки центрального офиса" in requests.text
         assert "Archive UI Integration" in receive.text
+        for page in (receive, placement, requests):
+            assert 'href="/search"' in page.text
+            assert 'href="/history"' in page.text
     finally:
         app.dependency_overrides.clear()
         await session.rollback()
