@@ -74,6 +74,19 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
         full_name="Hidden Patient", date_of_birth=date(1981, 2, 3),
         origin_branch_id=other_branch_id, current_location_id=other_location.id,
     )
+    # More than 50 matching cards at another branch must not crowd out
+    # an authorized result before the location predicate is applied.
+    other_matching_cards = [
+        Card(
+            id=uuid.uuid4(),
+            card_number=f"AA-{index:03d}-{uuid.uuid4().hex[:6]}",
+            full_name=f"Patient Other {index}",
+            date_of_birth=date(1982, 3, 4),
+            origin_branch_id=other_branch_id,
+            current_location_id=other_location.id,
+        )
+        for index in range(55)
+    ]
 
     try:
         async with session.begin():
@@ -83,7 +96,7 @@ async def test_postgresql_branch_search_and_history_are_limited_to_own_location(
             await session.flush()
             session.add_all([branch_location, other_location, actor])
             await session.flush()
-            session.add_all([own_card, other_card])
+            session.add_all([own_card, other_card, *other_matching_cards])
             await session.flush()
             session.add_all([
                 DomainEvent(
