@@ -116,6 +116,8 @@ async def branch_receive_page(
         "role_label": "Филиал",
         "menu_items": [
             {"url": "/dashboard", "label": "📊 Панель управления"},
+            {"url": "/search", "label": "🔍 Поиск"},
+            {"url": "/history", "label": "📜 Журнал движений"},
             {"url": "/branch/receive", "label": "📥 Приёмка"},
             {"url": "/packing", "label": "📦 Упаковка коробки"},
             {"url": "/transfer", "label": "🚚 Передача курьеру"},
