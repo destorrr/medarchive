@@ -118,9 +118,12 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
             await session.execute(
                 Location.__table__.delete().where(Location.branch_id == branch_id)
             )
-            actor = await session.get(User, actor_id)
-            if actor is not None:
-                await session.delete(actor)
+            for user_id in (
+                actor_id, archive_actor.id, central_actor.id, viewer.id,
+            ):
+                test_user = await session.get(User, user_id)
+                if test_user is not None:
+                    await session.delete(test_user)
             await session.flush()
             branch = await session.get(Branch, branch_id)
             if branch is not None:
