@@ -27,6 +27,7 @@
     {% for item in box_items %}
     <div style="border-bottom:1px solid #ddd;padding:12px 0">
         <strong>Коробка {{ item.box.box_number }}</strong>
+        <a class="btn btn-primary" href="/boxes/{{ item.box.id }}/label" target="_blank" rel="noopener">QR-этикетка / повторная печать</a>
         {% if item.cards %}
         <ul>{% for card in item.cards %}<li>{{ card.card_number }} · {{ card.full_name }}
             <form method="post" action="/central/packing/remove-card" style="display:inline">
