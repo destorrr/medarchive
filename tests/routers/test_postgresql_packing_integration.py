@@ -89,6 +89,31 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
             assert created.status_code == 303
             box_id = uuid.UUID(parse_qs(urlparse(created.headers["location"]).query)["box_id"][0])
 
+            # The printable label is reproducible and contains no patient data.
+            client.cookies.set("session", token)
+            label = await client.get(f"/boxes/{box_id}/label")
+            assert label.status_code == 200
+            assert "QR-этикетка" not in label.text
+            assert f"MEDARCHIVE:BOX:{box_id}" in label.text
+            assert "data:image/png;base64," in label.text
+
+            # A user without an operational role cannot access box labels.
+            viewer = User(
+                id=uuid.uuid4(),
+                username=f"viewer-{uuid.uuid4().hex[:10]}",
+                password_hash="test-only-hash",
+                full_name="Read Only Viewer",
+                role="viewer",
+                branch_id=None,
+                is_active=True,
+            )
+            session.add(viewer)
+            await session.flush()
+            viewer_token = get_auth().create_session_token(viewer)
+            client.cookies.set("session", viewer_token)
+            forbidden_label = await client.get(f"/boxes/{box_id}/label")
+            assert forbidden_label.status_code == 403
+
             qr = {
                 "version": 1,
                 "card_number": f"MED-{uuid.uuid4().hex[:12]}",
