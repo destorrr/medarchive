@@ -92,6 +92,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         token = get_auth().create_session_token(actor)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            client.cookies.set("session", token)
             marked = await client.post(
                 "/central/custody/mark",
                 data={
@@ -100,7 +101,6 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
                     "organization": "Test External Organization",
                     "comment": "Передано по акту № 17",
                 },
-                cookies={"session": token},
             )
             assert marked.status_code == 303
 
@@ -112,13 +112,13 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert card.external_comment == "Передано по акту № 17"
             assert card.external_since is not None
 
+            client.cookies.set("session", token)
             returned = await client.post(
                 "/central/custody/return",
                 data={
                     "card_id": str(card.id),
                     "comment": "Возвращена по акту № 18",
                 },
-                cookies={"session": token},
             )
             assert returned.status_code == 303
 
