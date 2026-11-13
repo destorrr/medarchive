@@ -8,7 +8,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
-    ArchiveRequest, ArchiveShelf, Box, BoxCardMembership, BoxCycle,
+    ArchiveRequest, ArchiveShelf, Box, BoxCardMembership, BoxCycle, BoxPlacement,
     Branch, Card, CardPlacement, Courier, DomainEvent, Location, ShipmentCard, User,
 )
 from medarchive.services.postgresql_archive_workflow import (
@@ -1141,3 +1141,148 @@ async def test_box_emptied_by_removing_last_card_can_be_written_off(pg_session):
     await workflow.write_off_box(box_id=box.id, actor_id=branch_user.id)
     await pg_session.refresh(box)
     assert box.status == "written_off"
+
+
+@pytest.mark.asyncio
+async def test_shelved_archive_card_cannot_be_added_as_standalone_cargo(pg_session):
+    (
+        branch, _branch_loc, archive_loc, central_loc,
+        _branch_user, archive_user, _central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Shelved archive patient",
+        date_of_birth=__import__("datetime").date(1984, 3, 4),
+        origin_branch_id=branch.id, current_location_id=archive_loc.id, status="active",
+    )
+    shelf = ArchiveShelf(
+        section_name="A", shelf_name=f"S-{uuid.uuid4().hex[:8]}", is_active=True,
+    )
+    pg_session.add_all([card, shelf])
+    await pg_session.flush()
+    archive = PostgreSQLArchiveWorkflow(pg_session)
+    await archive.place_card(card_id=card.id, shelf_id=shelf.id, actor_id=archive_user.id)
+
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    shipment = await workflow.create_draft(
+        from_location_id=archive_loc.id, to_location_id=central_loc.id,
+        courier_id=courier.id, issued_by=archive_user.id,
+    )
+    event_count = await pg_session.scalar(select(func.count()).select_from(DomainEvent))
+    with pytest.raises(ShipmentWorkflowError, match="снимите карту с архивной полки"):
+        await workflow.add_standalone_card(
+            shipment_id=shipment.id, card_id=card.id, actor_id=archive_user.id,
+        )
+
+    await pg_session.refresh(shipment)
+    await pg_session.refresh(card)
+    placement = await pg_session.scalar(select(CardPlacement).where(
+        CardPlacement.card_id == card.id, CardPlacement.removed_at.is_(None),
+    ))
+    assert shipment.status == "draft"
+    assert card.current_location_id == archive_loc.id
+    assert card.current_shipment_id is None
+    assert placement is not None and placement.shelf_id == shelf.id
+    assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == event_count
+
+
+@pytest.mark.asyncio
+async def test_handover_rechecks_legacy_standalone_card_placement_without_mutation(pg_session):
+    (
+        branch, _branch_loc, archive_loc, central_loc,
+        _branch_user, archive_user, _central_user, courier,
+    ) = await seed_locations(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Legacy shelved manifest patient",
+        date_of_birth=__import__("datetime").date(1986, 5, 6),
+        origin_branch_id=branch.id, current_location_id=archive_loc.id, status="active",
+    )
+    shelf = ArchiveShelf(
+        section_name="A", shelf_name=f"S-{uuid.uuid4().hex[:8]}", is_active=True,
+    )
+    pg_session.add_all([card, shelf])
+    await pg_session.flush()
+
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    shipment = await workflow.create_draft(
+        from_location_id=archive_loc.id, to_location_id=central_loc.id,
+        courier_id=courier.id, issued_by=archive_user.id,
+    )
+    await workflow.add_standalone_card(
+        shipment_id=shipment.id, card_id=card.id, actor_id=archive_user.id,
+    )
+    # Simulate a legacy/racing placement created after the manifest was drafted.
+    pg_session.add(CardPlacement(
+        card_id=card.id, shelf_id=shelf.id, placed_by=archive_user.id,
+    ))
+    await pg_session.flush()
+    event_count = await pg_session.scalar(select(func.count()).select_from(DomainEvent))
+
+    with pytest.raises(ShipmentWorkflowError, match="пока она размещена на архивной полке"):
+        await workflow.hand_over(shipment_id=shipment.id, actor_id=archive_user.id)
+
+    await pg_session.refresh(shipment)
+    await pg_session.refresh(card)
+    placement = await pg_session.scalar(select(CardPlacement).where(
+        CardPlacement.card_id == card.id, CardPlacement.removed_at.is_(None),
+    ))
+    assert shipment.status == "draft"
+    assert shipment.handed_over_at is None
+    assert card.current_location_id == archive_loc.id
+    assert card.current_shipment_id is None
+    assert placement is not None and placement.shelf_id == shelf.id
+    assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == event_count
+
+
+@pytest.mark.asyncio
+async def test_handover_rechecks_legacy_box_placement_without_mutation(pg_session):
+    (
+        _branch, _branch_loc, _archive_loc, central_loc,
+        _branch_user, _archive_user, central_user, courier,
+    ) = await seed_locations(pg_session)
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Legacy shelved box patient",
+        date_of_birth=__import__("datetime").date(1987, 7, 8),
+        origin_branch_id=(await seed_locations(pg_session))[0].id,
+        current_location_id=central_loc.id, status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+    box = await workflow.create_box(
+        location_id=central_loc.id, actor_id=central_user.id, card_ids=[card.id],
+    )
+    shipment = await workflow.create_draft(
+        from_location_id=central_loc.id,
+        to_location_id=(await pg_session.scalar(select(Location).where(Location.kind == "archive"))).id,
+        courier_id=courier.id, issued_by=central_user.id,
+    )
+    await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=central_user.id)
+    shelf = ArchiveShelf(
+        section_name="A", shelf_name=f"S-{uuid.uuid4().hex[:8]}", is_active=True,
+    )
+    pg_session.add(shelf)
+    await pg_session.flush()
+    # Defensive guard for a legacy/inconsistent active placement on a manifested box.
+    pg_session.add(BoxPlacement(
+        box_id=box.id, shelf_id=shelf.id, placed_by=central_user.id,
+    ))
+    await pg_session.flush()
+    event_count = await pg_session.scalar(select(func.count()).select_from(DomainEvent))
+
+    with pytest.raises(ShipmentWorkflowError, match="пока она размещена на архивной полке"):
+        await workflow.hand_over(shipment_id=shipment.id, actor_id=central_user.id)
+
+    await pg_session.refresh(shipment)
+    await pg_session.refresh(box)
+    await pg_session.refresh(card)
+    placement = await pg_session.scalar(select(BoxPlacement).where(
+        BoxPlacement.box_id == box.id, BoxPlacement.removed_at.is_(None),
+    ))
+    assert shipment.status == "draft"
+    assert shipment.handed_over_at is None
+    assert box.current_location_id == central_loc.id
+    assert box.current_shipment_id is None
+    assert card.current_location_id == central_loc.id
+    assert card.current_shipment_id is None
+    assert placement is not None and placement.shelf_id == shelf.id
+    assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == event_count
