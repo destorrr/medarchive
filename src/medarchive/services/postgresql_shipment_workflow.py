@@ -466,6 +466,7 @@ class PostgreSQLShipmentWorkflow:
                     raise ShipmentWorkflowError("Для каждой выдаваемой карты нужна свободная активная заявка ЦО")
                 request.status = "in_progress"
                 request.fulfillment_shipment_id = shipment.id
+                request.fulfilled_by = actor.id
                 request.updated_at = now
 
         # Ensure each transported card has exactly one manifest row and that its
@@ -695,7 +696,6 @@ class PostgreSQLShipmentWorkflow:
                 request.status = "completed"
                 request.completed_at = now
                 request.updated_at = now
-                request.fulfilled_by = actor.id
 
         await self.session.flush()
         if exception_resolution_note is None:
