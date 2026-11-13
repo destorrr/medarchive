@@ -6,6 +6,7 @@
         <img src="{{ qr_data_uri }}" alt="QR-код коробки {{ box.box_number }}" width="240" height="240">
         <div class="box-label-number">{{ box.box_number }}</div>
         <div class="box-label-location">{{ location.name }}</div>
+        <div class="box-label-payload">{{ qr_payload }}</div>
         <div class="box-label-hint">QR-код содержит идентификатор коробки, без данных пациентов</div>
     </div>
     <div class="box-label-actions">
@@ -20,7 +21,7 @@
 .box-label img { display: block; width: 240px; height: 240px; margin: 0 auto 10px; }
 .box-label-number { font-size: 24px; font-weight: 800; letter-spacing: .5px; overflow-wrap: anywhere; }
 .box-label-location { margin-top: 4px; font-size: 13px; }
-.box-label-hint { margin-top: 10px; font-size: 10px; color: #555; }
+.box-label-payload { margin-top: 4px; font: 9px monospace; overflow-wrap: anywhere; }\n.box-label-hint { margin-top: 10px; font-size: 10px; color: #555; }
 .box-label-actions { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
 @media print {
     @page { size: 100mm 100mm; margin: 5mm; }
