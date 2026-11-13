@@ -368,7 +368,9 @@ async def _search_context(
     if user.role in {"branch", "archive", "central_office"} and location_id is None:
         return {"query": query, "cards": cards_out, "boxes": boxes_out}
 
-    matched_cards = await CardRepository(session).search(query, limit=50)
+    card_statement = select(Card).where(
+        Card.card_number.ilike(f"%{query}%") | Card.full_name.ilike(f"%{query}%")
+    )
     if location_id is not None:
         visible_shipments = select(Shipment.id).where(
             Shipment.status == "in_transit",
@@ -377,12 +379,15 @@ async def _search_context(
                 Shipment.to_location_id == location_id,
             ),
         )
-        visible_shipment_ids = set((await session.scalars(visible_shipments)).all())
-        matched_cards = [
-            card for card in matched_cards
-            if card.current_location_id == location_id
-            or card.current_shipment_id in visible_shipment_ids
-        ]
+        card_statement = card_statement.where(
+            or_(
+                Card.current_location_id == location_id,
+                Card.current_shipment_id.in_(visible_shipments),
+            )
+        )
+    matched_cards = list((await session.scalars(
+        card_statement.order_by(Card.card_number).limit(50)
+    )).all())
     card_ids = [card.id for card in matched_cards]
     locations_by_id = {
         item.id: item for item in (await session.scalars(select(Location))).all()
