@@ -100,6 +100,8 @@ async def _packing_context(
         "role_label": role_label,
         "menu_items": [
             {"url": "/dashboard", "label": "📊 Панель управления"},
+            {"url": "/search", "label": "🔍 Поиск"},
+            {"url": "/history", "label": "📜 Журнал движений"},
             {"url": "/packing", "label": "📦 Упаковка коробки"},
             {"url": "/transfer", "label": "🚚 Передача курьеру"},
         ],
