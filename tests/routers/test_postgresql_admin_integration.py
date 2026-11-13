@@ -1216,7 +1216,8 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
                 full_name="Branch Shipment Test Actor",
                 role="branch", branch_id=branch.id, is_active=True,
             )
-            session.add_all([source, actor])
+            courier = Courier(full_name="Branch Shipment Test Courier", is_active=True)
+            session.add_all([source, actor, courier])
             await session.flush()
             target = await session.scalar(
                 select(Location).where(
@@ -1247,7 +1248,7 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
             shipment = await workflow.create_draft(
                 from_location_id=source.id,
                 to_location_id=target.id,
-                courier_id=None,
+                courier_id=courier.id,
                 issued_by=actor.id,
             )
             await workflow.add_standalone_card(
