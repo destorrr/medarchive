@@ -127,29 +127,29 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
         transport = httpx.ASGITransport(app=app)
 
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            client.cookies.set("session", central_token)
             search = await client.get(
                 "/requests/new",
                 params={"query": requested_card.card_number},
-                cookies={"session": central_token},
             )
             assert search.status_code == 200
             assert requested_card.card_number in search.text
 
+            client.cookies.set("session", central_token)
             created = await client.post(
                 "/requests/create",
                 data={"card_ids": str(requested_card_id)},
-                cookies={"session": central_token},
             )
             assert created.status_code == 303
 
             # An unrequested card must block the entire dispatch transaction.
+            client.cookies.set("session", archive_token)
             rejected = await client.post(
                 "/requests/fulfill",
                 data={
                     "card_ids": [str(requested_card_id), str(unrequested_card_id)],
                     "courier_id": str(courier_id),
                 },
-                cookies={"session": archive_token},
             )
             assert rejected.status_code == 200
             assert "свободная активная заявка ЦО" in rejected.text
@@ -161,13 +161,13 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert request_row.fulfillment_shipment_id is None
             assert await session.scalar(select(Shipment.id)) is None
 
+            client.cookies.set("session", archive_token)
             dispatched = await client.post(
                 "/requests/fulfill",
                 data={
                     "card_ids": [str(requested_card_id)],
                     "courier_id": str(courier_id),
                 },
-                cookies={"session": archive_token},
             )
             assert dispatched.status_code == 303
 
@@ -201,16 +201,16 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert in_transit_card.current_location_id is None
             assert in_transit_card.current_shipment_id == shipment_id
 
+            client.cookies.set("session", central_token)
             central_receive = await client.get(
-                "/central/receive", cookies={"session": central_token}
             )
             assert central_receive.status_code == 200
             assert requested_card.card_number in central_receive.text
 
+            client.cookies.set("session", central_token)
             received = await client.post(
                 "/central/receive/confirm",
                 data={"shipment_id": str(shipment_id), "confirmed": "true"},
-                cookies={"session": central_token},
             )
             assert received.status_code == 303
 
