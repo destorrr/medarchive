@@ -99,6 +99,12 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
     from medarchive.adapters.postgresql.models import (
         ArchiveShelf, Branch, Card, CardPlacement, DomainEvent,
     )
+    from medarchive.services.postgresql_archive_workflow import (
+        ArchiveWorkflowError, PostgreSQLArchiveWorkflow,
+    )
+    from medarchive.services.postgresql_shipment_workflow import (
+        PostgreSQLShipmentWorkflow, ShipmentWorkflowError,
+    )
 
     app = create_app(
         Config(
@@ -146,6 +152,15 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
         branch_id=None,
         is_active=True,
     )
+    central_actor = User(
+        id=uuid.uuid4(),
+        username=f"central-place-{uuid.uuid4().hex[:12]}",
+        password_hash="test-only-hash",
+        full_name="Central Placement Requester",
+        role="central_office",
+        branch_id=None,
+        is_active=True,
+    )
     shelf = ArchiveShelf(
         id=shelf_id, section_name="A-PLACEMENT", shelf_name="Shelf-01",
         qr_code=f"QR-{uuid.uuid4().hex}", is_active=True,
@@ -169,7 +184,7 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
 
     try:
         async with session.begin():
-            session.add_all([branch, archive, actor, shelf, inactive_shelf])
+            session.add_all([branch, archive, actor, central_actor, shelf, inactive_shelf])
             await session.flush()
             session.add(card)
 
@@ -226,6 +241,31 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
             assert first_placement.shelf_id == shelf_id
             assert first_placement.placed_by == actor_id
             assert first_placement.removed_at is None
+
+            # A card on an archive shelf must be removed from storage before
+            # it can be packed into a new/internal box or requested by the CO.
+            shipment_workflow = PostgreSQLShipmentWorkflow(session)
+            empty_box = await shipment_workflow.create_box(
+                location_id=archive_id, actor_id=actor_id, card_ids=[]
+            )
+            with pytest.raises(ShipmentWorkflowError, match="снимите карту с архивной полки"):
+                await shipment_workflow.create_box(
+                    location_id=archive_id, actor_id=actor_id, card_ids=[card_id]
+                )
+            with pytest.raises(ShipmentWorkflowError, match="снимите карту с архивной полки"):
+                await shipment_workflow.add_card_to_box(
+                    box_id=empty_box.id, card_id=card_id, actor_id=actor_id
+                )
+            with pytest.raises(ArchiveWorkflowError, match="снимите карту с архивной полки"):
+                await PostgreSQLArchiveWorkflow(session).create_requests(
+                    card_ids=[card_id], actor_id=central_actor.id
+                )
+            assert await session.scalar(
+                select(CardPlacement.id).where(
+                    CardPlacement.card_id == card_id,
+                    CardPlacement.removed_at.is_(None),
+                )
+            ) == first_placement.id
 
             events = list((await session.scalars(
                 select(DomainEvent).where(
