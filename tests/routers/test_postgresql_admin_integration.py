@@ -1178,3 +1178,108 @@ async def test_branch_can_be_deactivated_after_its_empty_box_is_written_off():
         await outer_transaction.rollback()
         await connection.close()
         await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+
+    database = Database(DATABASE_URL)
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    try:
+        async with session.begin():
+            branch = Branch(
+                code=f"BS-{uuid.uuid4().hex[:10]}",
+                name="Branch shipment guard test",
+                is_active=True,
+            )
+            session.add(branch)
+            await session.flush()
+            source = Location(
+                kind="branch", branch_id=branch.id,
+                name=branch.name, is_active=True,
+            )
+            actor = User(
+                username=f"branch-shipment-{uuid.uuid4().hex[:12]}",
+                password_hash="test-hash",
+                full_name="Branch Shipment Test Actor",
+                role="branch", branch_id=branch.id, is_active=True,
+            )
+            session.add_all([source, actor])
+            await session.flush()
+            target = await session.scalar(
+                select(Location).where(
+                    Location.kind == "central_office", Location.is_active.is_(True)
+                )
+            )
+            if target is None:
+                target = Location(
+                    kind="central_office", branch_id=None,
+                    name="Test Central Office", is_active=True,
+                )
+                session.add(target)
+                await session.flush()
+
+            card = Card(
+                card_number=f"BS-CARD-{uuid.uuid4().hex[:10]}",
+                full_name="Branch Shipment Guard Patient",
+                date_of_birth=date(1980, 1, 1),
+                origin_branch_id=branch.id,
+                current_location_id=source.id,
+                current_shipment_id=None,
+                created_by=actor.id,
+            )
+            session.add(card)
+            await session.flush()
+
+            workflow = PostgreSQLShipmentWorkflow(session)
+            shipment = await workflow.create_draft(
+                from_location_id=source.id,
+                to_location_id=target.id,
+                courier_id=None,
+                issued_by=actor.id,
+            )
+            await workflow.add_standalone_card(
+                shipment_id=shipment.id, card_id=card.id, actor_id=actor.id
+            )
+            actor.is_active = False
+            await session.flush()
+
+            with pytest.raises(ValueError, match="незавершённые отправления"):
+                await PostgreSQLAdminService(session).set_branch_active(
+                    branch.id, False
+                )
+            assert branch.is_active is True
+            assert source.is_active is True
+            assert shipment.status == "draft"
+
+            await workflow.hand_over(shipment_id=shipment.id, actor_id=actor.id)
+            await workflow.register_exception(
+                shipment_id=shipment.id,
+                actor_id=actor.id,
+                note="Отправление ожидает разрешения инцидента",
+            )
+            with pytest.raises(ValueError, match="незавершённые отправления"):
+                await PostgreSQLAdminService(session).set_branch_active(
+                    branch.id, False
+                )
+            assert branch.is_active is True
+            assert source.is_active is True
+            assert shipment.status == "exception"
+    finally:
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
+        await database.close()
