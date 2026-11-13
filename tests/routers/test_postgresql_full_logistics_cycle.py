@@ -222,6 +222,7 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             )
             assert archive_request is not None
             assert archive_request.status == "in_progress"
+            assert archive_request.fulfilled_by == archive_actor.id
             archive_to_central = await session.get(
                 Shipment, archive_request.fulfillment_shipment_id
             )
