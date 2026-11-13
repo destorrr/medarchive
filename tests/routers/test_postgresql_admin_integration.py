@@ -1251,12 +1251,11 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
                 courier_id=courier.id,
                 issued_by=actor.id,
             )
-            await workflow.add_standalone_card(
-                shipment_id=shipment.id, card_id=card.id, actor_id=actor.id
-            )
             actor.is_active = False
             await session.flush()
 
+            # An empty draft isolates the unfinished-shipment guard from the
+            # separate rule that blocks deactivation while cards remain on balance.
             with pytest.raises(ValueError, match="незавершённые отправления"):
                 await PostgreSQLAdminService(session).set_branch_active(
                     branch.id, False
@@ -1265,6 +1264,9 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
             assert source.is_active is True
             assert shipment.status == "draft"
 
+            await workflow.add_standalone_card(
+                shipment_id=shipment.id, card_id=card.id, actor_id=actor.id
+            )
             await workflow.hand_over(shipment_id=shipment.id, actor_id=actor.id)
             await workflow.register_exception(
                 shipment_id=shipment.id,
