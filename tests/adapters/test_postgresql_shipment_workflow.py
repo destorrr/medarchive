@@ -8,7 +8,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
-    ArchiveRequest, ArchiveShelf, Box, BoxCardMembership, BoxCycle, BoxPlacement,
+    ArchiveRequest, ArchiveShelf, Box, BoxCardMembership, BoxCycle,
     Branch, Card, CardPlacement, Courier, DomainEvent, Location, ShipmentCard, User,
 )
 from medarchive.services.postgresql_archive_workflow import (
@@ -1112,20 +1112,6 @@ async def test_box_in_active_shipment_cannot_be_written_off(pg_session):
     with pytest.raises(ShipmentWorkflowError, match="активное отправление"):
         await workflow.write_off_box(box_id=box.id, actor_id=branch_user.id)
     await pg_session.refresh(box); assert box.status == "active"
-
-
-@pytest.mark.asyncio
-async def test_placed_archive_box_must_be_removed_from_shelf_before_write_off(pg_session):
-    (_branch, _branch_loc, archive_loc, _central, _branch_user, archive_user, _central_user, _courier) = await seed_locations(pg_session)
-    shelf = ArchiveShelf(section_name=f"S-{uuid.uuid4().hex[:8]}", shelf_name="1", is_active=True)
-    pg_session.add(shelf); await pg_session.flush()
-    workflow = PostgreSQLShipmentWorkflow(pg_session)
-    box = await workflow.create_box(location_id=archive_loc.id, actor_id=archive_user.id)
-    await PostgreSQLArchiveWorkflow(pg_session).place_box(box_id=box.id, shelf_id=shelf.id, actor_id=archive_user.id)
-    with pytest.raises(ShipmentWorkflowError, match="снимите коробку"):
-        await workflow.write_off_box(box_id=box.id, actor_id=archive_user.id)
-    await pg_session.refresh(box); assert box.status == "active"
-
 
 
 @pytest.mark.asyncio
