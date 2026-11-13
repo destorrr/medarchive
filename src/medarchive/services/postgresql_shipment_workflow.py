@@ -115,13 +115,16 @@ class PostgreSQLShipmentWorkflow:
         cycle = await self.session.scalar(select(BoxCycle).where(
             BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None)
         ).with_for_update())
-        if cycle is None:
-            raise ShipmentWorkflowError("У коробки отсутствует открытый цикл использования")
-        membership = await self.session.scalar(select(BoxCardMembership.id).where(
-            BoxCardMembership.box_cycle_id == cycle.id,
-            BoxCardMembership.removed_at.is_(None),
-        ).limit(1))
-        if membership is not None:
+        membership_query = (
+            select(BoxCardMembership.id)
+            .join(BoxCycle, BoxCycle.id == BoxCardMembership.box_cycle_id)
+            .where(
+                BoxCycle.box_id == box.id,
+                BoxCardMembership.removed_at.is_(None),
+            )
+            .limit(1)
+        )
+        if await self.session.scalar(membership_query) is not None:
             raise ShipmentWorkflowError("Списать можно только пустую коробку")
         placement = await self.session.scalar(select(BoxPlacement).where(
             BoxPlacement.box_id == box.id, BoxPlacement.removed_at.is_(None)
@@ -129,14 +132,16 @@ class PostgreSQLShipmentWorkflow:
         if placement is not None:
             raise ShipmentWorkflowError("Сначала снимите коробку с архивной полки")
         now = datetime.now(timezone.utc)
-        cycle.ended_at = now
-        cycle.ended_by = actor.id
+        if cycle is not None:
+            cycle.ended_at = now
+            cycle.ended_by = actor.id
         box.status = "written_off"
         box.updated_at = now
         await self.session.flush()
         await self._event("box.written_off", "box", box.id, actor.id, {
             "box_number": box.box_number, "location_id": str(location.id),
-            "cycle_id": str(cycle.id), "cycle_number": cycle.cycle_number,
+            "cycle_id": str(cycle.id) if cycle is not None else None,
+            "cycle_number": cycle.cycle_number if cycle is not None else None,
         })
         return box
 
@@ -315,7 +320,7 @@ class PostgreSQLShipmentWorkflow:
             .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
             .where(
                 ShipmentBox.box_id == box_id,
-                Shipment.status.in_(("draft", "in_transit")),
+                Shipment.status.in_(("draft", "in_transit", "exception")),
             )
         )
         if existing is not None:
