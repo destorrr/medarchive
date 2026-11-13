@@ -73,8 +73,9 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         branch_id=None,
         is_active=True,
     )
+    archive_actor_id = uuid.uuid4()
     archive_actor = User(
-        id=uuid.uuid4(),
+        id=archive_actor_id,
         username=f"archive-custody-{uuid.uuid4().hex[:10]}",
         password_hash="test-only-hash",
         full_name="Archive Custody Operator",
@@ -206,7 +207,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert await session.scalar(select(Shipment.id)) is None
 
             # Archive staff must not be able to manage Central Office custody.
-            archive_token = get_auth().create_session_token(archive_actor)
+            archive_token = get_auth().create_session_token(type("TokenUser", (), {"id": archive_actor_id})())
             client.cookies.set("session", archive_token)
             forbidden_page = await client.get("/central/custody")
             forbidden_mark = await client.post(
