@@ -524,7 +524,7 @@ async def test_individual_archive_card_can_be_placed_retrieved_issued_and_return
         card_id=card_id, shelf_id=shelf_id, actor_id=archive_user_id,
     )
     shipping = PostgreSQLShipmentWorkflow(pg_session)
-    with pytest.raises(DBAPIError):
+    with pytest.raises(ShipmentWorkflowError, match="снимите карту с архивной полки"):
         async with pg_session.begin_nested():
             await shipping.create_box(
                 location_id=archive_location_id, actor_id=archive_user_id,
@@ -535,7 +535,7 @@ async def test_individual_archive_card_can_be_placed_retrieved_issued_and_return
         courier_id=courier_id, issued_by=archive_user_id,
     )
     outbound_id = outbound.id
-    with pytest.raises(DBAPIError):
+    with pytest.raises(ShipmentWorkflowError, match="снимите карту с архивной полки"):
         async with pg_session.begin_nested():
             await shipping.add_standalone_card(
                 shipment_id=outbound_id, card_id=card_id, actor_id=archive_user_id,
