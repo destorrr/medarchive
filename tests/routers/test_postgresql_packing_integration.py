@@ -82,7 +82,8 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
         token = get_auth().create_session_token(actor)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            created = await client.post("/packing/new-box", cookies={"session": token})
+            client.cookies.set("session", token)
+            created = await client.post("/packing/new-box")
             assert created.status_code == 303
             box_id = uuid.UUID(parse_qs(urlparse(created.headers["location"]).query)["box_id"][0])
 
@@ -93,10 +94,10 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
                 "birth_date": "1985-04-23",
                 "phone": "+79990000000",
             }
+            client.cookies.set("session", token)
             scanned = await client.post(
                 "/packing/scan-card",
                 data={"box_id": str(box_id), "qr_payload": json.dumps(qr, ensure_ascii=False)},
-                cookies={"session": token},
             )
             assert scanned.status_code == 200
             assert "Новая карта ещё не зарегистрирована" in scanned.text
@@ -104,10 +105,10 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
                 select(Card.id).where(Card.card_number == qr["card_number"])
             ) is None
 
+            client.cookies.set("session", token)
             confirmed = await client.post(
                 "/packing/confirm-card",
                 data={"box_id": str(box_id), "qr_payload": json.dumps(qr, ensure_ascii=False)},
-                cookies={"session": token},
             )
             assert confirmed.status_code == 303
 
@@ -129,18 +130,18 @@ async def test_postgresql_branch_packing_registers_qr_and_preserves_membership_h
             assert membership is not None
 
             # Re-scanning the same card into the same box is rejected, not duplicated.
+            client.cookies.set("session", token)
             duplicate = await client.post(
                 "/packing/scan-card",
                 data={"box_id": str(box_id), "qr_payload": json.dumps(qr, ensure_ascii=False)},
-                cookies={"session": token},
             )
             assert duplicate.status_code == 200
             assert "Карта уже находится в активной коробке" in duplicate.text
 
+            client.cookies.set("session", token)
             removed = await client.post(
                 "/packing/remove-card",
                 data={"box_id": str(box_id), "card_id": str(card_id)},
-                cookies={"session": token},
             )
             assert removed.status_code == 303
 
