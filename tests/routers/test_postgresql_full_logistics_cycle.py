@@ -119,24 +119,24 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
 
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             # The branch creates a transport box and registers the card from its QR.
+            client.cookies.set("session", branch_token)
             created_box = await client.post(
-                "/packing/new-box", cookies={"session": branch_token}
             )
             assert created_box.status_code == 303
             branch_box_id = uuid.UUID(
                 parse_qs(urlparse(created_box.headers["location"]).query)["box_id"][0]
             )
+            client.cookies.set("session", branch_token)
             scanned = await client.post(
                 "/packing/scan-card",
                 data={"box_id": str(branch_box_id), "qr_payload": qr_payload},
-                cookies={"session": branch_token},
             )
             assert scanned.status_code == 200
             assert "Full Flow Test Patient" in scanned.text
+            client.cookies.set("session", branch_token)
             confirmed_card = await client.post(
                 "/packing/confirm-card",
                 data={"box_id": str(branch_box_id), "qr_payload": qr_payload},
-                cookies={"session": branch_token},
             )
             assert confirmed_card.status_code == 303
             card = await session.scalar(
@@ -145,6 +145,7 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert card is not None
             card_id = card.id
 
+            client.cookies.set("session", branch_token)
             branch_dispatch = await client.post(
                 "/transfer/confirm",
                 data={
@@ -152,7 +153,6 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
                     "to_location_id": str(archive_location.id),
                     "courier_id": str(courier.id),
                 },
-                cookies={"session": branch_token},
             )
             assert branch_dispatch.status_code == 303
             branch_shipment = await session.scalar(
@@ -164,15 +164,15 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert branch_shipment is not None
             assert branch_shipment.status == "in_transit"
 
+            client.cookies.set("session", archive_token)
             archive_incoming = await client.get(
-                "/receive", cookies={"session": archive_token}
             )
             assert archive_incoming.status_code == 200
             assert card_number in archive_incoming.text
+            client.cookies.set("session", archive_token)
             archive_receipt = await client.post(
                 "/receive/confirm",
                 data={"shipment_id": str(branch_shipment.id), "confirmed": "true"},
-                cookies={"session": archive_token},
             )
             assert archive_receipt.status_code == 303
             await session.refresh(card)
@@ -183,10 +183,10 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert branch_box.current_location_id == archive_location.id
 
             # The archive extracts the requested card before unboxed fulfillment.
+            client.cookies.set("session", archive_token)
             extracted = await client.post(
                 "/placement/remove-card-from-box",
                 data={"box_id": str(branch_box_id), "card_id": str(card_id)},
-                cookies={"session": archive_token},
             )
             assert extracted.status_code == 303
             active_membership = await session.scalar(
@@ -197,26 +197,26 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             )
             assert active_membership is None
 
+            client.cookies.set("session", central_token)
             search = await client.get(
                 "/requests/new",
                 params={"query": card_number},
-                cookies={"session": central_token},
             )
             assert search.status_code == 200
+            client.cookies.set("session", central_token)
             request_created = await client.post(
                 "/requests/create",
                 data={"card_ids": str(card_id)},
-                cookies={"session": central_token},
             )
             assert request_created.status_code == 303
 
+            client.cookies.set("session", archive_token)
             fulfilled = await client.post(
                 "/requests/fulfill",
                 data={
                     "card_ids": [str(card_id)],
                     "courier_id": str(courier.id),
                 },
-                cookies={"session": archive_token},
             )
             assert fulfilled.status_code == 303
             archive_request = await session.scalar(
@@ -245,13 +245,13 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert unboxed_manifest is not None
             assert unboxed_manifest.box_id is None
 
+            client.cookies.set("session", central_token)
             central_receipt = await client.post(
                 "/central/receive/confirm",
                 data={
                     "shipment_id": str(archive_to_central.id),
                     "confirmed": "true",
                 },
-                cookies={"session": central_token},
             )
             assert central_receipt.status_code == 303
             await session.refresh(card)
@@ -261,10 +261,10 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert archive_request.status == "completed"
 
             # Central Office packs the card into its own box and returns that box to the archive.
+            client.cookies.set("session", central_token)
             central_box_response = await client.post(
                 "/central/packing/new-box",
                 data={"card_ids": [str(card_id)]},
-                cookies={"session": central_token},
             )
             assert central_box_response.status_code == 303
             central_box = await session.scalar(
@@ -285,6 +285,7 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             cycle = await session.get(BoxCycle, central_box_membership.box_cycle_id)
             assert cycle is not None and cycle.ended_at is None
 
+            client.cookies.set("session", central_token)
             central_dispatch = await client.post(
                 "/central/transfer/confirm",
                 data={
@@ -293,7 +294,6 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
                     "courier_id": str(courier.id),
                     "card_ids": [],
                 },
-                cookies={"session": central_token},
             )
             assert central_dispatch.status_code == 303
             central_to_archive = await session.scalar(
@@ -310,13 +310,13 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
                 )
             ) == central_box_id
 
+            client.cookies.set("session", archive_token)
             archive_final_receipt = await client.post(
                 "/receive/confirm",
                 data={
                     "shipment_id": str(central_to_archive.id),
                     "confirmed": "true",
                 },
-                cookies={"session": archive_token},
             )
             assert archive_final_receipt.status_code == 303
 
