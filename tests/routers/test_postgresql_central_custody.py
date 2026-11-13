@@ -71,6 +71,15 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         branch_id=None,
         is_active=True,
     )
+    archive_actor = User(
+        id=uuid.uuid4(),
+        username=f"archive-custody-{uuid.uuid4().hex[:10]}",
+        password_hash="test-only-hash",
+        full_name="Archive Custody Operator",
+        role="archive",
+        branch_id=None,
+        is_active=True,
+    )
     card = Card(
         id=uuid.uuid4(),
         card_number=f"CU-{uuid.uuid4().hex[:10]}",
@@ -85,7 +94,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
 
     try:
         async with session.begin():
-            session.add_all([branch, central, actor])
+            session.add_all([branch, central, actor, archive_actor])
             await session.flush()
             session.add(card)
 
@@ -93,6 +102,12 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             client.cookies.set("session", token)
+            initial_page = await client.get("/central/custody")
+            assert initial_page.status_code == 200
+            assert card.card_number in initial_page.text
+            assert "Custody Test Patient" in initial_page.text
+            assert "Отметить передачу" in initial_page.text
+
             marked = await client.post(
                 "/central/custody/mark",
                 data={
@@ -113,6 +128,33 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert card.external_since is not None
 
             client.cookies.set("session", token)
+            external_page = await client.get("/central/custody")
+            assert external_page.status_code == 200
+            assert card.card_number in external_page.text
+            assert "Test External Organization" in external_page.text
+            assert "Вернуть на баланс ЦО" in external_page.text
+            assert "Отметить передачу" not in external_page.text
+
+            # Archive staff must not be able to manage Central Office custody.
+            archive_token = get_auth().create_session_token(archive_actor)
+            client.cookies.set("session", archive_token)
+            forbidden_page = await client.get("/central/custody")
+            forbidden_mark = await client.post(
+                "/central/custody/mark",
+                data={
+                    "card_id": str(card.id),
+                    "custody_status": "at_court",
+                    "organization": "Unauthorized",
+                },
+            )
+            forbidden_return = await client.post(
+                "/central/custody/return", data={"card_id": str(card.id)}
+            )
+            assert forbidden_page.status_code == 403
+            assert forbidden_mark.status_code == 403
+            assert forbidden_return.status_code == 403
+
+            client.cookies.set("session", token)
             returned = await client.post(
                 "/central/custody/return",
                 data={
@@ -129,6 +171,15 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         assert card.external_organization is None
         assert card.external_since is None
         assert card.external_comment == "Возвращена по акту № 18"
+
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            client.cookies.set("session", token)
+            returned_page = await client.get("/central/custody")
+            assert returned_page.status_code == 200
+            assert card.card_number in returned_page.text
+            assert "Отметить передачу" in returned_page.text
+            assert "Вернуть на баланс ЦО" not in returned_page.text
+            assert "Test External Organization" not in returned_page.text
 
         events = list((
             await session.scalars(
