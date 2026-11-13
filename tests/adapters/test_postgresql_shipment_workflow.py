@@ -1252,8 +1252,8 @@ async def test_handover_rechecks_legacy_box_placement_without_mutation(pg_sessio
         location_id=archive_loc.id, actor_id=archive_user.id, card_ids=[card.id],
     )
     shipment = await workflow.create_draft(
-        from_location_id=central_loc.id,
-        to_location_id=archive_loc.id,
+        from_location_id=archive_loc.id,
+        to_location_id=central_loc.id,
         courier_id=courier.id, issued_by=archive_user.id,
     )
     await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=archive_user.id)
