@@ -35,6 +35,7 @@
 <div class="card">
     <h2 style="margin-bottom:8px">Коробка {{ box.box_number }}</h2>
     <p class="muted">Местонахождение: {{ location.name }} · Карт в коробке: {{ cards|length }}</p>
+    <p style="margin-top:12px"><a class="btn btn-primary" href="/boxes/{{ box.id }}/label" target="_blank" rel="noopener">QR-этикетка / повторная печать</a></p>
 </div>
 <div class="card">
     <h3 style="margin-bottom:12px">Добавить медицинскую карту</h3>
