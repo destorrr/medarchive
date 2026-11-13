@@ -132,6 +132,12 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
         transport = httpx.ASGITransport(app=app)
 
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            # Verify the branch operator's complete working surface before mutations.
+            client.cookies.set("session", branch_token)
+            for path in ("/dashboard", "/packing", "/transfer", "/search", "/history"):
+                page = await client.get(path)
+                assert page.status_code == 200, (path, page.text[:500])
+
             # The branch creates a transport box and registers the card from its QR.
             client.cookies.set("session", branch_token)
             created_box = await client.post("/packing/new-box")
@@ -197,6 +203,10 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             assert branch_shipment.status == "in_transit"
 
             client.cookies.set("session", archive_token)
+            for path in ("/dashboard", "/receive", "/placement", "/requests", "/history"):
+                page = await client.get(path)
+                assert page.status_code == 200, (path, page.text[:500])
+            client.cookies.set("session", archive_token)
             archive_incoming = await client.get("/receive")
             assert archive_incoming.status_code == 200
             assert card_number in archive_incoming.text
@@ -249,6 +259,13 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
                 )
                 assert active_membership is None
 
+            client.cookies.set("session", central_token)
+            for path in (
+                "/dashboard", "/requests/new", "/central/receive",
+                "/central/packing", "/central/transfer", "/central/custody", "/history",
+            ):
+                page = await client.get(path)
+                assert page.status_code == 200, (path, page.text[:500])
             client.cookies.set("session", central_token)
             search = await client.get(
                 "/requests/new",
