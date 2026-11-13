@@ -431,11 +431,26 @@ async def test_courier_with_draft_shipment_cannot_be_deactivated():
                 session.add(target)
                 await session.flush()
 
-            await PostgreSQLShipmentWorkflow(session).create_draft(
+            card = Card(
+                card_number=f"CR-CARD-{uuid.uuid4().hex[:10]}",
+                full_name="Courier Exception Test Patient",
+                date_of_birth=date(1980, 1, 1),
+                origin_branch_id=branch.id,
+                current_location_id=source.id,
+                current_shipment_id=None,
+                created_by=actor.id,
+            )
+            session.add(card)
+            await session.flush()
+            shipment = await PostgreSQLShipmentWorkflow(session).create_draft(
                 from_location_id=source.id,
                 to_location_id=target.id,
                 courier_id=courier.id,
                 issued_by=actor.id,
+            )
+            workflow = PostgreSQLShipmentWorkflow(session)
+            await workflow.add_standalone_card(
+                shipment_id=shipment.id, card_id=card.id, actor_id=actor.id
             )
             with pytest.raises(ValueError, match="активными отправлениями"):
                 await PostgreSQLAdminService(session).set_courier_active(
@@ -446,7 +461,6 @@ async def test_courier_with_draft_shipment_cannot_be_deactivated():
                 select(Shipment).where(Shipment.courier_id == courier.id)
             )
             assert shipment is not None
-            workflow = PostgreSQLShipmentWorkflow(session)
             await workflow.hand_over(shipment_id=shipment.id, actor_id=actor.id)
             await workflow.register_exception(
                 shipment_id=shipment.id,
