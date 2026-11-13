@@ -109,6 +109,8 @@ async def test_postgresql_central_office_creates_archive_card_request():
             )
             assert search.status_code == 200
             assert card.card_number in search.text
+            assert 'href="/search"' in search.text
+            assert 'href="/history"' in search.text
 
             client.cookies.set("session", token)
             created = await client.post(
