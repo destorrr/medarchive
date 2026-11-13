@@ -14,6 +14,7 @@
     {% for item in box_items %}
     <div style="border-bottom:1px solid #ddd;padding:12px 0">
         <strong>Коробка {{ item.box.box_number }}</strong>
+        <a class="btn btn-primary" href="/boxes/{{ item.box.id }}/label" target="_blank" rel="noopener">QR-этикетка / повторная печать</a>
         {% if item.cards %}
         <ul>{% for card in item.cards %}<li>{{ card.card_number }} · {{ card.full_name }}
             <form method="post" action="/placement/remove-card-from-box" style="display:inline">
@@ -83,7 +84,7 @@
     {% if placed_boxes %}
     <table class="data"><thead><tr><th>Коробка</th><th>Место</th><th>Действие</th></tr></thead><tbody>
     {% for box, placement, shelf in placed_boxes %}<tr>
-        <td>{{ box.box_number }}</td><td>{{ shelf.section_name }} / {{ shelf.shelf_name }}</td><td>
+        <td>{{ box.box_number }}<br><a href="/boxes/{{ box.id }}/label" target="_blank" rel="noopener">QR-этикетка / повторная печать</a></td><td>{{ shelf.section_name }} / {{ shelf.shelf_name }}</td><td>
             <form method="post" action="/placement/remove-box">
                 <input type="hidden" name="box_id" value="{{ box.id }}">
                 <button class="btn btn-secondary" type="submit">Снять с полки</button>
