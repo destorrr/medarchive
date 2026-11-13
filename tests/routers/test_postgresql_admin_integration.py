@@ -600,6 +600,19 @@ async def test_shelf_with_active_box_placement_cannot_be_deactivated():
             )
             assert persisted_shelf is not None and persisted_shelf.is_active is True
             assert placement is not None
+
+            removed = await PostgreSQLArchiveWorkflow(session).remove_box_from_shelf(
+                box_id=box.id, actor_id=actor.id
+            )
+            assert removed.removed_at is not None
+            assert removed.removed_by == actor.id
+            await PostgreSQLAdminService(session).set_shelf_active(
+                shelf.id, False
+            )
+            assert shelf.is_active is False
+            historical_placement = await session.get(BoxPlacement, placement.id)
+            assert historical_placement is not None
+            assert historical_placement.removed_at is not None
     finally:
         await session.rollback()
         await session.close()
@@ -825,6 +838,20 @@ async def test_admin_service_rejects_deactivating_shelf_with_active_card_placeme
                     shelf.id, False
                 )
             assert shelf.is_active is True
+
+            from medarchive.services.postgresql_archive_workflow import PostgreSQLArchiveWorkflow
+            removed = await PostgreSQLArchiveWorkflow(session).remove_card_from_shelf(
+                card_id=card.id, actor_id=archive_actor.id
+            )
+            assert removed.removed_at is not None
+            assert removed.removed_by == archive_actor.id
+            await PostgreSQLAdminService(session).set_shelf_active(
+                shelf.id, False
+            )
+            assert shelf.is_active is False
+            historical_placement = await session.get(CardPlacement, removed.id)
+            assert historical_placement is not None
+            assert historical_placement.removed_at is not None
     finally:
         await session.rollback()
         await session.close()
