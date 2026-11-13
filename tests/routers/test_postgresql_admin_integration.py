@@ -1008,3 +1008,78 @@ async def test_qr_intake_waits_for_branch_deactivation_location_lock():
                     await session.delete(branch)
             await session.commit()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_branch_can_be_deactivated_after_its_empty_box_is_written_off():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+
+    database = Database(DATABASE_URL)
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    try:
+        async with session.begin():
+            branch = Branch(
+                code=f"WO-{uuid.uuid4().hex[:10]}",
+                name="Written-off box branch",
+                is_active=True,
+            )
+            session.add(branch)
+            await session.flush()
+            location = Location(
+                kind="branch",
+                branch_id=branch.id,
+                name=branch.name,
+                is_active=True,
+            )
+            actor = User(
+                username=f"writeoff-{uuid.uuid4().hex[:12]}",
+                password_hash="test-hash",
+                full_name="Write-off Test Actor",
+                role="branch",
+                branch_id=branch.id,
+                is_active=True,
+            )
+            session.add_all([location, actor])
+            await session.flush()
+            box = Box(
+                box_number=f"WO-BOX-{uuid.uuid4().hex[:10]}",
+                current_location_id=location.id,
+                current_shipment_id=None,
+                status="active",
+                created_by=actor.id,
+            )
+            session.add(box)
+            await session.flush()
+
+            written_off = await PostgreSQLShipmentWorkflow(session).write_off_box(
+                box_id=box.id, actor_id=actor.id
+            )
+            assert written_off.status == "written_off"
+            assert written_off.current_location_id == location.id
+
+            # The user must be deactivated before the branch can be disabled.
+            actor.is_active = False
+            await session.flush()
+            await PostgreSQLAdminService(session).set_branch_active(
+                branch.id, False
+            )
+
+            assert branch.is_active is False
+            assert location.is_active is False
+            assert written_off.status == "written_off"
+    finally:
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
+        await database.close()
