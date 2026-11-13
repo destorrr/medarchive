@@ -2,7 +2,7 @@
 
 from alembic import op
 
-revision = "0010_archive_fulfillment_handover"
+revision = "0010_archive_fulfill"
 down_revision = "0009_external_org_custody"
 branch_labels = None
 depends_on = None
