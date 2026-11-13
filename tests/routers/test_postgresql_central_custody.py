@@ -89,9 +89,13 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
     courier = Courier(
         id=uuid.uuid4(), full_name="Custody Workflow Courier", is_active=True,
     )
+    central_id = central.id
+    archive_id = archive.id
+    courier_id = courier.id
+    empty_box_id = uuid.uuid4()
     empty_box = Box(
-        id=uuid.uuid4(), box_number=f"BX-CU-{uuid.uuid4().hex[:10].upper()}",
-        current_location_id=central.id, status="active", created_by=actor.id,
+        id=empty_box_id, box_number=f"BX-CU-{uuid.uuid4().hex[:10].upper()}",
+        current_location_id=central_id, status="active", created_by=actor.id,
     )
     card_id = uuid.uuid4()
     card = Card(
@@ -136,7 +140,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert marked.status_code == 303
 
             await session.refresh(card)
-            assert card.current_location_id == central.id
+            assert card.current_location_id == central_id
             assert card.current_shipment_id is None
             assert card.custody_status == custody_status
             assert card.external_organization == "Test External Organization"
@@ -164,7 +168,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             client.cookies.set("session", token)
             add_to_box = await client.post(
                 "/central/packing/add-card",
-                data={"box_id": str(empty_box.id), "card_id": str(card_id)},
+                data={"box_id": str(empty_box_id), "card_id": str(card_id)},
             )
             assert add_to_box.status_code == 200
             assert "Карта не найдена в месте хранения коробки или недоступна" in add_to_box.text
@@ -182,15 +186,15 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
                 "/central/transfer/confirm",
                 data={
                     "card_ids": str(card_id),
-                    "to_location_id": str(archive.id),
-                    "courier_id": str(courier.id),
+                    "to_location_id": str(archive_id),
+                    "courier_id": str(courier_id),
                 },
             )
             assert dispatch_external_card.status_code == 200
             assert "Карта передана во внешнюю организацию и недоступна для внутреннего перемещения" in dispatch_external_card.text
 
             await session.refresh(card)
-            assert card.current_location_id == central.id
+            assert card.current_location_id == central_id
             assert card.current_shipment_id is None
             assert card.custody_status == custody_status
             assert await session.scalar(
@@ -231,7 +235,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert returned.status_code == 303
 
         await session.refresh(card)
-        assert card.current_location_id == central.id
+        assert card.current_location_id == central_id
         assert card.current_shipment_id is None
         assert card.custody_status == "available"
         assert card.external_organization is None
