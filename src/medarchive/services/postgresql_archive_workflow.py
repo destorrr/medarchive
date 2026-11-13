@@ -50,6 +50,14 @@ class PostgreSQLArchiveWorkflow:
                 or card.current_shipment_id is not None
             ):
                 raise ArchiveWorkflowError("Заявку можно создать только на карту, находящуюся в архиве")
+            placed = await self.session.scalar(
+                select(CardPlacement.id).where(
+                    CardPlacement.card_id == card.id,
+                    CardPlacement.removed_at.is_(None),
+                ).limit(1)
+            )
+            if placed is not None:
+                raise ArchiveWorkflowError("Сначала снимите карту с архивной полки")
             active = await self.session.scalar(
                 select(ArchiveRequest.id).where(
                     ArchiveRequest.card_id == card.id,
