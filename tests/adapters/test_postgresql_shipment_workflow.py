@@ -428,6 +428,17 @@ async def test_central_office_can_request_archive_cards_and_archive_can_repack_t
     )
     assert placement.removed_at is None
 
+    # A stored box is not an active packing surface: its contents are frozen
+    # until the archive operator explicitly removes it from the shelf.
+    with pytest.raises(ShipmentWorkflowError, match="снимите коробку с архивной полки"):
+        await shipping.remove_card_from_box(
+            box_id=original_box.id, card_id=card.id, actor_id=archive_user.id,
+        )
+    with pytest.raises(ShipmentWorkflowError, match="снимите коробку с архивной полки"):
+        await shipping.add_card_to_box(
+            box_id=original_box.id, card_id=card.id, actor_id=archive_user.id,
+        )
+
     await archive.remove_box_from_shelf(box_id=original_box.id, actor_id=archive_user.id)
     await shipping.remove_card_from_box(
         box_id=original_box.id, card_id=card.id, actor_id=archive_user.id,
