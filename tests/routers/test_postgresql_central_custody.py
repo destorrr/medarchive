@@ -9,7 +9,9 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from medarchive.adapters.postgresql.models import Branch, Card, DomainEvent, Location, User
+from medarchive.adapters.postgresql.models import (
+    Box, BoxCardMembership, Branch, Card, Courier, DomainEvent, Location, Shipment, User,
+)
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_database, get_pg_session
 from medarchive.main import create_app
@@ -80,6 +82,17 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         branch_id=None,
         is_active=True,
     )
+    archive = Location(
+        id=uuid.uuid4(), kind="archive", branch_id=None,
+        name="Custody Archive", is_active=True,
+    )
+    courier = Courier(
+        id=uuid.uuid4(), full_name="Custody Workflow Courier", is_active=True,
+    )
+    empty_box = Box(
+        id=uuid.uuid4(), box_number=f"BX-CU-{uuid.uuid4().hex[:10].upper()}",
+        current_location_id=central.id, status="active", created_by=actor.id,
+    )
     card = Card(
         id=uuid.uuid4(),
         card_number=f"CU-{uuid.uuid4().hex[:10]}",
@@ -94,7 +107,7 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
 
     try:
         async with session.begin():
-            session.add_all([branch, central, actor, archive_actor])
+            session.add_all([branch, central, archive, actor, archive_actor, courier, empty_box])
             await session.flush()
             session.add(card)
 
@@ -134,6 +147,56 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert "Test External Organization" in external_page.text
             assert "Вернуть на баланс ЦО" in external_page.text
             assert "Отметить передачу" not in external_page.text
+
+            # External custody remains on the CO balance but must be excluded
+            # from packing and internal dispatch until the physical return.
+            client.cookies.set("session", token)
+            packing_page = await client.get("/central/packing")
+            transfer_page = await client.get("/central/transfer")
+            assert packing_page.status_code == 200
+            assert transfer_page.status_code == 200
+            assert card.card_number not in packing_page.text
+            assert card.card_number not in transfer_page.text
+
+            client.cookies.set("session", token)
+            add_to_box = await client.post(
+                "/central/packing/add-card",
+                data={"box_id": str(empty_box.id), "card_id": str(card.id)},
+            )
+            assert add_to_box.status_code == 200
+            assert "Карта не найдена в месте хранения коробки или недоступна" in add_to_box.text
+
+            client.cookies.set("session", token)
+            create_box_with_external_card = await client.post(
+                "/central/packing/new-box",
+                data={"card_ids": str(card.id)},
+            )
+            assert create_box_with_external_card.status_code == 200
+            assert "Карта передана во внешнюю организацию и недоступна для внутреннего перемещения" in create_box_with_external_card.text
+
+            client.cookies.set("session", token)
+            dispatch_external_card = await client.post(
+                "/central/transfer/confirm",
+                data={
+                    "card_ids": str(card.id),
+                    "to_location_id": str(archive.id),
+                    "courier_id": str(courier.id),
+                },
+            )
+            assert dispatch_external_card.status_code == 200
+            assert "Карта передана во внешнюю организацию и недоступна для внутреннего перемещения" in dispatch_external_card.text
+
+            await session.refresh(card)
+            assert card.current_location_id == central.id
+            assert card.current_shipment_id is None
+            assert card.custody_status == custody_status
+            assert await session.scalar(
+                select(BoxCardMembership.id).where(
+                    BoxCardMembership.card_id == card.id,
+                    BoxCardMembership.removed_at.is_(None),
+                )
+            ) is None
+            assert await session.scalar(select(Shipment.id)) is None
 
             # Archive staff must not be able to manage Central Office custody.
             archive_token = get_auth().create_session_token(archive_actor)
