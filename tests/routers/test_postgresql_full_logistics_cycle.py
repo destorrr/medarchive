@@ -13,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
     ArchiveRequest,
+    ArchiveShelf,
     Box,
+    BoxPlacement,
     BoxCardMembership,
     BoxCycle,
     Branch,
@@ -74,6 +76,10 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
         id=uuid.uuid4(), kind="archive", branch_id=None,
         name="Full Flow Archive", is_active=True,
     )
+    archive_shelf = ArchiveShelf(
+        id=uuid.uuid4(), section_name="A", shelf_name=f"FLOW-{uuid.uuid4().hex[:6]}",
+        qr_code=f"SHELF-{uuid.uuid4().hex[:10]}", is_active=True,
+    )
     central_location = Location(
         id=uuid.uuid4(), kind="central_office", branch_id=None,
         name="Full Flow Central Office", is_active=True,
@@ -109,7 +115,7 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
         async with session.begin():
             session.add_all([
                 branch, branch_location, archive_location, central_location,
-                branch_actor, archive_actor, central_actor, courier,
+                archive_shelf, branch_actor, archive_actor, central_actor, courier,
             ])
 
         branch_token = get_auth().create_session_token(branch_actor)
@@ -319,12 +325,35 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
             )
             assert archive_final_receipt.status_code == 303
 
+            # Archive stores the received Central Office box on its own shelf.
+            # The transport box was created and dispatched by Central Office;
+            # archive only performs receipt and placement.
+            client.cookies.set("session", archive_token)
+            placed = await client.post(
+                "/placement/box",
+                data={
+                    "box_id": str(central_box_id),
+                    "shelf_id": str(archive_shelf.id),
+                },
+            )
+            assert placed.status_code == 303
+            active_placement = await session.scalar(
+                select(BoxPlacement).where(
+                    BoxPlacement.box_id == central_box_id,
+                    BoxPlacement.removed_at.is_(None),
+                )
+            )
+            assert active_placement is not None
+            assert active_placement.shelf_id == archive_shelf.id
+            assert active_placement.placed_by == archive_actor.id
+
         await session.refresh(card)
         await session.refresh(central_box)
         assert card.current_location_id == archive_location.id
         assert card.current_shipment_id is None
         assert central_box.current_location_id == archive_location.id
         assert central_box.current_shipment_id is None
+        assert central_box.created_by == central_actor.id
         assert (await session.get(Shipment, branch_shipment.id)).status == "received"
         assert (await session.get(Shipment, archive_to_central.id)).status == "received"
         assert (await session.get(Shipment, central_to_archive.id)).status == "received"
