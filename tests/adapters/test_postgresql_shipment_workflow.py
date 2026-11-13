@@ -152,7 +152,8 @@ async def test_archive_to_central_requires_request_and_completes_it_on_receipt(p
     assert card.current_location_id == central_loc.id
     assert card.current_shipment_id is None
     assert request.status == "completed"
-    assert request.fulfilled_by == central_user.id
+    # The archive operator is the fulfiller at courier handover; central-office receipt does not overwrite attribution.
+    assert request.fulfilled_by == archive_user.id
 
     with pytest.raises(DBAPIError):
         async with pg_session.begin_nested():
