@@ -177,6 +177,8 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert request_row is not None
             assert request_row.status == "in_progress"
             assert request_row.fulfillment_shipment_id is not None
+            # The fulfiller is the archive operator who handed the card to the courier.
+            assert request_row.fulfilled_by == archive_actor_id
             shipment_id = request_row.fulfillment_shipment_id
 
             shipment = await session.get(Shipment, shipment_id)
@@ -218,7 +220,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             card = await session.get(Card, requested_card_id)
             assert shipment is not None and shipment.status == "received"
             assert request_row is not None and request_row.status == "completed"
-            assert request_row.fulfilled_by == central_actor_id
+            assert request_row.fulfilled_by == archive_actor_id
             assert request_row.completed_at is not None
             assert card is not None
             assert card.current_location_id == central_location_id
