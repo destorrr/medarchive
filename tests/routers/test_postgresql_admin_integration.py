@@ -1232,18 +1232,6 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
                 session.add(target)
                 await session.flush()
 
-            card = Card(
-                card_number=f"BS-CARD-{uuid.uuid4().hex[:10]}",
-                full_name="Branch Shipment Guard Patient",
-                date_of_birth=date(1980, 1, 1),
-                origin_branch_id=branch.id,
-                current_location_id=source.id,
-                current_shipment_id=None,
-                created_by=actor.id,
-            )
-            session.add(card)
-            await session.flush()
-
             workflow = PostgreSQLShipmentWorkflow(session)
             shipment = await workflow.create_draft(
                 from_location_id=source.id,
@@ -1263,6 +1251,20 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
             assert branch.is_active is True
             assert source.is_active is True
             assert shipment.status == "draft"
+
+            # Create the card only after the empty-draft guard has been checked:
+            # any card on the branch balance independently blocks deactivation.
+            card = Card(
+                card_number=f"BS-CARD-{uuid.uuid4().hex[:10]}",
+                full_name="Branch Shipment Guard Patient",
+                date_of_birth=date(1980, 1, 1),
+                origin_branch_id=branch.id,
+                current_location_id=source.id,
+                current_shipment_id=None,
+                created_by=actor.id,
+            )
+            session.add(card)
+            await session.flush()
 
             await workflow.add_standalone_card(
                 shipment_id=shipment.id, card_id=card.id, actor_id=actor.id
