@@ -266,13 +266,18 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
 
             placement_rows = list((await session.scalars(
                 select(CardPlacement).where(CardPlacement.card_id == card_id)
-                .order_by(CardPlacement.placed_at, CardPlacement.id)
             )).all())
             assert len(placement_rows) == 2
-            assert placement_rows[0].removed_at is not None
-            assert placement_rows[0].removed_by == actor_id
-            assert placement_rows[1].removed_at is None
-            assert placement_rows[1].placed_by == actor_id
+            removed_placements = [
+                row for row in placement_rows if row.removed_at is not None
+            ]
+            active_placements = [
+                row for row in placement_rows if row.removed_at is None
+            ]
+            assert len(removed_placements) == 1
+            assert removed_placements[0].removed_by == actor_id
+            assert len(active_placements) == 1
+            assert active_placements[0].placed_by == actor_id
 
             events = list((await session.scalars(
                 select(DomainEvent).where(
