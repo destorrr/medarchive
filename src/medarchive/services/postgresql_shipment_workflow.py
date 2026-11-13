@@ -330,6 +330,8 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Коробка не найдена или недоступна для отправки")
         if box.current_location_id != shipment.from_location_id or box.current_shipment_id is not None:
             raise ShipmentWorkflowError("Коробка не находится в месте отправления")
+        if await self._active_box_placement(box.id):
+            raise ShipmentWorkflowError("Сначала снимите коробку с архивной полки")
         existing = await self.session.scalar(
             select(ShipmentBox)
             .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
@@ -432,6 +434,8 @@ class PostgreSQLShipmentWorkflow:
         for box in boxes:
             if box.status != "active" or box.current_location_id != source.id or box.current_shipment_id is not None:
                 raise ShipmentWorkflowError("Коробка изменила местонахождение или недоступна")
+            if await self._active_box_placement(box.id):
+                raise ShipmentWorkflowError("Нельзя отправить коробку, пока она размещена на архивной полке")
             cycle = await self.session.scalar(
                 select(BoxCycle).where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None)).with_for_update()
             )
@@ -823,6 +827,15 @@ class PostgreSQLShipmentWorkflow:
             select(CardPlacement.id).where(
                 CardPlacement.card_id == card_id,
                 CardPlacement.removed_at.is_(None),
+            ).limit(1)
+        )
+        return result is not None
+
+    async def _active_box_placement(self, box_id: uuid.UUID) -> bool:
+        result = await self.session.scalar(
+            select(BoxPlacement.id).where(
+                BoxPlacement.box_id == box_id,
+                BoxPlacement.removed_at.is_(None),
             ).limit(1)
         )
         return result is not None
