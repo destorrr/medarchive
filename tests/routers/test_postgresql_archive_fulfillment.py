@@ -183,20 +183,21 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
                 courier_id=courier_id,
                 issued_by=archive_actor_id,
             )
-            await workflow.add_box(
-                shipment_id=forbidden_box_shipment.id,
-                box_id=archive_box.id,
-                actor_id=archive_actor_id,
-            )
             with pytest.raises(
                 ShipmentWorkflowError,
                 match="архив отправляет только отдельные карты, без коробок",
             ):
-                await workflow.hand_over(
+                await workflow.add_box(
                     shipment_id=forbidden_box_shipment.id,
+                    box_id=archive_box.id,
                     actor_id=archive_actor_id,
                 )
             assert forbidden_box_shipment.status == "draft"
+            assert await session.scalar(
+                select(ShipmentBox.box_id).where(
+                    ShipmentBox.shipment_id == forbidden_box_shipment.id
+                )
+            ) is None
             assert archive_box.current_location_id == archive_location_id
             assert archive_box.current_shipment_id is None
             assert unrequested_card.current_location_id == archive_location_id
