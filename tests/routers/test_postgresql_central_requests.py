@@ -123,7 +123,7 @@ async def test_postgresql_central_office_creates_archive_card_request():
                 "/requests/new", params={"query": card.card_number}
             )
             assert duplicate_search.status_code == 200
-            assert card.card_number not in duplicate_search.text
+            assert f'value="{card.id}"' not in duplicate_search.text
             assert "уже создана активная заявка" in duplicate_search.text
 
             client.cookies.set("session", get_auth().create_session_token(archive_actor))
