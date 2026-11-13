@@ -1237,26 +1237,26 @@ async def test_handover_rechecks_legacy_standalone_card_placement_without_mutati
 async def test_handover_rechecks_legacy_box_placement_without_mutation(pg_session):
     (
         branch, _branch_loc, archive_loc, central_loc,
-        _branch_user, _archive_user, central_user, courier,
+        _branch_user, archive_user, _central_user, courier,
     ) = await seed_locations(pg_session)
     workflow = PostgreSQLShipmentWorkflow(pg_session)
     card = Card(
         card_number=f"C-{uuid.uuid4().hex}", full_name="Legacy shelved box patient",
         date_of_birth=__import__("datetime").date(1987, 7, 8),
         origin_branch_id=branch.id,
-        current_location_id=central_loc.id, status="active",
+        current_location_id=archive_loc.id, status="active",
     )
     pg_session.add(card)
     await pg_session.flush()
     box = await workflow.create_box(
-        location_id=central_loc.id, actor_id=central_user.id, card_ids=[card.id],
+        location_id=archive_loc.id, actor_id=archive_user.id, card_ids=[card.id],
     )
     shipment = await workflow.create_draft(
         from_location_id=central_loc.id,
         to_location_id=archive_loc.id,
-        courier_id=courier.id, issued_by=central_user.id,
+        courier_id=courier.id, issued_by=archive_user.id,
     )
-    await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=central_user.id)
+    await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=archive_user.id)
     shelf = ArchiveShelf(
         section_name="A", shelf_name=f"S-{uuid.uuid4().hex[:8]}", is_active=True,
     )
@@ -1280,9 +1280,9 @@ async def test_handover_rechecks_legacy_box_placement_without_mutation(pg_sessio
     ))
     assert shipment.status == "draft"
     assert shipment.handed_over_at is None
-    assert box.current_location_id == central_loc.id
+    assert box.current_location_id == archive_loc.id
     assert box.current_shipment_id is None
-    assert card.current_location_id == central_loc.id
+    assert card.current_location_id == archive_loc.id
     assert card.current_shipment_id is None
     assert placement is not None and placement.shelf_id == shelf.id
     assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == event_count
