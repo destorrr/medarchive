@@ -482,6 +482,27 @@ async def remove_box_from_shelf(
     return RedirectResponse("/placement?message=Коробка+снята+с+полки", status_code=303)
 
 
+@router.post("/placement/write-off-box")
+async def archive_write_off_box(
+    request: Request, box_id: uuid.UUID = Form(...),
+    user: User = Depends(archive_only), session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        box = await PostgreSQLShipmentWorkflow(session).write_off_box(box_id=box_id, actor_id=user.id)
+        number = box.box_number
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        await session.refresh(user)
+        return await placement_page(request, error=str(exc), user=user, session=session)
+    except IntegrityError:
+        await session.rollback()
+        await session.refresh(user)
+        return await placement_page(request, error="Списание заблокировано ограничениями целостности.", user=user, session=session)
+    message = f"Пустая коробка {number} списана."
+    return RedirectResponse(url=f"/placement?message={quote(message, safe='')}", status_code=303)
+
+
 @router.post("/placement/remove-card")
 async def remove_card_from_shelf(
     request: Request,

@@ -335,6 +335,27 @@ async def central_remove_card(
     return RedirectResponse("/central/packing?message=Карта+извлечена+из+коробки", status_code=303)
 
 
+@router.post("/central/packing/write-off-box")
+async def central_write_off_box(
+    request: Request, box_id: uuid.UUID = Form(...),
+    user: User = Depends(central_only), session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        box = await PostgreSQLShipmentWorkflow(session).write_off_box(box_id=box_id, actor_id=user.id)
+        number = box.box_number
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        await session.refresh(user)
+        return await central_packing_page(request, error=str(exc), user=user, session=session)
+    except IntegrityError:
+        await session.rollback()
+        await session.refresh(user)
+        return await central_packing_page(request, error="Списание заблокировано ограничениями целостности.", user=user, session=session)
+    message = f"Пустая коробка {number} списана."
+    return RedirectResponse(url=f"/central/packing?message={quote(message, safe='')}", status_code=303)
+
+
 @router.get("/central/transfer")
 async def central_transfer_page(
     request: Request,

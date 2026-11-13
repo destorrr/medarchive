@@ -16,6 +16,7 @@ from medarchive.adapters.postgresql.models import (
     Box,
     BoxCardMembership,
     BoxCycle,
+    BoxPlacement,
     Card,
     Courier,
     DomainEvent,
@@ -97,6 +98,46 @@ class PostgreSQLShipmentWorkflow:
             await self._event("card.added_to_box", "card", card.id, actor.id, {
                 "box_id": str(box.id), "location_id": str(location.id),
             })
+        return box
+
+    async def write_off_box(self, *, box_id: uuid.UUID, actor_id: uuid.UUID) -> Box:
+        """Write off an empty, stationary box while preserving its lifecycle history."""
+        actor = await self._active_user(actor_id)
+        box = await self.session.scalar(select(Box).where(Box.id == box_id).with_for_update())
+        if box is None or box.status != "active":
+            raise ShipmentWorkflowError("Активная коробка не найдена или уже списана")
+        if box.current_location_id is None or box.current_shipment_id is not None:
+            raise ShipmentWorkflowError("Нельзя списать коробку, находящуюся в пути")
+        location = await self._location(box.current_location_id)
+        await self._authorize_location(actor, location)
+        if await self._has_active_manifest_box(box.id):
+            raise ShipmentWorkflowError("Нельзя списать коробку, включённую в активное отправление")
+        cycle = await self.session.scalar(select(BoxCycle).where(
+            BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None)
+        ).with_for_update())
+        if cycle is None:
+            raise ShipmentWorkflowError("У коробки отсутствует открытый цикл использования")
+        membership = await self.session.scalar(select(BoxCardMembership.id).where(
+            BoxCardMembership.box_cycle_id == cycle.id,
+            BoxCardMembership.removed_at.is_(None),
+        ).limit(1))
+        if membership is not None:
+            raise ShipmentWorkflowError("Списать можно только пустую коробку")
+        placement = await self.session.scalar(select(BoxPlacement).where(
+            BoxPlacement.box_id == box.id, BoxPlacement.removed_at.is_(None)
+        ).with_for_update())
+        if placement is not None:
+            raise ShipmentWorkflowError("Сначала снимите коробку с архивной полки")
+        now = datetime.now(timezone.utc)
+        cycle.ended_at = now
+        cycle.ended_by = actor.id
+        box.status = "written_off"
+        box.updated_at = now
+        await self.session.flush()
+        await self._event("box.written_off", "box", box.id, actor.id, {
+            "box_number": box.box_number, "location_id": str(location.id),
+            "cycle_id": str(cycle.id), "cycle_number": cycle.cycle_number,
+        })
         return box
 
     async def add_card_to_box(

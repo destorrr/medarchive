@@ -290,3 +290,24 @@ async def remove_card(
         url=f"/packing?box_id={box_id}&message={quote('Карта извлечена из коробки', safe='')}",
         status_code=303,
     )
+
+
+@router.post("/packing/write-off-box")
+async def write_off_box(
+    request: Request, box_id: uuid.UUID = Form(...),
+    user: User = Depends(branch_only), session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        box = await PostgreSQLShipmentWorkflow(session).write_off_box(box_id=box_id, actor_id=user.id)
+        number = box.box_number
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        await session.refresh(user)
+        return await _render_packing(request, user, session, box_id=box_id, error=str(exc))
+    except IntegrityError:
+        await session.rollback()
+        await session.refresh(user)
+        return await _render_packing(request, user, session, box_id=box_id, error="Списание заблокировано ограничениями целостности.")
+    message = f"Пустая коробка {number} списана."
+    return RedirectResponse(url=f"/packing?message={quote(message, safe='')}", status_code=303)

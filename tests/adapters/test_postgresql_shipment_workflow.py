@@ -8,8 +8,8 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
-    ArchiveRequest, ArchiveShelf, Box, BoxCardMembership, BoxCycle, Branch, Card,
-    CardPlacement, Courier, DomainEvent, Location, ShipmentCard, User,
+    ArchiveRequest, ArchiveShelf, Box, BoxCardMembership, BoxCycle, BoxPlacement,
+    Branch, Card, CardPlacement, Courier, DomainEvent, Location, ShipmentCard, User,
 )
 from medarchive.services.postgresql_archive_workflow import (
     ArchiveWorkflowError, PostgreSQLArchiveWorkflow,
@@ -1056,3 +1056,72 @@ async def test_exception_resolution_requires_recipient_and_valid_incident(pg_ses
     assert shipment.status == "exception"
     assert card.current_shipment_id == shipment.id
     assert card.current_location_id is None
+
+
+
+@pytest.mark.asyncio
+async def test_empty_box_can_be_written_off_and_cycle_history_is_closed(pg_session):
+    (_branch, branch_loc, archive_loc, central_loc,
+     branch_user, archive_user, central_user, _courier) = await seed_locations(pg_session)
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    for location, actor in ((branch_loc, branch_user), (central_loc, central_user), (archive_loc, archive_user)):
+        box = await workflow.create_box(location_id=location.id, actor_id=actor.id)
+        cycle = await pg_session.scalar(select(BoxCycle).where(BoxCycle.box_id == box.id, BoxCycle.ended_at.is_(None)))
+        written_off = await workflow.write_off_box(box_id=box.id, actor_id=actor.id)
+        await pg_session.refresh(written_off); await pg_session.refresh(cycle)
+        assert written_off.status == "written_off" and written_off.current_location_id == location.id
+        assert written_off.current_shipment_id is None
+        assert cycle.ended_at is not None and cycle.ended_by == actor.id
+        event = await pg_session.scalar(select(DomainEvent).where(
+            DomainEvent.event_type == "box.written_off", DomainEvent.aggregate_id == box.id))
+        assert event is not None and event.payload["location_id"] == str(location.id)
+        with pytest.raises(ShipmentWorkflowError, match="уже списана"):
+            await workflow.write_off_box(box_id=box.id, actor_id=actor.id)
+        with pytest.raises(ShipmentWorkflowError):
+            await workflow.add_card_to_box(box_id=box.id, card_id=uuid.uuid4(), actor_id=actor.id)
+
+
+@pytest.mark.asyncio
+async def test_nonempty_box_cannot_be_written_off(pg_session):
+    branch, branch_loc, _archive, _central, branch_user, *_ = await seed_locations(pg_session)
+    card = Card(card_number=f"C-{uuid.uuid4().hex}", full_name="Patient",
+        date_of_birth=__import__("datetime").date(1980, 1, 1),
+        origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active")
+    pg_session.add(card); await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=branch_loc.id, actor_id=branch_user.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=branch_user.id)
+    with pytest.raises(ShipmentWorkflowError, match="только пустую"):
+        await workflow.write_off_box(box_id=box.id, actor_id=branch_user.id)
+    await pg_session.refresh(box); assert box.status == "active"
+
+
+@pytest.mark.asyncio
+async def test_box_in_active_shipment_cannot_be_written_off(pg_session):
+    branch, branch_loc, archive_loc, _central, branch_user, _archive_user, _central_user, courier = await seed_locations(pg_session)
+    card = Card(card_number=f"C-{uuid.uuid4().hex}", full_name="Patient",
+        date_of_birth=__import__("datetime").date(1980, 1, 1),
+        origin_branch_id=branch.id, current_location_id=branch_loc.id, status="active")
+    pg_session.add(card); await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=branch_loc.id, actor_id=branch_user.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=branch_user.id)
+    shipment = await workflow.create_draft(from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=branch_user.id)
+    await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=branch_user.id)
+    with pytest.raises(ShipmentWorkflowError, match="активное отправление"):
+        await workflow.write_off_box(box_id=box.id, actor_id=branch_user.id)
+    await pg_session.refresh(box); assert box.status == "active"
+
+
+@pytest.mark.asyncio
+async def test_placed_archive_box_must_be_removed_from_shelf_before_write_off(pg_session):
+    (_branch, _branch_loc, archive_loc, _central, _branch_user, archive_user, _central_user, _courier) = await seed_locations(pg_session)
+    shelf = ArchiveShelf(section_name=f"S-{uuid.uuid4().hex[:8]}", shelf_name="1", is_active=True)
+    pg_session.add(shelf); await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=archive_loc.id, actor_id=archive_user.id)
+    await PostgreSQLArchiveWorkflow(pg_session).place_box(box_id=box.id, shelf_id=shelf.id, actor_id=archive_user.id)
+    with pytest.raises(ShipmentWorkflowError, match="снимите коробку"):
+        await workflow.write_off_box(box_id=box.id, actor_id=archive_user.id)
+    await pg_session.refresh(box); assert box.status == "active"

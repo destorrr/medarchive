@@ -35,7 +35,13 @@
                 <button class="btn btn-secondary" type="submit">Извлечь</button>
             </form>
         </li>{% endfor %}</ul>
-        {% else %}<p class="muted">Коробка пустая.</p>{% endif %}
+        {% else %}
+        <p class="muted">Коробка пустая.</p>
+        <form method="post" action="/central/packing/write-off-box" onsubmit="return confirm('Списать пустую коробку? Повторное использование будет запрещено.');">
+            <input type="hidden" name="box_id" value="{{ item.box.id }}">
+            <button class="btn btn-danger-ghost" type="submit">Списать пустую коробку</button>
+        </form>
+        {% endif %}
         {% if cards %}
         <form method="post" action="/central/packing/add-card" style="display:flex;gap:8px;flex-wrap:wrap">
             <input type="hidden" name="box_id" value="{{ item.box.id }}">

@@ -71,7 +71,11 @@
         </tbody>
     </table>
     {% else %}
-    <p class="muted">Коробка пока пустая. Пустую коробку можно сохранить и использовать позже.</p>
+    <p class="muted">Коробка пока пустая. Её можно сохранить или списать.</p>
+    <form method="post" action="/packing/write-off-box" onsubmit="return confirm('Списать пустую коробку? Повторное использование будет запрещено.');">
+        <input type="hidden" name="box_id" value="{{ box.id }}">
+        <button class="btn btn-danger-ghost" type="submit">Списать пустую коробку</button>
+    </form>
     {% endif %}
 </div>
 {% endif %}
