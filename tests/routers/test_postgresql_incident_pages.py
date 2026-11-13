@@ -9,13 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from medarchive.adapters.postgresql.models import (
-    Branch, Card, Courier, DomainEvent, Location, User,
+    Branch, Card, Courier, DomainEvent, Location, ShipmentCard, User,
 )
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_session
 from medarchive.main import create_app
 from medarchive.services.postgresql_bootstrap import ensure_system_locations
-from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+from medarchive.services.postgresql_shipment_workflow import (
+    PostgreSQLShipmentWorkflow, ShipmentWorkflowError,
+)
 
 
 DATABASE_URL = os.getenv("MEDARCHIVE_DATABASE_URL")
@@ -167,6 +169,40 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 assert "Укажите результат проверки" in blank_result.text
                 await session.refresh(shipment)
                 assert shipment.status == "exception"
+
+                # A resolution must not partially receive a shipment when even
+                # one item from the box is absent from the persisted manifest.
+                manifest_row = await session.scalar(select(ShipmentCard).where(
+                    ShipmentCard.shipment_id == shipment_id,
+                    ShipmentCard.card_id == card.id,
+                ))
+                assert manifest_row is not None
+                await session.delete(manifest_row)
+                await session.flush()
+                with pytest.raises(ShipmentWorkflowError, match="состав отправления"):
+                    await workflow.resolve_exception(
+                        shipment_id=shipment_id,
+                        actor_id=archive_user.id,
+                        resolution_note="Попытка принять неполный манифест",
+                    )
+                await session.refresh(shipment)
+                await session.refresh(card)
+                await session.refresh(box)
+                assert shipment.status == "exception"
+                assert card.current_shipment_id == shipment_id
+                assert box.current_shipment_id == shipment_id
+                assert card.current_location_id is None
+                assert box.current_location_id is None
+                assert await session.scalar(select(DomainEvent.id).where(
+                    DomainEvent.event_type == "shipment.exception_resolved",
+                    DomainEvent.aggregate_id == shipment_id,
+                )) is None
+
+                # Restore the exact manifest item, then resolve normally.
+                session.add(ShipmentCard(
+                    shipment_id=shipment_id, card_id=card.id, box_id=box.id,
+                ))
+                await session.flush()
 
                 resolved = await client.post(
                     "/receive/resolve",
