@@ -45,8 +45,10 @@ async def test_postgresql_dashboard_uses_postgresql_session_and_authentication()
         token = get_auth().create_session_token(actor)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            response = await client.get("/dashboard", cookies={"session": token})
-            search_response = await client.get("/search", cookies={"session": token})
+            client.cookies.set("session", token)
+            response = await client.get("/dashboard")
+            client.cookies.set("session", token)
+            search_response = await client.get("/search")
 
         assert search_response.status_code == 200
         assert "Поиск по архиву" in search_response.text
