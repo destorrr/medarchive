@@ -51,6 +51,7 @@ async def test_postgresql_history_is_available_and_paginated():
     try:
         async with session.begin():
             session.add(actor)
+            await session.flush()
             session.add_all([
                 DomainEvent(
                     event_type="box.written_off",
