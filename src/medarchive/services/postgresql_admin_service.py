@@ -155,7 +155,7 @@ class PostgreSQLAdminService:
             active_shipments = await self.session.scalar(
                 select(func.count()).select_from(Shipment).where(
                     Shipment.courier_id == courier.id,
-                    Shipment.status.in_(("draft", "in_transit")),
+                    Shipment.status.in_(("draft", "in_transit", "exception")),
                 )
             )
             if active_shipments:
