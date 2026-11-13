@@ -1236,14 +1236,14 @@ async def test_handover_rechecks_legacy_standalone_card_placement_without_mutati
 @pytest.mark.asyncio
 async def test_handover_rechecks_legacy_box_placement_without_mutation(pg_session):
     (
-        _branch, _branch_loc, _archive_loc, central_loc,
+        branch, _branch_loc, archive_loc, central_loc,
         _branch_user, _archive_user, central_user, courier,
     ) = await seed_locations(pg_session)
     workflow = PostgreSQLShipmentWorkflow(pg_session)
     card = Card(
         card_number=f"C-{uuid.uuid4().hex}", full_name="Legacy shelved box patient",
         date_of_birth=__import__("datetime").date(1987, 7, 8),
-        origin_branch_id=(await seed_locations(pg_session))[0].id,
+        origin_branch_id=branch.id,
         current_location_id=central_loc.id, status="active",
     )
     pg_session.add(card)
@@ -1253,7 +1253,7 @@ async def test_handover_rechecks_legacy_box_placement_without_mutation(pg_sessio
     )
     shipment = await workflow.create_draft(
         from_location_id=central_loc.id,
-        to_location_id=(await pg_session.scalar(select(Location).where(Location.kind == "archive"))).id,
+        to_location_id=archive_loc.id,
         courier_id=courier.id, issued_by=central_user.id,
     )
     await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=central_user.id)
