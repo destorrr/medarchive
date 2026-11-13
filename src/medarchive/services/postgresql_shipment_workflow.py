@@ -18,6 +18,7 @@ from medarchive.adapters.postgresql.models import (
     BoxCycle,
     BoxPlacement,
     Card,
+    CardPlacement,
     Courier,
     DomainEvent,
     Location,
@@ -69,6 +70,8 @@ class PostgreSQLShipmentWorkflow:
                 raise ShipmentWorkflowError("Карта не найдена в указанном месте или недоступна")
             if await self._active_membership(card.id) is not None:
                 raise ShipmentWorkflowError("Карта уже находится в другой активной коробке")
+            if await self._active_card_placement(card.id):
+                raise ShipmentWorkflowError("Сначала снимите карту с архивной полки")
             if await self._has_active_manifest_card(card.id):
                 raise ShipmentWorkflowError("Карта уже включена в активное отправление")
             cards.append(card)
@@ -174,6 +177,8 @@ class PostgreSQLShipmentWorkflow:
             raise ShipmentWorkflowError("Карта не найдена в месте хранения коробки или недоступна")
         if await self._active_membership(card.id) is not None:
             raise ShipmentWorkflowError("Карта уже находится в активной коробке")
+        if await self._active_card_placement(card.id):
+            raise ShipmentWorkflowError("Сначала снимите карту с архивной полки")
         if await self._has_active_manifest_card(card.id):
             raise ShipmentWorkflowError("Карта уже включена в активное отправление")
         # Archive staff may repack cards for internal storage. The separate
@@ -382,6 +387,8 @@ class PostgreSQLShipmentWorkflow:
         membership = await self._active_membership(card.id)
         if membership is not None:
             raise ShipmentWorkflowError("Карта находится в коробке; отправьте коробку целиком")
+        if await self._active_card_placement(card.id):
+            raise ShipmentWorkflowError("Сначала снимите карту с архивной полки")
         existing = await self.session.scalar(
             select(ShipmentCard)
             .join(Shipment, Shipment.id == ShipmentCard.shipment_id)
@@ -444,6 +451,8 @@ class PostgreSQLShipmentWorkflow:
                 )
                 if card is None or card.status != "active" or card.custody_status != "available" or card.current_location_id != source.id or card.current_shipment_id is not None:
                     raise ShipmentWorkflowError("Карта в коробке изменила местонахождение или недоступна")
+                if await self._active_card_placement(card.id):
+                    raise ShipmentWorkflowError("Нельзя отправить карту, пока она размещена на архивной полке")
                 boxed_cards.append((card, box.id))
 
         for row in standalone_rows:
@@ -454,6 +463,8 @@ class PostgreSQLShipmentWorkflow:
                 raise ShipmentWorkflowError("Отдельная карта изменила местонахождение или недоступна")
             if await self._active_membership(card.id) is not None:
                 raise ShipmentWorkflowError("Нельзя отправить отдельно карту, находящуюся в коробке")
+            if await self._active_card_placement(card.id):
+                raise ShipmentWorkflowError("Нельзя отправить карту, пока она размещена на архивной полке")
 
         # Archive issues to the central office are allowed only for cards covered
         # by active central-office requests. The request remains open until receipt.
@@ -804,6 +815,15 @@ class PostgreSQLShipmentWorkflow:
                 Shipment.status.in_(("draft", "in_transit")),
             )
             .limit(1)
+        )
+        return result is not None
+
+    async def _active_card_placement(self, card_id: uuid.UUID) -> bool:
+        result = await self.session.scalar(
+            select(CardPlacement.id).where(
+                CardPlacement.card_id == card_id,
+                CardPlacement.removed_at.is_(None),
+            ).limit(1)
         )
         return result is not None
 
