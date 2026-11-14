@@ -52,7 +52,11 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
         archive_location = await session.scalar(
             select(Location).where(Location.kind == "archive")
         )
+        central_location = await session.scalar(
+            select(Location).where(Location.kind == "central_office")
+        )
         assert archive_location is not None
+        assert central_location is not None
 
         suffix = uuid.uuid4().hex
         branch_id = uuid.uuid4()
@@ -81,8 +85,15 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
             username=f"incident-archive-{suffix}", password_hash="test-hash",
             full_name="Incident Reporter", role="archive", is_active=True,
         )
+        central_user = User(
+            username=f"incident-central-{suffix}", password_hash="test-hash",
+            full_name="Central Incident Receiver", role="central_office", is_active=True,
+        )
         courier = Courier(full_name=f"Incident Courier {suffix}", is_active=True)
-        session.add_all([branch, branch_location, admin, viewer, branch_user, archive_user, courier])
+        session.add_all([
+            branch, branch_location, admin, viewer, branch_user, archive_user,
+            central_user, courier,
+        ])
         await session.flush()
 
         card = Card(
@@ -269,6 +280,88 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 await session.refresh(card)
                 assert card.current_location_id == archive_location.id
                 assert card.current_shipment_id is None
+
+                # The Central Office is also a receiving location and must be
+                # able to inspect and resolve incidents on branch shipments.
+                central_card = Card(
+                    card_number=f"INC-CENTRAL-{suffix}",
+                    full_name="Central Incident Patient",
+                    date_of_birth=date(1985, 3, 4),
+                    origin_branch_id=branch.id,
+                    current_location_id=branch_location.id,
+                    status="active",
+                )
+                session.add(central_card)
+                await session.flush()
+                central_box = await workflow.create_box(
+                    location_id=branch_location.id,
+                    actor_id=branch_user.id,
+                    card_ids=[central_card.id],
+                )
+                central_shipment = await workflow.create_draft(
+                    from_location_id=branch_location.id,
+                    to_location_id=central_location.id,
+                    courier_id=courier.id,
+                    issued_by=branch_user.id,
+                )
+                await workflow.add_box(
+                    shipment_id=central_shipment.id,
+                    box_id=central_box.id,
+                    actor_id=branch_user.id,
+                )
+                await workflow.hand_over(
+                    shipment_id=central_shipment.id, actor_id=branch_user.id,
+                )
+                await workflow.register_exception(
+                    shipment_id=central_shipment.id,
+                    actor_id=branch_user.id,
+                    note="Инцидент отправления в центральный офис",
+                )
+                await session.flush()
+                central_shipment_id = central_shipment.id
+                central_token = get_auth().create_session_token(central_user)
+
+                client.cookies.set("session", central_token)
+                central_page = await client.get("/central/receive")
+                assert central_page.status_code == 200
+                assert "Инцидент отправления в центральный офис" in central_page.text
+                assert f"INC-CENTRAL-{suffix}" in central_page.text
+
+                wrong_recipient = await client.post(
+                    "/receive/resolve",
+                    data={
+                        "shipment_id": str(central_shipment_id),
+                        "confirmed": "true",
+                        "resolution_note": "Попытка использовать маршрут архива",
+                    },
+                )
+                assert wrong_recipient.status_code == 403
+
+                central_resolved = await client.post(
+                    "/central/receive/resolve",
+                    data={
+                        "shipment_id": str(central_shipment_id),
+                        "confirmed": "true",
+                        "resolution_note": "Коробка и карта проверены в ЦО",
+                    },
+                    follow_redirects=False,
+                )
+                assert central_resolved.status_code == 303
+                assert central_resolved.headers["location"].startswith("/central/receive?message=")
+                await session.refresh(central_shipment)
+                await session.refresh(central_card)
+                await session.refresh(central_box)
+                assert central_shipment.status == "received"
+                assert central_card.current_location_id == central_location.id
+                assert central_card.current_shipment_id is None
+                assert central_box.current_location_id == central_location.id
+                assert central_box.current_shipment_id is None
+                central_event = await session.scalar(select(DomainEvent).where(
+                    DomainEvent.event_type == "shipment.exception_resolved",
+                    DomainEvent.aggregate_id == central_shipment_id,
+                ))
+                assert central_event is not None
+                assert central_event.payload["resolution_note"] == "Коробка и карта проверены в ЦО"
         finally:
             app.dependency_overrides.clear()
             await session.close()
