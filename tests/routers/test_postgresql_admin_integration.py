@@ -2785,3 +2785,137 @@ async def test_admin_html_courier_deactivation_is_blocked_by_draft_shipment():
         await outer_transaction.rollback()
         await connection.close()
         await database.close()
+
+@pytest.mark.asyncio
+async def test_admin_incident_list_and_detail_render_exception_shipment_on_postgresql():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from datetime import datetime, timezone
+
+    from medarchive.adapters.postgresql.models import Shipment
+
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="integration-test-secret",
+    ))
+    database = await get_pg_database()
+    actor_id = uuid.uuid4()
+    courier_id = None
+    shipment_id = None
+    branch_id = None
+    location_ids = []
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                branch = Branch(
+                    code=f"INC-{uuid.uuid4().hex[:10]}",
+                    name="Incident admin test branch",
+                    is_active=True,
+                )
+                session.add(branch)
+                await session.flush()
+                branch_id = branch.id
+                source = Location(
+                    kind="branch", branch_id=branch.id,
+                    name=branch.name, is_active=True,
+                )
+                target = Location(
+                    kind="central_office", branch_id=None,
+                    name=f"Incident target {uuid.uuid4().hex[:6]}",
+                    is_active=True,
+                )
+                actor = User(
+                    id=actor_id,
+                    username=f"incident-admin-{uuid.uuid4().hex[:10]}",
+                    password_hash="test-only-hash",
+                    full_name="Incident Admin",
+                    role="admin",
+                    is_active=True,
+                )
+                courier = Courier(
+                    full_name=f"Incident Courier {uuid.uuid4().hex[:8]}",
+                    phone=None,
+                    is_active=True,
+                )
+                session.add_all([source, target, actor, courier])
+                await session.flush()
+                location_ids = [source.id, target.id]
+                courier_id = courier.id
+                now = datetime.now(timezone.utc)
+                shipment = Shipment(
+                    from_location_id=source.id,
+                    to_location_id=target.id,
+                    courier_id=courier.id,
+                    status="exception",
+                    issued_by=actor.id,
+                    handed_over_at=now,
+                    exception_by=actor.id,
+                    exception_at=now,
+                    exception_note="Тестовый инцидент: повреждена упаковка",
+                )
+                session.add(shipment)
+                await session.flush()
+                shipment_id = shipment.id
+
+        async def admin_override():
+            async with database.session_factory() as session:
+                return await session.get(User, actor_id)
+
+        async def session_override():
+            async with database.session_factory() as session:
+                yield session
+
+        app.dependency_overrides[admin_only] = admin_override
+        from medarchive.dependencies import get_pg_session
+        app.dependency_overrides[get_pg_session] = session_override
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            listing = await client.get("/admin/incidents")
+            assert listing.status_code == 200
+            assert "Тестовый инцидент: повреждена упаковка" in listing.text
+            assert "Incident Courier" in listing.text
+            assert f"/admin/incidents/{shipment_id}" in listing.text
+
+            detail = await client.get(f"/admin/incidents/{shipment_id}")
+            assert detail.status_code == 200
+            assert "Incident Admin" in detail.text
+            assert "Тестовый инцидент: повреждена упаковка" in detail.text
+            assert "Коробки в отправлении нет." in detail.text
+            assert "В манифесте нет карт." in detail.text
+
+            missing = await client.get(f"/admin/incidents/{uuid.uuid4()}")
+            assert missing.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+        async with database.session_factory() as session:
+            if shipment_id is not None:
+                shipment = await session.get(Shipment, shipment_id)
+                if shipment is not None:
+                    await session.delete(shipment)
+                    await session.flush()
+            if courier_id is not None:
+                courier = await session.get(Courier, courier_id)
+                if courier is not None:
+                    await session.delete(courier)
+                    await session.flush()
+            actor = await session.get(User, actor_id)
+            if actor is not None:
+                await session.delete(actor)
+                await session.flush()
+            for location_id in location_ids:
+                location = await session.get(Location, location_id)
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+            if branch_id is not None:
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+                    await session.flush()
+            await session.commit()
+        await database.close()
+
