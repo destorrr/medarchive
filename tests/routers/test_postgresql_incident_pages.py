@@ -5,7 +5,7 @@ from datetime import date
 
 import httpx
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -247,6 +247,28 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 ))
                 assert event is not None
                 assert event.payload["resolution_note"] == "Коробка и полный состав сверены с манифестом"
+
+                # Resolving the same incident twice must not create a second
+                # receipt or duplicate the immutable resolution event.
+                duplicate_resolution = await client.post(
+                    "/receive/resolve",
+                    data={
+                        "shipment_id": str(shipment_id),
+                        "confirmed": "true",
+                        "resolution_note": "Повторная попытка разрешения",
+                    },
+                )
+                assert duplicate_resolution.status_code == 200
+                assert "Инцидент не найден или уже разрешён" in duplicate_resolution.text
+                await session.refresh(shipment)
+                assert shipment.status == "received"
+                assert await session.scalar(select(func.count()).select_from(DomainEvent).where(
+                    DomainEvent.event_type == "shipment.exception_resolved",
+                    DomainEvent.aggregate_id == shipment_id,
+                )) == 1
+                await session.refresh(card)
+                assert card.current_location_id == archive_location.id
+                assert card.current_shipment_id is None
         finally:
             app.dependency_overrides.clear()
             await session.close()
