@@ -6,7 +6,7 @@
     <form method="post" action="/admin/users">
         <input type="text" name="username" placeholder="Логин" maxlength="128" required>
         <input type="text" name="full_name" placeholder="ФИО" maxlength="255" required>
-        <input type="password" name="password" placeholder="Пароль (не менее 12 символов)" minlength="12" required>
+        <input type="password" name="password" placeholder="Пароль (не менее 4 символов)" minlength="4" required>
         <select name="role" required>
             <option value="" disabled selected>Выберите роль</option>
             {% for r in role_options %}
@@ -54,7 +54,7 @@
             </td>
             <td>
                 <form id="user-{{ u.id }}" method="post" action="/admin/users/{{ u.id }}/edit">
-                    <input type="password" name="password" placeholder="Новый пароль (необязательно)" minlength="12">
+                    <input type="password" name="password" placeholder="Новый пароль (необязательно)" minlength="4">
                     {% if u.id == user.id %}
                     <input type="hidden" name="is_active" value="true">
                     <label><input type="checkbox" checked disabled> Активен (свою учётную запись отключить нельзя)</label>
