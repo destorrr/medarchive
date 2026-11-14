@@ -11,6 +11,7 @@ WorkingDirectory=/opt/medarchive
 EnvironmentFile=/etc/medarchive/medarchive.env
 Environment=MEDARCHIVE_POSTGRES_ENABLED=true
 Environment=MEDARCHIVE_AUTH_BACKEND=postgresql
+Environment=MEDARCHIVE_ENVIRONMENT=production
 UMask=0077
 ExecStart=/opt/medarchive/.venv/bin/uvicorn medarchive.main:create_app --factory --host 0.0.0.0 --port 8000
 Restart=always
