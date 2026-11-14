@@ -17,7 +17,7 @@ def test_user_input_requires_long_password():
     with pytest.raises(ValidationError):
         UserCreateInput(
             username="operator", full_name="Иванов Иван",
-            password="short", role="branch",
+            password="abc", role="branch",
         )
 
 
@@ -66,3 +66,20 @@ def test_user_update_preserves_active_status_when_omitted():
 
     payload = UserUpdateInput(full_name="Иванов Иван", role="admin")
     assert payload.is_active is None
+
+
+@pytest.mark.parametrize("password", ["abcd", "a1b2"])
+def test_user_input_accepts_four_character_password(password):
+    payload = UserCreateInput(
+        username="operator", full_name="Иванов Иван",
+        password=password, role="admin",
+    )
+    assert payload.password == password
+
+
+def test_user_input_rejects_three_character_password():
+    with pytest.raises(ValidationError):
+        UserCreateInput(
+            username="operator", full_name="Иванов Иван",
+            password="abc", role="admin",
+        )
