@@ -17,7 +17,7 @@ from medarchive.dependencies import get_auth, get_pg_session
 from medarchive.main import create_app
 from medarchive.services.postgresql_bootstrap import ensure_system_locations
 from medarchive.services.postgresql_shipment_workflow import (
-    PostgreSQLShipmentWorkflow,
+    PostgreSQLShipmentWorkflow, ShipmentWorkflowError,
 )
 
 
@@ -203,6 +203,32 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     DomainEvent.event_type == "shipment.exception_resolved",
                     DomainEvent.aggregate_id == shipment_id,
                 )) is None
+
+                # Even with an immutable manifest, a cargo item's live transit
+                # pointer can be inconsistent. Resolution must reject the whole
+                # shipment rather than receive the remaining items.
+                with pytest.raises(
+                    ShipmentWorkflowError,
+                    match="Состояние карты не соответствует отправлению",
+                ):
+                    async with session.begin_nested():
+                        card.current_location_id = archive_location.id
+                        card.current_shipment_id = None
+                        await session.flush()
+                        await workflow.resolve_exception(
+                            shipment_id=shipment_id,
+                            actor_id=archive_user.id,
+                            resolution_note="Попытка приёмки с несовпадающим состоянием карты",
+                        )
+
+                await session.refresh(card)
+                await session.refresh(box)
+                await session.refresh(shipment)
+                assert card.current_location_id is None
+                assert card.current_shipment_id == shipment_id
+                assert box.current_location_id is None
+                assert box.current_shipment_id == shipment_id
+                assert shipment.status == "exception"
 
                 resolved = await client.post(
                     "/receive/resolve",
