@@ -40,7 +40,7 @@ trap cleanup EXIT
 # Convert the application's SQLAlchemy asyncpg URL to libpq environment
 # variables. Credentials are written to a mode-0600 temporary pgpass file;
 # the URL/password is never passed as a command-line argument to pg_dump.
-eval "$(python3 - <<'PY'
+PG_ENV="$(python3 - <<'PY'
 import os
 import shlex
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -92,6 +92,7 @@ for key, value in values.items():
     print(f"export {key}={shlex.quote(value)}")
 PY
 )"
+eval "$PG_ENV"
 
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_FILE="$BACKUP_DIR/medarchive-$TIMESTAMP.dump"
