@@ -63,19 +63,19 @@ def _user_json(user):
 
 @router.get("/branches")
 async def list_branches(
-    _: User = Depends(admin_only), session: AsyncSession = Depends(get_pg_session)
+    actor: User = Depends(admin_only), session: AsyncSession = Depends(get_pg_session)
 ):
     return [_branch_json(item) for item in await PostgreSQLAdminService(session).list_branches()]
 
 
 @router.post("/branches", status_code=201)
 async def create_branch(
-    data: BranchInput, _: User = Depends(admin_only),
+    data: BranchInput, actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
         branch = await PostgreSQLAdminService(session).create_branch(
-            code=data.code, name=data.name
+            code=data.code, name=data.name, actor_id=actor.id
         )
         result = _branch_json(branch)
         await session.commit()
@@ -90,12 +90,12 @@ async def create_branch(
 
 @router.put("/branches/{branch_id}")
 async def update_branch(
-    branch_id: uuid.UUID, data: BranchInput, _: User = Depends(admin_only),
+    branch_id: uuid.UUID, data: BranchInput, actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
         branch = await PostgreSQLAdminService(session).update_branch(
-            branch_id, code=data.code, name=data.name
+            branch_id, code=data.code, name=data.name, actor_id=actor.id
         )
         result = _branch_json(branch)
         await session.commit()
@@ -113,11 +113,11 @@ async def update_branch(
 
 @router.post("/branches/{branch_id}/deactivate")
 async def deactivate_branch(
-    branch_id: uuid.UUID, _: User = Depends(admin_only),
+    branch_id: uuid.UUID, actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        branch = await PostgreSQLAdminService(session).set_branch_active(branch_id, False)
+        branch = await PostgreSQLAdminService(session).set_branch_active(branch_id, False, actor_id=actor.id)
         result = _branch_json(branch)
         await session.commit()
         return result
@@ -134,11 +134,11 @@ async def deactivate_branch(
 
 @router.post("/branches/{branch_id}/activate")
 async def activate_branch(
-    branch_id: uuid.UUID, _: User = Depends(admin_only),
+    branch_id: uuid.UUID, actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        branch = await PostgreSQLAdminService(session).set_branch_active(branch_id, True)
+        branch = await PostgreSQLAdminService(session).set_branch_active(branch_id, True, actor_id=actor.id)
         result = _branch_json(branch)
         await session.commit()
         return result
@@ -149,14 +149,14 @@ async def activate_branch(
 
 @router.get("/users")
 async def list_users(
-    _: User = Depends(admin_only), session: AsyncSession = Depends(get_pg_session)
+    actor: User = Depends(admin_only), session: AsyncSession = Depends(get_pg_session)
 ):
     return [_user_json(item) for item in await PostgreSQLAdminService(session).list_users()]
 
 
 @router.post("/users", status_code=201)
 async def create_user(
-    data: UserCreateInput, _: User = Depends(admin_only),
+    data: UserCreateInput, actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     auth = get_auth()
@@ -164,7 +164,7 @@ async def create_user(
         user = await PostgreSQLAdminService(session).create_user(
             username=data.username, full_name=data.full_name,
             password_hash=auth.hash_password(data.password),
-            role=data.role, branch_id=data.branch_id,
+            role=data.role, branch_id=data.branch_id, actor_id=actor.id,
         )
         result = _user_json(user)
         await session.commit()
@@ -191,7 +191,7 @@ async def update_user(
             user_id, full_name=data.full_name, role=data.role,
             branch_id=data.branch_id,
             password_hash=auth.hash_password(data.password) if data.password else None,
-            is_active=data.is_active,
+            is_active=data.is_active, actor_id=actor.id,
         )
         result = _user_json(user)
         await session.commit()
