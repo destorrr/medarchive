@@ -14,6 +14,7 @@ from medarchive.adapters.postgresql.models import (
     Branch,
     Card,
     Courier,
+    DomainEvent,
     Location,
     Shipment,
     ShipmentBox,
@@ -222,6 +223,27 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert all(row.status == "in_progress" for row in request_rows)
             assert len({row.fulfillment_shipment_id for row in request_rows}) == 1
             assert all(row.fulfilled_by == archive_actor_id for row in request_rows)
+            started_events = list((await session.scalars(
+                select(DomainEvent).where(
+                    DomainEvent.event_type == "archive_request.fulfillment_started",
+                    DomainEvent.aggregate_type == "archive_request",
+                    DomainEvent.aggregate_id.in_([requested_card_id, second_requested_card_id]),
+                )
+            )).all())
+            # The event aggregate is the request ID, not the card ID.
+            request_ids = [row.id for row in request_rows]
+            started_events = list((await session.scalars(
+                select(DomainEvent).where(
+                    DomainEvent.event_type == "archive_request.fulfillment_started",
+                    DomainEvent.aggregate_type == "archive_request",
+                    DomainEvent.aggregate_id.in_(request_ids),
+                )
+            )).all())
+            assert len(started_events) == 2
+            assert {event.actor_user_id for event in started_events} == {archive_actor_id}
+            assert {event.payload["shipment_id"] for event in started_events} == {
+                str(row.fulfillment_shipment_id) for row in request_rows
+            }
             shipment_id = request_rows[0].fulfillment_shipment_id
             assert shipment_id is not None
 
@@ -271,6 +293,18 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert all(row.status == "completed" for row in completed_requests)
             assert all(row.fulfilled_by == archive_actor_id for row in completed_requests)
             assert all(row.completed_at is not None for row in completed_requests)
+            completed_events = list((await session.scalars(
+                select(DomainEvent).where(
+                    DomainEvent.event_type == "archive_request.completed",
+                    DomainEvent.aggregate_type == "archive_request",
+                    DomainEvent.aggregate_id.in_([row.id for row in completed_requests]),
+                )
+            )).all())
+            assert len(completed_events) == 2
+            assert {event.actor_user_id for event in completed_events} == {central_actor_id}
+            assert {event.payload["shipment_id"] for event in completed_events} == {
+                str(shipment_id)
+            }
             for card_id in (requested_card_id, second_requested_card_id):
                 card = await session.get(Card, card_id)
                 assert card is not None
