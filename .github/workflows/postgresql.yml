@@ -55,8 +55,18 @@ jobs:
           chmod 0755 "$client_bin/pg_dump" "$client_bin/pg_restore"
           export PATH="$client_bin:$PATH"
 
+          # Seed old completed archives to exercise retention in the real script.
+          mkdir -p "$MEDARCHIVE_BACKUP_DIR"
+          umask 077
+          for i in $(seq 1 26); do
+            touch "$MEDARCHIVE_BACKUP_DIR/medarchive-old-$i.dump"
+            touch -d "2000-01-01 00:00:$i UTC" "$MEDARCHIVE_BACKUP_DIR/medarchive-old-$i.dump"
+          done
+
           scripts/backup.sh
-          backup_file="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-*.dump' -print -quit)"
+          backup_count="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-*.dump' | wc -l)"
+          test "$backup_count" -eq 24
+          backup_file="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-????????T??????Z.dump' -print -quit)"
           test -n "$backup_file"
           test "$(stat -c '%a' "$backup_file")" = "600"
           export PGPASSWORD=medarchive
