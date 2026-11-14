@@ -54,7 +54,7 @@ async def test_non_admin_roles_cannot_open_postgresql_admin_pages_or_api():
         html_paths = (
             "/admin", "/admin/branches", "/admin/users",
             "/admin/couriers", "/admin/sections", "/admin/incidents",
-            f"/admin/incidents/{uuid.uuid4()}",
+            f"/admin/incidents/{uuid.uuid4()}", "/admin/audit",
         )
         api_paths = ("/api/admin/branches", "/api/admin/users")
         transport = httpx.ASGITransport(app=app)
