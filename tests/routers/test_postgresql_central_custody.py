@@ -154,6 +154,34 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert card.external_comment == "Передано по акту № 17"
             assert card.external_since is not None
 
+            # A repeated external hand-off must be rejected without writing
+            # a second custody-start event or overwriting the first record.
+            duplicate_mark = await client.post(
+                "/central/custody/mark",
+                data={
+                    "card_id": str(card_id),
+                    "custody_status": "at_court",
+                    "organization": "Duplicate Organization",
+                },
+            )
+            assert duplicate_mark.status_code == 200
+            assert "Карта уже передана во внешнюю организацию" in duplicate_mark.text
+            await session.refresh(card)
+            assert card.custody_status == custody_status
+            assert card.external_organization == "Test External Organization"
+            assert await session.scalar(
+                select(DomainEvent.id).where(
+                    DomainEvent.event_type == "card.external_custody_started",
+                    DomainEvent.aggregate_id == card_id,
+                )
+            ) is not None
+            assert await session.scalar(
+                select(DomainEvent.id).where(
+                    DomainEvent.event_type == "card.external_custody_started",
+                    DomainEvent.aggregate_id == card_id,
+                ).offset(1)
+            ) is None
+
             client.cookies.set("session", token)
             external_page = await client.get("/central/custody")
             assert external_page.status_code == 200
@@ -247,6 +275,26 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         assert card.external_organization is None
         assert card.external_since is None
         assert card.external_comment == "Возвращена по акту № 18"
+
+        # Repeating the return is rejected; the first return event remains the
+        # only return event and the card stays available on the CO balance.
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            client.cookies.set("session", token)
+            duplicate_return = await client.post(
+                "/central/custody/return",
+                data={"card_id": str(card_id), "comment": "Повторный возврат"},
+            )
+            assert duplicate_return.status_code == 200
+            assert "Карта не отмечена как находящаяся во внешней организации" in duplicate_return.text
+        await session.refresh(card)
+        assert card.custody_status == "available"
+        assert card.current_location_id == central_id
+        assert await session.scalar(
+            select(DomainEvent.id).where(
+                DomainEvent.event_type == "card.external_custody_returned",
+                DomainEvent.aggregate_id == card_id,
+            ).offset(1)
+        ) is None
 
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             client.cookies.set("session", token)
