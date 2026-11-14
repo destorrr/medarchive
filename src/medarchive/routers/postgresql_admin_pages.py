@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
-    Box, Card, Courier, Location, Shipment, ShipmentBox, ShipmentCard, User,
+    Box, Card, Courier, DomainEvent, Location, Shipment, ShipmentBox, ShipmentCard, User,
 )
 from medarchive.dependencies import get_auth, get_pg_session, require_pg_role
 from medarchive.services.postgresql_admin_service import PostgreSQLAdminService
@@ -450,13 +450,33 @@ async def incident_detail_page(
             .order_by(Box.box_number)
         )
     ).all()
+    resolution_row = await session.execute(
+        select(DomainEvent, User.full_name)
+        .outerjoin(User, User.id == DomainEvent.actor_user_id)
+        .where(
+            DomainEvent.aggregate_type == "shipment",
+            DomainEvent.aggregate_id == shipment_id,
+            DomainEvent.event_type == "shipment.exception_resolved",
+        )
+        .order_by(DomainEvent.id.desc())
+        .limit(1)
+    )
+    resolution_data = resolution_row.first()
+    resolution = None
+    if resolution_data is not None:
+        resolution_event, resolution_actor = resolution_data
+        resolution = {
+            "occurred_at": resolution_event.occurred_at,
+            "actor_name": resolution_actor,
+            "note": resolution_event.payload.get("resolution_note"),
+        }
     return request.app.state.templates.TemplateResponse(
         request=request,
         name="admin/postgresql_incident_detail.html",
         context=_context(
             request, user, shipment=shipment, source_name=source_name,
             target_name=target_name, courier_name=courier_name,
-            reporter_name=reporter_name,
+            reporter_name=reporter_name, resolution=resolution,
             cargo=[{
                 "card_number": card_number, "full_name": full_name,
                 "box_id": box_id, "box_number": box_number,
