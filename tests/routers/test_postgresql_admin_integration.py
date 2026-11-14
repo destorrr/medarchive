@@ -462,6 +462,12 @@ async def test_courier_with_draft_shipment_cannot_be_deactivated():
             )
             assert shipment is not None
             await workflow.hand_over(shipment_id=shipment.id, actor_id=actor.id)
+            with pytest.raises(ValueError, match="активными отправлениями"):
+                await PostgreSQLAdminService(session).set_courier_active(
+                    courier.id, False
+                )
+            assert courier.is_active is True
+
             await workflow.register_exception(
                 shipment_id=shipment.id,
                 actor_id=actor.id,
