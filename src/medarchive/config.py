@@ -36,6 +36,14 @@ class Config:
             raise ValueError(
                 "MEDARCHIVE_POSTGRES_ENABLED=true is required for PostgreSQL authentication"
             )
+        if self.auth_backend == "postgresql" and not self.cookie_secure:
+            raise ValueError(
+                "MEDARCHIVE_COOKIE_SECURE=true is required for PostgreSQL production authentication"
+            )
+        if self.auth_backend == "postgresql" and (self.secret_key is None or len(self.secret_key) < 32):
+            raise ValueError(
+                "MEDARCHIVE_SECRET_KEY must contain at least 32 characters for PostgreSQL production authentication"
+            )
 
     @property
     def effective_database_url(self) -> str:
