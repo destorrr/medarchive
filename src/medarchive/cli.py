@@ -52,10 +52,10 @@ def main() -> None:
     if not username or not full_name:
         parser.error("Логин и ФИО не должны быть пустыми.")
 
-    password = getpass.getpass("Пароль (не менее 12 символов): ")
+    password = getpass.getpass("Пароль (не менее 4 символов): ")
     confirmation = getpass.getpass("Повторите пароль: ")
-    if len(password) < 12:
-        parser.error("Пароль должен содержать не менее 12 символов.")
+    if len(password) < 4:
+        parser.error("Пароль должен содержать не менее 4 символов.")
     if password != confirmation:
         parser.error("Пароли не совпадают.")
 
