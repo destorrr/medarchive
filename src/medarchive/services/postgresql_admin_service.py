@@ -25,7 +25,8 @@ class PostgreSQLAdminService:
         self.users = UserRepository(session)
 
     async def _audit_admin_change(self, event_type: str, aggregate_type: str, aggregate_id: uuid.UUID, actor_id: uuid.UUID | None, payload: dict) -> None:
-        self.session.add(DomainEvent(event_type=event_type, aggregate_type=aggregate_type, aggregate_id=aggregate_id, actor_user_id=actor_id, payload=payload))
+        persisted_actor_id = actor_id if actor_id is not None and await self.session.get(User, actor_id) is not None else None
+        self.session.add(DomainEvent(event_type=event_type, aggregate_type=aggregate_type, aggregate_id=aggregate_id, actor_user_id=persisted_actor_id, payload=payload))
         await self.session.flush()
 
     async def list_branches(self) -> list[Branch]:
