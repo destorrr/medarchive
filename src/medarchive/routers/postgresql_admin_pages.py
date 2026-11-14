@@ -189,9 +189,9 @@ async def users_create(
     _: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
-    if len(password) < 12:
+    if len(password) < 4:
         raise HTTPException(
-            status_code=422, detail="Пароль должен содержать не менее 12 символов"
+            status_code=422, detail="Пароль должен содержать не менее 4 символов"
         )
     try:
         await PostgreSQLAdminService(session).create_user(
@@ -233,9 +233,9 @@ async def users_edit(
             status_code=409,
             detail="Нельзя отключить себя или снять с себя роль администратора",
         )
-    if password and len(password) < 12:
+    if password and len(password) < 4:
         raise HTTPException(
-            status_code=422, detail="Пароль должен содержать не менее 12 символов"
+            status_code=422, detail="Пароль должен содержать не менее 4 символов"
         )
     try:
         await PostgreSQLAdminService(session).update_user(
