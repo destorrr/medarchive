@@ -3135,3 +3135,108 @@ async def test_admin_audit_page_filters_and_renders_append_only_events_on_postgr
         await outer_transaction.rollback()
         await connection.close()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_admin_service_audits_all_administrative_mutations_with_actor_and_safe_payloads():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    database = await get_pg_database()
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"audit-coverage-admin-{uuid.uuid4().hex[:10]}",
+        password_hash="test-only-hash",
+        full_name="Audit Coverage Admin",
+        role="admin",
+        is_active=True,
+    )
+    suffix = uuid.uuid4().hex[:10]
+    try:
+        async with session.begin():
+            session.add(actor)
+            await session.flush()
+            service = PostgreSQLAdminService(session)
+
+            branch = await service.create_branch(
+                code=f"AUD-{suffix}", name="Audit Branch", actor_id=actor.id
+            )
+            await service.update_branch(
+                branch.id, code=f"AUD-{suffix}-EDIT", name="Audit Branch Updated",
+                actor_id=actor.id,
+            )
+            await service.set_branch_active(branch.id, False, actor_id=actor.id)
+            await service.set_branch_active(branch.id, True, actor_id=actor.id)
+
+            courier = await service.create_courier(
+                full_name=f"Audit Courier {suffix}", actor_id=actor.id
+            )
+            await service.set_courier_active(courier.id, False, actor_id=actor.id)
+            await service.set_courier_active(courier.id, True, actor_id=actor.id)
+
+            shelf = await service.create_shelf(
+                section_name=f"AUDIT-{suffix}", shelf_name="01", actor_id=actor.id
+            )
+            await service.update_shelf(
+                shelf.id, section_name=f"AUDIT-{suffix}", shelf_name="02",
+                actor_id=actor.id,
+            )
+            await service.set_shelf_active(shelf.id, False, actor_id=actor.id)
+            await service.set_shelf_active(shelf.id, True, actor_id=actor.id)
+
+            managed_user = await service.create_user(
+                username=f"audit-user-{suffix}",
+                full_name="Audit Managed User",
+                password_hash="initial-secret-hash",
+                role="viewer",
+                branch_id=None,
+                actor_id=actor.id,
+            )
+            await service.update_user(
+                managed_user.id,
+                full_name="Audit Managed User Updated",
+                role="viewer",
+                branch_id=None,
+                password_hash="replacement-secret-hash",
+                actor_id=actor.id,
+            )
+
+            events = list((await session.scalars(
+                select(DomainEvent).where(
+                    DomainEvent.actor_user_id == actor.id,
+                    DomainEvent.event_type.like("admin.%"),
+                ).order_by(DomainEvent.id)
+            )).all())
+            event_types = {event.event_type for event in events}
+            expected = {
+                "admin.branch_created", "admin.branch_updated",
+                "admin.branch_deactivated", "admin.branch_activated",
+                "admin.courier_created", "admin.courier_deactivated",
+                "admin.courier_activated", "admin.shelf_created",
+                "admin.shelf_updated", "admin.shelf_deactivated",
+                "admin.shelf_activated", "admin.user_created",
+                "admin.user_updated",
+            }
+            assert event_types == expected
+            assert len(events) == len(expected)
+            user_update = next(
+                event for event in events if event.event_type == "admin.user_updated"
+            )
+            assert user_update.payload["password_changed"] is True
+            serialized_payloads = str([event.payload for event in events])
+            assert "initial-secret-hash" not in serialized_payloads
+            assert "replacement-secret-hash" not in serialized_payloads
+            assert all(event.actor_user_id == actor.id for event in events)
+    finally:
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
+        await database.close()
