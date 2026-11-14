@@ -95,6 +95,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
             central_user, courier,
         ])
         await session.flush()
+        branch_location_id = branch_location.id
 
         card = Card(
             card_number=f"INC-CARD-{suffix}", full_name="Incident Test Patient",
@@ -288,7 +289,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     full_name="Central Incident Patient",
                     date_of_birth=date(1985, 3, 4),
                     origin_branch_id=branch_id,
-                    current_location_id=branch_location.id,
+                    current_location_id=branch_location_id,
                     status="active",
                 )
                 session.add(central_card)
