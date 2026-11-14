@@ -43,3 +43,16 @@ jobs:
           psql "postgresql://medarchive:medarchive@localhost:5432/medarchive" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.cards') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL AND to_regclass('public.domain_events') IS NOT NULL AS schema_ready" | grep -qx t
       - name: Run application tests
         run: pytest -q
+      - name: Verify PostgreSQL backup and restore
+        env:
+          MEDARCHIVE_BACKUP_DIR: ${{ runner.temp }}/medarchive-backups
+        run: |
+          scripts/backup.sh
+          backup_file="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-*.dump' -print -quit)"
+          test -n "$backup_file"
+          test "$(stat -c '%a' "$backup_file")" = "600"
+          export PGPASSWORD=medarchive
+          createdb --host=localhost --username=medarchive medarchive_restore_check
+          pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=medarchive --dbname=medarchive_restore_check "$backup_file"
+          psql "postgresql://medarchive:medarchive@localhost:5432/medarchive_restore_check" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.domain_events') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL" | grep -qx t
+          dropdb --host=localhost --username=medarchive medarchive_restore_check
