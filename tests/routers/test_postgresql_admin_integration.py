@@ -696,6 +696,7 @@ async def test_admin_html_courier_shelf_forms_and_validation_on_postgresql():
     section_name = f"HTML Section {uuid.uuid4().hex[:8]}"
     shelf_name = f"Shelf {uuid.uuid4().hex[:8]}"
     courier_id = None
+    optional_phone_courier_id = None
     shelf_id = None
 
     try:
@@ -747,6 +748,35 @@ async def test_admin_html_courier_shelf_forms_and_validation_on_postgresql():
                 assert courier.phone == "+7 900 000-00-00"
                 assert courier.is_active is True
 
+            # Whitespace-only optional phone values are normalized to NULL.
+            response = await client.post(
+                "/admin/couriers",
+                data={"full_name": f"{courier_name} optional phone", "phone": "   "},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                optional_phone_courier = await session.scalar(
+                    select(Courier).where(
+                        Courier.full_name == f"{courier_name} optional phone"
+                    )
+                )
+                assert optional_phone_courier is not None
+                optional_phone_courier_id = optional_phone_courier.id
+                assert optional_phone_courier.phone is None
+
+            response = await client.get("/admin/couriers")
+            assert response.status_code == 200
+            assert courier_name in response.text
+            assert "+7 900 000-00-00" in response.text
+            assert f"{courier_name} optional phone" in response.text
+
+            missing_courier = await client.post(
+                f"/admin/couriers/{uuid.uuid4()}/status",
+                data={"is_active": "false"},
+                follow_redirects=False,
+            )
+            assert missing_courier.status_code == 404
+
             response = await client.post(
                 f"/admin/couriers/{courier_id}/status",
                 data={"is_active": "false"},
@@ -792,11 +822,12 @@ async def test_admin_html_courier_shelf_forms_and_validation_on_postgresql():
                 assert shelf is not None and shelf.is_active is True
     finally:
         async with database.session_factory() as session:
-            if courier_id is not None:
-                courier = await session.get(Courier, courier_id)
-                if courier is not None:
-                    await session.delete(courier)
-                    await session.flush()
+            for cleanup_courier_id in (courier_id, optional_phone_courier_id):
+                if cleanup_courier_id is not None:
+                    courier = await session.get(Courier, cleanup_courier_id)
+                    if courier is not None:
+                        await session.delete(courier)
+                        await session.flush()
             if shelf_id is not None:
                 shelf = await session.get(ArchiveShelf, shelf_id)
                 if shelf is not None:
