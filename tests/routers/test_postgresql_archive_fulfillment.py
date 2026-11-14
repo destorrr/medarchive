@@ -24,6 +24,7 @@ from medarchive.adapters.postgresql.models import (
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_database, get_pg_session
 from medarchive.main import create_app
+from medarchive.services.postgresql_archive_workflow import PostgreSQLArchiveWorkflow
 from medarchive.services.postgresql_shipment_workflow import (
     PostgreSQLShipmentWorkflow,
     ShipmentWorkflowError,
@@ -69,6 +70,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
     requested_card_id = uuid.uuid4()
     second_requested_card_id = uuid.uuid4()
     unrequested_card_id = uuid.uuid4()
+    not_found_card_id = uuid.uuid4()
 
     branch = Branch(
         id=branch_id,
@@ -120,6 +122,7 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
     requested_card = make_card(requested_card_id, "REQ-AF")
     second_requested_card = make_card(second_requested_card_id, "REQ-AF-2")
     unrequested_card = make_card(unrequested_card_id, "NO-REQ-AF")
+    not_found_card = make_card(not_found_card_id, "NOT-FOUND-AF")
 
     try:
         async with session.begin():
@@ -127,7 +130,9 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
                 branch, archive, central, central_actor, archive_actor, courier,
             ])
             await session.flush()
-            session.add_all([requested_card, second_requested_card, unrequested_card])
+            session.add_all([
+                requested_card, second_requested_card, unrequested_card, not_found_card,
+            ])
 
         central_token = get_auth().create_session_token(central_actor)
         archive_token = get_auth().create_session_token(archive_actor)
@@ -309,6 +314,30 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert untouched_card is not None
             assert untouched_card.current_location_id == archive_location_id
             assert untouched_card.current_shipment_id is None
+
+            # Mark-not-found and fulfilment both lock Card before ArchiveRequest.
+            # This functional path also verifies the not-found transition and audit.
+            archive_workflow = PostgreSQLArchiveWorkflow(session)
+            [not_found_request] = await archive_workflow.create_requests(
+                card_ids=[not_found_card_id], actor_id=central_actor_id,
+            )
+            marked = await archive_workflow.mark_not_found(
+                request_id=not_found_request.id,
+                actor_id=archive_actor_id,
+                note="Карта не обнаружена при проверке архивного места",
+            )
+            assert marked.status == "not_found"
+            assert marked.fulfilled_by == archive_actor_id
+            assert marked.completed_at is not None
+            not_found_event = await session.scalar(
+                select(DomainEvent).where(
+                    DomainEvent.event_type == "archive_request.not_found",
+                    DomainEvent.aggregate_id == not_found_request.id,
+                )
+            )
+            assert not_found_event is not None
+            assert not_found_event.actor_user_id == archive_actor_id
+            assert not_found_event.payload["card_id"] == str(not_found_card_id)
     finally:
         app.dependency_overrides.clear()
         await session.rollback()
