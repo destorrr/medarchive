@@ -96,29 +96,33 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
         ])
         await session.flush()
         branch_location_id = branch_location.id
+        branch_user_id = branch_user_id
+        courier_id = courier_id
+        archive_location_id = archive_location.id
+        central_location_id = central_location.id
 
         card = Card(
             card_number=f"INC-CARD-{suffix}", full_name="Incident Test Patient",
             date_of_birth=date(1980, 1, 2), origin_branch_id=branch.id,
-            current_location_id=branch_location.id, status="active",
+            current_location_id=branch_location_id, status="active",
         )
         session.add(card)
         await session.flush()
 
         workflow = PostgreSQLShipmentWorkflow(session)
         box = await workflow.create_box(
-            location_id=branch_location.id, actor_id=branch_user.id, card_ids=[card.id],
+            location_id=branch_location_id, actor_id=branch_user_id, card_ids=[card.id],
         )
         shipment = await workflow.create_draft(
-            from_location_id=branch_location.id,
-            to_location_id=archive_location.id,
-            courier_id=courier.id,
-            issued_by=branch_user.id,
+            from_location_id=branch_location_id,
+            to_location_id=archive_location_id,
+            courier_id=courier_id,
+            issued_by=branch_user_id,
         )
         await workflow.add_box(
-            shipment_id=shipment.id, box_id=box.id, actor_id=branch_user.id,
+            shipment_id=shipment.id, box_id=box.id, actor_id=branch_user_id,
         )
-        await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
+        await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user_id)
         await workflow.register_exception(
             shipment_id=shipment.id, actor_id=archive_user.id,
             note="Интеграционная проверка инцидента",
@@ -224,7 +228,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     match="Состояние карты не соответствует отправлению",
                 ):
                     async with session.begin_nested():
-                        card.current_location_id = archive_location.id
+                        card.current_location_id = archive_location_id
                         card.current_shipment_id = None
                         await session.flush()
                         await workflow.resolve_exception(
@@ -279,7 +283,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     DomainEvent.aggregate_id == shipment_id,
                 )) == 1
                 await session.refresh(card)
-                assert card.current_location_id == archive_location.id
+                assert card.current_location_id == archive_location_id
                 assert card.current_shipment_id is None
 
                 # The Central Office is also a receiving location and must be
@@ -295,27 +299,27 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 session.add(central_card)
                 await session.flush()
                 central_box = await workflow.create_box(
-                    location_id=branch_location.id,
-                    actor_id=branch_user.id,
+                    location_id=branch_location_id,
+                    actor_id=branch_user_id,
                     card_ids=[central_card.id],
                 )
                 central_shipment = await workflow.create_draft(
-                    from_location_id=branch_location.id,
-                    to_location_id=central_location.id,
-                    courier_id=courier.id,
-                    issued_by=branch_user.id,
+                    from_location_id=branch_location_id,
+                    to_location_id=central_location_id,
+                    courier_id=courier_id,
+                    issued_by=branch_user_id,
                 )
                 await workflow.add_box(
                     shipment_id=central_shipment.id,
                     box_id=central_box.id,
-                    actor_id=branch_user.id,
+                    actor_id=branch_user_id,
                 )
                 await workflow.hand_over(
-                    shipment_id=central_shipment.id, actor_id=branch_user.id,
+                    shipment_id=central_shipment.id, actor_id=branch_user_id,
                 )
                 await workflow.register_exception(
                     shipment_id=central_shipment.id,
-                    actor_id=branch_user.id,
+                    actor_id=branch_user_id,
                     note="Инцидент отправления в центральный офис",
                 )
                 await session.flush()
@@ -353,9 +357,9 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 await session.refresh(central_card)
                 await session.refresh(central_box)
                 assert central_shipment.status == "received"
-                assert central_card.current_location_id == central_location.id
+                assert central_card.current_location_id == central_location_id
                 assert central_card.current_shipment_id is None
-                assert central_box.current_location_id == central_location.id
+                assert central_box.current_location_id == central_location_id
                 assert central_box.current_shipment_id is None
                 central_event = await session.scalar(select(DomainEvent).where(
                     DomainEvent.event_type == "shipment.exception_resolved",
