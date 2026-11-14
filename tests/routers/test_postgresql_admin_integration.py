@@ -2835,29 +2835,59 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
                     role="admin",
                     is_active=True,
                 )
+                reporter = User(
+                    username=f"incident-reporter-{uuid.uuid4().hex[:10]}",
+                    password_hash="test-only-hash",
+                    full_name="Incident Branch Reporter",
+                    role="branch",
+                    branch_id=branch.id,
+                    is_active=True,
+                )
                 courier = Courier(
                     full_name=f"Incident Courier {uuid.uuid4().hex[:8]}",
                     phone=None,
                     is_active=True,
                 )
-                session.add_all([source, target, actor, courier])
+                session.add_all([source, target, actor, reporter, courier])
                 await session.flush()
                 location_ids = [source.id, target.id]
                 courier_id = courier.id
-                now = datetime.now(timezone.utc)
-                shipment = Shipment(
+
+                # Build the incident through the real workflow: a non-empty
+                # manifest is handed to the courier before the reporter flags it.
+                card = Card(
+                    card_number=f"INC-CARD-{uuid.uuid4().hex[:10]}",
+                    full_name="Incident Test Patient",
+                    date_of_birth=date(1980, 1, 1),
+                    origin_branch_id=branch.id,
+                    current_location_id=source.id,
+                    current_shipment_id=None,
+                    created_by=reporter.id,
+                )
+                session.add(card)
+                await session.flush()
+                from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+                workflow = PostgreSQLShipmentWorkflow(session)
+                shipment = await workflow.create_draft(
                     from_location_id=source.id,
                     to_location_id=target.id,
                     courier_id=courier.id,
-                    status="exception",
-                    issued_by=actor.id,
-                    handed_over_at=now,
-                    exception_by=actor.id,
-                    exception_at=now,
-                    exception_note="Тестовый инцидент: повреждена упаковка",
+                    issued_by=reporter.id,
                 )
-                session.add(shipment)
-                await session.flush()
+                await workflow.add_standalone_card(
+                    shipment_id=shipment.id,
+                    card_id=card.id,
+                    actor_id=reporter.id,
+                )
+                await workflow.hand_over(
+                    shipment_id=shipment.id,
+                    actor_id=reporter.id,
+                )
+                await workflow.register_exception(
+                    shipment_id=shipment.id,
+                    actor_id=reporter.id,
+                    note="Тестовый инцидент: повреждена упаковка",
+                )
                 shipment_id = shipment.id
 
         async def admin_override():
@@ -2882,10 +2912,10 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
 
             detail = await client.get(f"/admin/incidents/{shipment_id}")
             assert detail.status_code == 200
-            assert "Incident Admin" in detail.text
+            assert "Incident Branch Reporter" in detail.text
             assert "Тестовый инцидент: повреждена упаковка" in detail.text
             assert "Коробки в отправлении нет." in detail.text
-            assert "В манифесте нет карт." in detail.text
+            assert "Incident Test Patient" in detail.text
 
             missing = await client.get(f"/admin/incidents/{uuid.uuid4()}")
             assert missing.status_code == 404
@@ -2902,6 +2932,13 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
                 if courier is not None:
                     await session.delete(courier)
                     await session.flush()
+            reporter = await session.scalar(
+                select(User).where(User.username.like("incident-reporter-%"))
+                .order_by(User.id.desc()).limit(1)
+            )
+            if reporter is not None:
+                await session.delete(reporter)
+                await session.flush()
             actor = await session.get(User, actor_id)
             if actor is not None:
                 await session.delete(actor)
