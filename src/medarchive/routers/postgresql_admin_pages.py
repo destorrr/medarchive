@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date, datetime, time, timedelta, timezone
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 from sqlalchemy.exc import IntegrityError
 from fastapi.responses import RedirectResponse
@@ -50,6 +52,7 @@ def _context(request: Request, user: User, **extra):
             {"url": "/admin/couriers", "label": "🚚 Курьеры"},
             {"url": "/admin/sections", "label": "🗂 Секции / Полки"},
             {"url": "/admin/incidents", "label": "🚨 Инциденты"},
+            {"url": "/admin/audit", "label": "📋 Журнал действий"},
         ],
     }
     ctx.update(extra)
@@ -399,6 +402,100 @@ async def shelves_status(
         await session.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _redirect("/admin/sections")
+
+
+@router.get("/admin/audit")
+async def admin_audit_page(
+    request: Request,
+    user: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+    event_type: str = "",
+    aggregate_type: str = "",
+    actor_id: uuid.UUID | None = None,
+    date_from: str = "",
+    date_to: str = "",
+    page: int = 1,
+):
+    """Read-only, paginated view of the append-only event journal."""
+    page = max(1, page)
+    filters = []
+    parsed_from = None
+    parsed_to = None
+    try:
+        if date_from:
+            parsed_from = date.fromisoformat(date_from)
+        if date_to:
+            parsed_to = date.fromisoformat(date_to)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Дата должна быть в формате ГГГГ-ММ-ДД") from exc
+    if parsed_from and parsed_to and parsed_to < parsed_from:
+        raise HTTPException(status_code=422, detail="Начальная дата не может быть позже конечной")
+    if event_type:
+        filters.append(DomainEvent.event_type == event_type)
+    if aggregate_type:
+        filters.append(DomainEvent.aggregate_type == aggregate_type)
+    if actor_id:
+        filters.append(DomainEvent.actor_user_id == actor_id)
+    if parsed_from:
+        filters.append(DomainEvent.occurred_at >= datetime.combine(parsed_from, time.min, tzinfo=timezone.utc))
+    if parsed_to:
+        filters.append(DomainEvent.occurred_at < datetime.combine(parsed_to + timedelta(days=1), time.min, tzinfo=timezone.utc))
+
+    total = await session.scalar(
+        select(func.count()).select_from(DomainEvent).where(*filters)
+    ) or 0
+    page_size = 50
+    rows = (await session.execute(
+        select(DomainEvent, User.full_name, User.username)
+        .outerjoin(User, User.id == DomainEvent.actor_user_id)
+        .where(*filters)
+        .order_by(DomainEvent.id.desc())
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+    )).all()
+    events = [
+        {
+            "event": event,
+            "actor_name": actor_name or "Не указан",
+            "actor_username": actor_username or "",
+        }
+        for event, actor_name, actor_username in rows
+    ]
+    event_types = list((await session.scalars(
+        select(DomainEvent.event_type).distinct().order_by(DomainEvent.event_type)
+    )).all())
+    aggregate_types = list((await session.scalars(
+        select(DomainEvent.aggregate_type).distinct().order_by(DomainEvent.aggregate_type)
+    )).all())
+    actors = list((await session.scalars(
+        select(User).join(DomainEvent, DomainEvent.actor_user_id == User.id)
+        .distinct().order_by(User.full_name, User.username)
+    )).all())
+    query = {
+        "event_type": event_type,
+        "aggregate_type": aggregate_type,
+        "actor_id": str(actor_id) if actor_id else "",
+        "date_from": date_from,
+        "date_to": date_to,
+    }
+    def page_url(target_page: int) -> str:
+        params = {key: value for key, value in query.items() if value}
+        params["page"] = target_page
+        return "/admin/audit?" + urlencode(params)
+    return request.app.state.templates.TemplateResponse(
+        request=request,
+        name="admin/postgresql_audit.html",
+        context=_context(
+            request, user, events=events, event_types=event_types,
+            aggregate_types=aggregate_types, actors=actors,
+            selected_event_type=event_type, selected_aggregate_type=aggregate_type,
+            selected_actor_id=str(actor_id) if actor_id else "",
+            date_from=date_from, date_to=date_to, page=page,
+            total=total, page_size=page_size,
+            has_previous=page > 1, has_next=page * page_size < total,
+            previous_url=page_url(page - 1), next_url=page_url(page + 1),
+        ),
+    )
 
 
 @router.get("/admin/incidents")
