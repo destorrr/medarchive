@@ -431,6 +431,17 @@ async def test_courier_with_draft_shipment_cannot_be_deactivated():
                 session.add(target)
                 await session.flush()
 
+            central_actor = User(
+                username=f"courier-central-{uuid.uuid4().hex[:12]}",
+                password_hash="test-hash",
+                full_name="Courier Central Receiver",
+                role="central_office",
+                branch_id=None,
+                is_active=True,
+            )
+            session.add(central_actor)
+            await session.flush()
+
             card = Card(
                 card_number=f"CR-CARD-{uuid.uuid4().hex[:10]}",
                 full_name="Courier Exception Test Patient",
@@ -477,6 +488,26 @@ async def test_courier_with_draft_shipment_cannot_be_deactivated():
                 await PostgreSQLAdminService(session).set_courier_active(
                     courier.id, False
                 )
+
+            received = await workflow.resolve_exception(
+                shipment_id=shipment.id,
+                actor_id=central_actor.id,
+                resolution_note="Отправление полностью проверено и принято",
+            )
+            assert received.status == "received"
+            assert card.current_location_id == target.id
+            assert card.current_shipment_id is None
+
+            await PostgreSQLAdminService(session).set_courier_active(
+                courier.id, False
+            )
+            assert courier.is_active is False
+            retained_shipment = await session.scalar(
+                select(Shipment).where(Shipment.id == shipment.id)
+            )
+            assert retained_shipment is not None
+            assert retained_shipment.status == "received"
+            assert retained_shipment.courier_id == courier.id
     finally:
         await session.rollback()
         await session.close()
