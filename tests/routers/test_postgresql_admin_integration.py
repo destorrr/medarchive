@@ -1360,7 +1360,7 @@ async def test_admin_html_role_change_preserves_account_and_blocks_self_demotion
                 data={
                     "username": f"short-password-{uuid.uuid4().hex[:8]}",
                     "full_name": "Short Password User",
-                    "password": "too-short",
+                    "password": "abc",
                     "role": "viewer",
                     "branch_id": "",
                 },
@@ -1373,7 +1373,7 @@ async def test_admin_html_role_change_preserves_account_and_blocks_self_demotion
                     "full_name": "Role Transition Employee",
                     "role": "branch",
                     "branch_id": str(branch_id),
-                    "password": "too-short",
+                    "password": "abc",
                     "is_active": "true",
                 },
             )
