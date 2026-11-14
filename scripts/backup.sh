@@ -27,6 +27,7 @@ if ! flock -n 9; then
 fi
 
 PGPASS_FILE="$(mktemp "$BACKUP_DIR/.pgpass.XXXXXX")"
+export PGPASS_FILE
 TEMP_FILE=""
 cleanup() {
     rm -f -- "$PGPASS_FILE"
