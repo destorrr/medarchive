@@ -3075,6 +3075,13 @@ async def test_admin_audit_page_filters_and_renders_append_only_events_on_postgr
                     actor_user_id=None,
                     payload={"marker": "other-audit-marker"},
                 ),
+                DomainEvent(
+                    event_type="shipment.patient_context",
+                    aggregate_type="shipment",
+                    aggregate_id=uuid.uuid4(),
+                    actor_user_id=actor.id,
+                    payload={"marker": "clinical-event-must-not-appear"},
+                ),
             ])
             await session.flush()
 
@@ -3094,6 +3101,7 @@ async def test_admin_audit_page_filters_and_renders_append_only_events_on_postgr
             assert listing.status_code == 200, listing.text
             assert "visible-audit-marker" in listing.text
             assert "other-audit-marker" in listing.text
+            assert "clinical-event-must-not-appear" not in listing.text
             assert "Audit Journal Admin" in listing.text
             assert "Найдено событий:" in listing.text
 
