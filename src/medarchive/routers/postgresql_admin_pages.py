@@ -90,11 +90,11 @@ async def branches_page(
 async def branches_create(
     code: str = Form(...),
     name: str = Form(...),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
-        await PostgreSQLAdminService(session).create_branch(code=code, name=name)
+        await PostgreSQLAdminService(session).create_branch(code=code, name=name, actor_id=actor.id)
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
@@ -113,12 +113,12 @@ async def branches_edit(
     branch_id: uuid.UUID,
     code: str = Form(...),
     name: str = Form(...),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
         await PostgreSQLAdminService(session).update_branch(
-            branch_id, code=code, name=name
+            branch_id, code=code, name=name, actor_id=actor.id
         )
         await session.commit()
     except LookupError as exc:
@@ -140,12 +140,12 @@ async def branches_edit(
 async def branches_status(
     branch_id: uuid.UUID,
     is_active: bool = Form(...),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
         await PostgreSQLAdminService(session).set_branch_active(
-            branch_id, is_active
+            branch_id, is_active, actor_id=actor.id
         )
         await session.commit()
     except LookupError as exc:
@@ -186,7 +186,7 @@ async def users_create(
     password: str = Form(...),
     role: str = Form(...),
     branch_id: str = Form(""),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     if len(password) < 4:
@@ -200,6 +200,7 @@ async def users_create(
             password_hash=get_auth().hash_password(password),
             role=role,
             branch_id=uuid.UUID(branch_id) if branch_id else None,
+            actor_id=actor.id,
         )
         await session.commit()
     except IntegrityError as exc:
@@ -245,6 +246,7 @@ async def users_edit(
             branch_id=uuid.UUID(branch_id) if branch_id else None,
             password_hash=get_auth().hash_password(password) if password else None,
             is_active=is_active,
+            actor_id=actor.id,
         )
         await session.commit()
     except LookupError as exc:
@@ -283,12 +285,12 @@ async def couriers_page(
 async def couriers_create(
     full_name: str = Form(...),
     phone: str = Form(""),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
         await PostgreSQLAdminService(session).create_courier(
-            full_name=full_name, phone=phone
+            full_name=full_name, phone=phone, actor_id=actor.id
         )
         await session.commit()
     except ValueError as exc:
@@ -301,7 +303,7 @@ async def couriers_create(
 async def couriers_status(
     courier_id: uuid.UUID,
     is_active: bool = Form(...),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
@@ -336,12 +338,12 @@ async def shelves_page(
 async def shelves_create(
     section_name: str = Form(...),
     shelf_name: str = Form(...),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
         await PostgreSQLAdminService(session).create_shelf(
-            section_name=section_name, shelf_name=shelf_name
+            section_name=section_name, shelf_name=shelf_name, actor_id=actor.id
         )
         await session.commit()
     except IntegrityError as exc:
@@ -358,12 +360,12 @@ async def shelves_edit(
     shelf_id: uuid.UUID,
     section_name: str = Form(...),
     shelf_name: str = Form(...),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
         await PostgreSQLAdminService(session).update_shelf(
-            shelf_id, section_name=section_name, shelf_name=shelf_name
+            shelf_id, section_name=section_name, shelf_name=shelf_name, actor_id=actor.id
         )
         await session.commit()
     except LookupError as exc:
@@ -382,12 +384,12 @@ async def shelves_edit(
 async def shelves_status(
     shelf_id: uuid.UUID,
     is_active: bool = Form(...),
-    _: User = Depends(admin_only),
+    actor: User = Depends(admin_only),
     session: AsyncSession = Depends(get_pg_session),
 ):
     try:
         await PostgreSQLAdminService(session).set_shelf_active(
-            shelf_id, is_active
+            shelf_id, is_active, actor_id=actor.id
         )
         await session.commit()
     except LookupError as exc:
