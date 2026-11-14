@@ -10,6 +10,14 @@
     <p><strong>Время регистрации:</strong> {{ shipment.exception_at }}</p>
     <p><strong>Передано курьеру:</strong> {{ shipment.handed_over_at }}</p>
 </div>
+{% if resolution %}
+<div class="card">
+    <h2 style="font-size:16px;">Разрешение инцидента</h2>
+    <p><strong>Результат проверки:</strong> {{ resolution.note or "—" }}</p>
+    <p><strong>Принял:</strong> {{ resolution.actor_name or "—" }}</p>
+    <p><strong>Время разрешения:</strong> {{ resolution.occurred_at }}</p>
+</div>
+{% endif %}
 <div class="card">
     <h2 style="font-size:16px;">Коробки в отправлении</h2>
     {% if boxes %}
