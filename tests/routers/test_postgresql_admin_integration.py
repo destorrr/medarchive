@@ -2450,3 +2450,81 @@ async def test_admin_user_api_keeps_role_and_branch_assignment_consistent():
         app.dependency_overrides.clear()
         await database.close()
 
+
+
+@pytest.mark.asyncio
+async def test_admin_user_api_rejects_invalid_role_branch_combinations_on_create():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.dependencies import get_pg_session
+    from medarchive.routers.postgresql_admin import admin_only as api_admin_only
+
+    database = await get_pg_database()
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="user-create-role-branch-validation-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"create-validation-admin-{uuid.uuid4().hex[:8]}",
+        password_hash="admin-test-hash",
+        full_name="Create Validation Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[api_admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    usernames = [
+        f"invalid-role-{uuid.uuid4().hex[:8]}",
+        f"missing-branch-{uuid.uuid4().hex[:8]}",
+        f"unexpected-branch-{uuid.uuid4().hex[:8]}",
+    ]
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            payloads = (
+                {
+                    "username": usernames[0],
+                    "full_name": "Invalid Role",
+                    "password": "abcd",
+                    "role": "superuser",
+                    "branch_id": None,
+                },
+                {
+                    "username": usernames[1],
+                    "full_name": "Missing Branch",
+                    "password": "abcd",
+                    "role": "branch",
+                    "branch_id": None,
+                },
+                {
+                    "username": usernames[2],
+                    "full_name": "Unexpected Branch",
+                    "password": "abcd",
+                    "role": "central_office",
+                    "branch_id": str(uuid.uuid4()),
+                },
+            )
+            for payload in payloads:
+                response = await client.post("/api/admin/users", json=payload)
+                assert response.status_code == 422, response.text
+
+        async with database.session_factory() as session:
+            persisted = await session.scalar(
+                select(User.id).where(User.username.in_(usernames))
+            )
+            assert persisted is None
+    finally:
+        app.dependency_overrides.clear()
+        await database.close()
