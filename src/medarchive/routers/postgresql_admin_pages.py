@@ -308,7 +308,7 @@ async def couriers_status(
 ):
     try:
         await PostgreSQLAdminService(session).set_courier_active(
-            courier_id, is_active
+            courier_id, is_active, actor_id=actor.id
         )
         await session.commit()
     except LookupError as exc:
