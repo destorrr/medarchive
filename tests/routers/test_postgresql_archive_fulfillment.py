@@ -154,6 +154,14 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             )
             assert created.status_code == 303
 
+            # A card cannot acquire a second active archive request while it
+            # is still in the archive and its first request is active.
+            archive_workflow = PostgreSQLArchiveWorkflow(session)
+            with pytest.raises(ValueError, match="активная заявка"):
+                await archive_workflow.create_requests(
+                    card_ids=[requested_card_id], actor_id=central_actor_id,
+                )
+
             # An unrequested card must block the entire dispatch transaction.
             client.cookies.set("session", archive_token)
             rejected = await client.post(
@@ -228,13 +236,6 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert all(row.status == "in_progress" for row in request_rows)
             assert len({row.fulfillment_shipment_id for row in request_rows}) == 1
             assert all(row.fulfilled_by == archive_actor_id for row in request_rows)
-
-            # A card cannot acquire a second active archive request.
-            archive_workflow = PostgreSQLArchiveWorkflow(session)
-            with pytest.raises(ValueError, match="активная заявка"):
-                await archive_workflow.create_requests(
-                    card_ids=[requested_card_id], actor_id=central_actor_id,
-                )
 
             # An in-progress request cannot be marked as not-found.
             with pytest.raises(ValueError):
@@ -338,6 +339,13 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             [not_found_request] = await archive_workflow.create_requests(
                 card_ids=[not_found_card_id], actor_id=central_actor_id,
             )
+            with pytest.raises(ValueError, match="пояснение"):
+                await archive_workflow.mark_not_found(
+                    request_id=not_found_request.id,
+                    actor_id=archive_actor_id,
+                    note="   ",
+                )
+            assert not_found_request.status == "new"
             marked = await archive_workflow.mark_not_found(
                 request_id=not_found_request.id,
                 actor_id=archive_actor_id,
