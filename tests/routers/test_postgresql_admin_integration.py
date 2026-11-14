@@ -1496,3 +1496,94 @@ async def test_admin_html_role_change_preserves_account_and_blocks_self_demotion
             await session.commit()
         app.dependency_overrides.clear()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_admin_branch_edit_updates_logistics_location_on_postgresql():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.dependencies import get_pg_session
+
+    database = Database(DATABASE_URL)
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="admin-branch-edit-integration-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"branch-edit-admin-{uuid.uuid4().hex[:10]}",
+        password_hash="admin-test-hash",
+        full_name="Branch Edit Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    branch_id = None
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                branch = await PostgreSQLAdminService(session).create_branch(
+                    code=f"EDIT-{uuid.uuid4().hex[:10]}",
+                    name="Initial branch name",
+                )
+                branch_id = branch.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            page = await client.get("/admin/branches")
+            assert page.status_code == 200
+            assert "Initial branch name" in page.text
+
+            response = await client.post(
+                f"/admin/branches/{branch_id}/edit",
+                data={
+                    "code": f"UPDATED-{uuid.uuid4().hex[:10]}",
+                    "name": "Updated branch name",
+                },
+                follow_redirects=False,
+            )
+            assert response.status_code == 303
+
+        async with database.session_factory() as session:
+            branch = await session.get(Branch, branch_id)
+            location = await session.scalar(
+                select(Location).where(
+                    Location.kind == "branch",
+                    Location.branch_id == branch_id,
+                )
+            )
+            assert branch is not None
+            assert branch.code.startswith("UPDATED-")
+            assert branch.name == "Updated branch name"
+            assert location is not None
+            assert location.name == "Updated branch name"
+    finally:
+        async with database.session_factory() as session:
+            if branch_id is not None:
+                location = await session.scalar(
+                    select(Location).where(
+                        Location.kind == "branch", Location.branch_id == branch_id
+                    )
+                )
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
