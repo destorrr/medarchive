@@ -21,6 +21,9 @@ class Config:
     auth_backend: str = field(
         default_factory=lambda: os.environ.get("MEDARCHIVE_AUTH_BACKEND", "sqlite").strip().lower()
     )
+    environment: str = field(
+        default_factory=lambda: os.environ.get("MEDARCHIVE_ENVIRONMENT", "development").strip().lower()
+    )
     cookie_secure: bool = field(
         default_factory=lambda: os.environ.get("MEDARCHIVE_COOKIE_SECURE", "false").strip().lower()
         in {"1", "true", "yes", "on"}
@@ -32,18 +35,21 @@ class Config:
     def __post_init__(self) -> None:
         if self.auth_backend not in {"sqlite", "postgresql"}:
             raise ValueError("MEDARCHIVE_AUTH_BACKEND must be sqlite or postgresql")
+        if self.environment not in {"development", "test", "production"}:
+            raise ValueError("MEDARCHIVE_ENVIRONMENT must be development, test or production")
         if self.auth_backend == "postgresql" and not self.postgres_enabled:
             raise ValueError(
                 "MEDARCHIVE_POSTGRES_ENABLED=true is required for PostgreSQL authentication"
             )
-        if self.auth_backend == "postgresql" and not self.cookie_secure:
-            raise ValueError(
-                "MEDARCHIVE_COOKIE_SECURE=true is required for PostgreSQL production authentication"
-            )
-        if self.auth_backend == "postgresql" and (self.secret_key is None or len(self.secret_key) < 32):
-            raise ValueError(
-                "MEDARCHIVE_SECRET_KEY must contain at least 32 characters for PostgreSQL production authentication"
-            )
+        if self.environment == "production" and self.auth_backend == "postgresql":
+            if not self.cookie_secure:
+                raise ValueError(
+                    "MEDARCHIVE_COOKIE_SECURE=true is required for PostgreSQL production authentication"
+                )
+            if self.secret_key is None or len(self.secret_key) < 32:
+                raise ValueError(
+                    "MEDARCHIVE_SECRET_KEY must contain at least 32 characters for PostgreSQL production authentication"
+                )
 
     @property
     def effective_database_url(self) -> str:
