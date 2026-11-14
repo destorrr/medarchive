@@ -1355,6 +1355,30 @@ async def test_admin_html_role_change_preserves_account_and_blocks_self_demotion
             assert page.status_code == 200
             assert "Role Transition Employee" in page.text
 
+            short_create = await client.post(
+                "/admin/users",
+                data={
+                    "username": f"short-password-{uuid.uuid4().hex[:8]}",
+                    "full_name": "Short Password User",
+                    "password": "too-short",
+                    "role": "viewer",
+                    "branch_id": "",
+                },
+            )
+            assert short_create.status_code == 422
+
+            short_update = await client.post(
+                f"/admin/users/{user_id}/edit",
+                data={
+                    "full_name": "Role Transition Employee",
+                    "role": "branch",
+                    "branch_id": str(branch_id),
+                    "password": "too-short",
+                    "is_active": "true",
+                },
+            )
+            assert short_update.status_code == 422
+
             changed = await client.post(
                 f"/admin/users/{user_id}/edit",
                 data={
