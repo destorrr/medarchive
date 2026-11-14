@@ -186,6 +186,19 @@ class PostgreSQLAdminService:
         await self.session.flush()
         return shelf
 
+    async def update_shelf(
+        self, shelf_id: uuid.UUID, *, section_name: str, shelf_name: str
+    ) -> ArchiveShelf:
+        shelf = await self.session.get(ArchiveShelf, shelf_id, with_for_update=True)
+        if shelf is None:
+            raise LookupError("Архивная полка не найдена")
+        section_name, shelf_name = section_name.strip(), shelf_name.strip()
+        if not section_name or not shelf_name:
+            raise ValueError("Секция и номер полки обязательны")
+        shelf.section_name, shelf.shelf_name = section_name, shelf_name
+        await self.session.flush()
+        return shelf
+
     async def set_shelf_active(
         self, shelf_id: uuid.UUID, active: bool
     ) -> ArchiveShelf:
