@@ -2321,3 +2321,132 @@ async def test_admin_user_api_rejects_assignment_to_inactive_branch_then_allows_
         app.dependency_overrides.clear()
         await database.close()
 
+@pytest.mark.asyncio
+async def test_admin_user_api_keeps_role_and_branch_assignment_consistent():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.dependencies import get_pg_session
+    from medarchive.routers.postgresql_admin import admin_only as api_admin_only
+
+    database = await get_pg_database()
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="user-role-branch-consistency-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"role-branch-api-admin-{uuid.uuid4().hex[:8]}",
+        password_hash="admin-test-hash",
+        full_name="Role Branch API Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[api_admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    branch_id = user_id = None
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                branch = await PostgreSQLAdminService(session).create_branch(
+                    code=f"ROLE-BRANCH-{uuid.uuid4().hex[:8]}",
+                    name="Role assignment branch",
+                )
+                branch_id = branch.id
+                employee = await PostgreSQLAdminService(session).create_user(
+                    username=f"role-branch-employee-{uuid.uuid4().hex[:8]}",
+                    full_name="Role Branch Employee",
+                    password_hash="test-only-hash",
+                    role="viewer",
+                    branch_id=None,
+                )
+                user_id = employee.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            invalid_non_branch = await client.put(
+                f"/api/admin/users/{user_id}",
+                json={
+                    "full_name": "Role Branch Employee",
+                    "role": "central_office",
+                    "branch_id": str(branch_id),
+                },
+            )
+            assert invalid_non_branch.status_code == 409, invalid_non_branch.text
+
+            invalid_branch = await client.put(
+                f"/api/admin/users/{user_id}",
+                json={
+                    "full_name": "Role Branch Employee",
+                    "role": "branch",
+                    "branch_id": None,
+                },
+            )
+            assert invalid_branch.status_code == 409, invalid_branch.text
+
+            async with database.session_factory() as session:
+                unchanged = await session.get(User, user_id)
+                assert unchanged is not None
+                assert unchanged.role == "viewer"
+                assert unchanged.branch_id is None
+
+            assigned = await client.put(
+                f"/api/admin/users/{user_id}",
+                json={
+                    "full_name": "Role Branch Employee",
+                    "role": "branch",
+                    "branch_id": str(branch_id),
+                },
+            )
+            assert assigned.status_code == 200, assigned.text
+            assert assigned.json()["role"] == "branch"
+            assert assigned.json()["branch_id"] == str(branch_id)
+
+            moved_to_central = await client.put(
+                f"/api/admin/users/{user_id}",
+                json={
+                    "full_name": "Role Branch Employee",
+                    "role": "central_office",
+                    "branch_id": None,
+                },
+            )
+            assert moved_to_central.status_code == 200, moved_to_central.text
+            assert moved_to_central.json()["role"] == "central_office"
+            assert moved_to_central.json()["branch_id"] is None
+
+            async with database.session_factory() as session:
+                final_user = await session.get(User, user_id)
+                assert final_user is not None
+                assert final_user.role == "central_office"
+                assert final_user.branch_id is None
+    finally:
+        async with database.session_factory() as session:
+            if user_id is not None:
+                employee = await session.get(User, user_id)
+                if employee is not None:
+                    await session.delete(employee)
+                    await session.flush()
+            if branch_id is not None:
+                location = await session.scalar(select(Location).where(
+                    Location.kind == "branch", Location.branch_id == branch_id
+                ))
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
+
