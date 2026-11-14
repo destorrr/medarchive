@@ -223,14 +223,6 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert all(row.status == "in_progress" for row in request_rows)
             assert len({row.fulfillment_shipment_id for row in request_rows}) == 1
             assert all(row.fulfilled_by == archive_actor_id for row in request_rows)
-            started_events = list((await session.scalars(
-                select(DomainEvent).where(
-                    DomainEvent.event_type == "archive_request.fulfillment_started",
-                    DomainEvent.aggregate_type == "archive_request",
-                    DomainEvent.aggregate_id.in_([requested_card_id, second_requested_card_id]),
-                )
-            )).all())
-            # The event aggregate is the request ID, not the card ID.
             request_ids = [row.id for row in request_rows]
             started_events = list((await session.scalars(
                 select(DomainEvent).where(
