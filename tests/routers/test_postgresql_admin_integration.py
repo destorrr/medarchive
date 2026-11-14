@@ -2199,3 +2199,125 @@ async def test_admin_html_user_creation_validates_branch_and_normalizes_login():
             await session.commit()
         app.dependency_overrides.clear()
         await database.close()
+
+@pytest.mark.asyncio
+async def test_admin_user_api_rejects_assignment_to_inactive_branch_then_allows_reactivation():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.dependencies import get_pg_session
+    from medarchive.routers.postgresql_admin import admin_only as api_admin_only
+
+    database = await get_pg_database()
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="inactive-branch-user-api-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"inactive-branch-api-admin-{uuid.uuid4().hex[:8]}",
+        password_hash="admin-test-hash",
+        full_name="Inactive Branch API Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[api_admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    branch_id = user_id = None
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                service = PostgreSQLAdminService(session)
+                branch = await service.create_branch(
+                    code=f"INACTIVE-API-{uuid.uuid4().hex[:8]}",
+                    name="Inactive assignment branch",
+                )
+                branch_id = branch.id
+                await service.set_branch_active(branch.id, False)
+                employee = await service.create_user(
+                    username=f"inactive-api-employee-{uuid.uuid4().hex[:8]}",
+                    full_name="Unassigned API Employee",
+                    password_hash="test-only-hash",
+                    role="viewer",
+                    branch_id=None,
+                )
+                user_id = employee.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            rejected = await client.put(
+                f"/api/admin/users/{user_id}",
+                json={
+                    "full_name": "Unassigned API Employee",
+                    "role": "branch",
+                    "branch_id": str(branch_id),
+                },
+            )
+            assert rejected.status_code == 409, rejected.text
+            assert "действующий филиал" in rejected.json()["detail"]
+
+            async with database.session_factory() as session:
+                unchanged = await session.get(User, user_id)
+                assert unchanged is not None
+                assert unchanged.role == "viewer"
+                assert unchanged.branch_id is None
+                inactive_branch = await session.get(Branch, branch_id)
+                assert inactive_branch is not None
+                assert inactive_branch.is_active is False
+
+            async with database.session_factory() as session:
+                async with session.begin():
+                    await PostgreSQLAdminService(session).set_branch_active(
+                        branch_id, True
+                    )
+
+            accepted = await client.put(
+                f"/api/admin/users/{user_id}",
+                json={
+                    "full_name": "Assigned API Employee",
+                    "role": "branch",
+                    "branch_id": str(branch_id),
+                },
+            )
+            assert accepted.status_code == 200, accepted.text
+            assert accepted.json()["role"] == "branch"
+            assert accepted.json()["branch_id"] == str(branch_id)
+
+            async with database.session_factory() as session:
+                assigned = await session.get(User, user_id)
+                assert assigned is not None
+                assert assigned.full_name == "Assigned API Employee"
+                assert assigned.role == "branch"
+                assert assigned.branch_id == branch_id
+                assert assigned.is_active is True
+    finally:
+        async with database.session_factory() as session:
+            if user_id is not None:
+                employee = await session.get(User, user_id)
+                if employee is not None:
+                    await session.delete(employee)
+                    await session.flush()
+            if branch_id is not None:
+                location = await session.scalar(select(Location).where(
+                    Location.kind == "branch", Location.branch_id == branch_id
+                ))
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
+
