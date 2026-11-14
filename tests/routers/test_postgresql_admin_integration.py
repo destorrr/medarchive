@@ -804,6 +804,33 @@ async def test_admin_html_courier_shelf_forms_and_validation_on_postgresql():
                 shelf_id = shelf.id
                 assert shelf.is_active is True
 
+            edited_section_name = f"{section_name} Updated"
+            edited_shelf_name = f"{shelf_name} Updated"
+            response = await client.post(
+                f"/admin/sections/{shelf_id}/edit",
+                data={
+                    "section_name": edited_section_name,
+                    "shelf_name": edited_shelf_name,
+                },
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                shelf = await session.get(ArchiveShelf, shelf_id)
+                assert shelf is not None
+                assert shelf.section_name == edited_section_name
+                assert shelf.shelf_name == edited_shelf_name
+
+            invalid_edit = await client.post(
+                f"/admin/sections/{shelf_id}/edit",
+                data={"section_name": "   ", "shelf_name": edited_shelf_name},
+            )
+            assert invalid_edit.status_code == 422
+            missing_shelf = await client.post(
+                f"/admin/sections/{uuid.uuid4()}/edit",
+                data={"section_name": "Missing", "shelf_name": "Missing"},
+            )
+            assert missing_shelf.status_code == 404
+
             response = await client.post(
                 f"/admin/sections/{shelf_id}/status",
                 data={"is_active": "false"},
