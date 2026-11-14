@@ -228,6 +228,23 @@ async def test_archive_request_is_fulfilled_by_unboxed_shipment_and_completed_on
             assert all(row.status == "in_progress" for row in request_rows)
             assert len({row.fulfillment_shipment_id for row in request_rows}) == 1
             assert all(row.fulfilled_by == archive_actor_id for row in request_rows)
+
+            # A card cannot acquire a second active archive request.
+            archive_workflow = PostgreSQLArchiveWorkflow(session)
+            with pytest.raises(ValueError, match="активная заявка"):
+                await archive_workflow.create_requests(
+                    card_ids=[requested_card_id], actor_id=central_actor_id,
+                )
+
+            # An in-progress request cannot be marked as not-found.
+            with pytest.raises(ValueError):
+                await archive_workflow.mark_not_found(
+                    request_id=request_rows[0].id,
+                    actor_id=archive_actor_id,
+                    note="Повторная проверка",
+                )
+            assert request_rows[0].status == "in_progress"
+
             request_ids = [row.id for row in request_rows]
             started_events = list((await session.scalars(
                 select(DomainEvent).where(
