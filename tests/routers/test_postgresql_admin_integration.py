@@ -2967,7 +2967,8 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
             )
             assert resolved_detail.status_code == 200
             assert "Тестовый разрешённый инцидент" in resolved_detail.text
-            assert "Полный манифест проверен, отправление принято" not in resolved_detail.text
+            assert "Полный манифест проверен, отправление принято" in resolved_detail.text
+            assert "Incident Central Receiver" in resolved_detail.text
             assert "received" in resolved_detail.text
             assert "Resolved Incident Patient" in resolved_detail.text
 
