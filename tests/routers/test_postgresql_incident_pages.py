@@ -98,6 +98,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
         branch_location_id = branch_location.id
         branch_user_id = branch_user.id
         courier_id = courier.id
+        archive_user_id = archive_user.id
         archive_location_id = archive_location.id
         central_location_id = central_location.id
 
@@ -124,7 +125,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
         )
         await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user_id)
         await workflow.register_exception(
-            shipment_id=shipment.id, actor_id=archive_user.id,
+            shipment_id=shipment.id, actor_id=archive_user_id,
             note="Интеграционная проверка инцидента",
         )
         await session.flush()
@@ -133,6 +134,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
         viewer_token = get_auth().create_session_token(viewer)
         archive_token = get_auth().create_session_token(archive_user)
         branch_token = get_auth().create_session_token(branch_user)
+        central_token = get_auth().create_session_token(central_user)
         shipment_id = shipment.id
         box_number = box.box_number
 
@@ -233,7 +235,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                         await session.flush()
                         await workflow.resolve_exception(
                             shipment_id=shipment_id,
-                            actor_id=archive_user.id,
+                            actor_id=archive_user_id,
                             resolution_note="Попытка приёмки с несовпадающим состоянием карты",
                         )
 
@@ -324,8 +326,6 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 )
                 await session.flush()
                 central_shipment_id = central_shipment.id
-                central_token = get_auth().create_session_token(central_user)
-
                 client.cookies.set("session", central_token)
                 central_page = await client.get("/central/receive")
                 assert central_page.status_code == 200
