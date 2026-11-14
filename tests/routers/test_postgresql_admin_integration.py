@@ -1587,3 +1587,111 @@ async def test_admin_branch_edit_updates_logistics_location_on_postgresql():
             await session.commit()
         app.dependency_overrides.clear()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_admin_branch_code_uniqueness_is_preserved_on_create_and_edit():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="branch-code-uniqueness-integration-secret",
+    ))
+    database = await get_pg_database()
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"branch-code-admin-{uuid.uuid4().hex[:12]}",
+        password_hash="test-only-hash",
+        full_name="Branch Code Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    from medarchive.dependencies import get_pg_session
+    app.dependency_overrides[admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+
+    first_id = second_id = None
+    first_code = f"UNIQUE-{uuid.uuid4().hex[:12]}"
+    second_code = f"UNIQUE-{uuid.uuid4().hex[:12]}"
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                service = PostgreSQLAdminService(session)
+                first = await service.create_branch(
+                    code=first_code, name="First unique branch"
+                )
+                second = await service.create_branch(
+                    code=second_code, name="Second unique branch"
+                )
+                first_id, second_id = first.id, second.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            duplicate_create = await client.post(
+                "/admin/branches",
+                data={"code": first_code, "name": "Duplicate branch"},
+            )
+            assert duplicate_create.status_code == 409
+
+            duplicate_edit = await client.post(
+                f"/admin/branches/{first_id}/edit",
+                data={"code": second_code, "name": "Must not overwrite"},
+            )
+            assert duplicate_edit.status_code == 409
+
+        async with database.session_factory() as session:
+            first = await session.get(Branch, first_id)
+            second = await session.get(Branch, second_id)
+            first_location = await session.scalar(
+                select(Location).where(
+                    Location.kind == "branch", Location.branch_id == first_id
+                )
+            )
+            second_location = await session.scalar(
+                select(Location).where(
+                    Location.kind == "branch", Location.branch_id == second_id
+                )
+            )
+            assert first is not None
+            assert second is not None
+            assert first.code == first_code
+            assert first.name == "First unique branch"
+            assert second.code == second_code
+            assert second.name == "Second unique branch"
+            assert first_location is not None
+            assert first_location.name == "First unique branch"
+            assert second_location is not None
+            assert second_location.name == "Second unique branch"
+            assert await session.scalar(
+                select(Branch.id).where(Branch.name == "Duplicate branch")
+            ) is None
+    finally:
+        async with database.session_factory() as session:
+            for branch_id in (first_id, second_id):
+                if branch_id is None:
+                    continue
+                location = await session.scalar(
+                    select(Location).where(
+                        Location.kind == "branch", Location.branch_id == branch_id
+                    )
+                )
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
