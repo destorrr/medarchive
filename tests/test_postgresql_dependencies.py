@@ -9,7 +9,8 @@ async def test_postgresql_dependency_is_available_when_enabled():
     config = Config(
         database_url="postgresql+asyncpg://user:pass@localhost:5432/medarchive",
         postgres_enabled=True,
-        secret_key="test-secret",
+        secret_key="test-secret-key-with-at-least-32-characters",
+        cookie_secure=True,
     )
     init_dependencies(config)
 
