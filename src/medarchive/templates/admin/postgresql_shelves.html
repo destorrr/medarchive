@@ -23,10 +23,13 @@
         <tbody>
         {% for shelf in shelves %}
         <tr>
-            <td>{{ shelf.section_name }}</td>
-            <td>{{ shelf.shelf_name }}</td>
+            <td><input name="section_name" value="{{ shelf.section_name }}" form="shelf-{{ shelf.id }}" required></td>
+            <td><input name="shelf_name" value="{{ shelf.shelf_name }}" form="shelf-{{ shelf.id }}" required></td>
             <td>{{ "Активна" if shelf.is_active else "Отключена" }}</td>
             <td>
+                <form id="shelf-{{ shelf.id }}" method="post" action="/admin/sections/{{ shelf.id }}/edit" style="display:inline">
+                    <button class="btn btn-primary" type="submit">Сохранить</button>
+                </form>
                 <form method="post" action="/admin/sections/{{ shelf.id }}/status">
                     <input type="hidden" name="is_active" value="{{ 'false' if shelf.is_active else 'true' }}">
                     <button class="btn btn-secondary" type="submit">{{ "Отключить" if shelf.is_active else "Включить" }}</button>
