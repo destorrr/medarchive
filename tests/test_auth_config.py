@@ -18,7 +18,7 @@ def test_postgresql_auth_can_be_selected_explicitly():
     config = Config(
         postgres_enabled=True,
         auth_backend="postgresql",
-        secret_key="test-secret",
+        secret_key="test-secret-key-with-at-least-32-characters",
         cookie_secure=True,
     )
     assert config.auth_backend == "postgresql"
@@ -28,3 +28,22 @@ def test_postgresql_auth_can_be_selected_explicitly():
 def test_unknown_authentication_backend_is_rejected():
     with pytest.raises(ValueError, match="MEDARCHIVE_AUTH_BACKEND"):
         Config(auth_backend="mysql", secret_key="test-secret")
+
+
+def test_postgresql_auth_rejects_insecure_session_cookie():
+    with pytest.raises(ValueError, match="MEDARCHIVE_COOKIE_SECURE"):
+        Config(
+            postgres_enabled=True,
+            auth_backend="postgresql",
+            secret_key="test-secret-key-with-at-least-32-characters",
+        )
+
+
+def test_postgresql_auth_rejects_short_session_secret():
+    with pytest.raises(ValueError, match="MEDARCHIVE_SECRET_KEY"):
+        Config(
+            postgres_enabled=True,
+            auth_backend="postgresql",
+            secret_key="short",
+            cookie_secure=True,
+        )
