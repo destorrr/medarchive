@@ -2802,15 +2802,16 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
         secret_key="integration-test-secret",
     ))
     database = await get_pg_database()
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
     actor_id = uuid.uuid4()
-    reporter_id = None
-    courier_id = None
-    shipment_id = None
-    branch_id = None
-    location_ids = []
     try:
-        async with database.session_factory() as session:
-            async with session.begin():
+        async with session.begin():
                 branch = Branch(
                     code=f"INC-{uuid.uuid4().hex[:10]}",
                     name="Incident admin test branch",
@@ -2893,12 +2894,10 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
                 shipment_id = shipment.id
 
         async def admin_override():
-            async with database.session_factory() as session:
-                return await session.get(User, actor_id)
+            return actor
 
         async def session_override():
-            async with database.session_factory() as session:
-                yield session
+            yield session
 
         app.dependency_overrides[admin_only] = admin_override
         from medarchive.dependencies import get_pg_session
@@ -2923,35 +2922,8 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
             assert missing.status_code == 404
     finally:
         app.dependency_overrides.clear()
-        async with database.session_factory() as session:
-            if shipment_id is not None:
-                shipment = await session.get(Shipment, shipment_id)
-                if shipment is not None:
-                    await session.delete(shipment)
-                    await session.flush()
-            if courier_id is not None:
-                courier = await session.get(Courier, courier_id)
-                if courier is not None:
-                    await session.delete(courier)
-                    await session.flush()
-            reporter = await session.get(User, reporter_id) if reporter_id is not None else None
-            if reporter is not None:
-                await session.delete(reporter)
-                await session.flush()
-            actor = await session.get(User, actor_id)
-            if actor is not None:
-                await session.delete(actor)
-                await session.flush()
-            for location_id in location_ids:
-                location = await session.get(Location, location_id)
-                if location is not None:
-                    await session.delete(location)
-                    await session.flush()
-            if branch_id is not None:
-                branch = await session.get(Branch, branch_id)
-                if branch is not None:
-                    await session.delete(branch)
-                    await session.flush()
-            await session.commit()
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
         await database.close()
-
