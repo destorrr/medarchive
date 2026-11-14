@@ -1294,3 +1294,128 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
         await outer_transaction.rollback()
         await connection.close()
         await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_admin_html_role_change_preserves_account_and_blocks_self_demotion():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.dependencies import get_pg_session
+
+    database = Database(DATABASE_URL)
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="admin-role-change-integration-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"role-admin-{uuid.uuid4().hex[:12]}",
+        password_hash="admin-test-hash",
+        full_name="Role Change Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    branch_id = None
+    user_id = None
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                branch = await PostgreSQLAdminService(session).create_branch(
+                    code=f"ROLE-{uuid.uuid4().hex[:10]}",
+                    name="Role transition test branch",
+                )
+                branch_id = branch.id
+                employee = await PostgreSQLAdminService(session).create_user(
+                    username=f"role-user-{uuid.uuid4().hex[:12]}",
+                    full_name="Role Transition Employee",
+                    password_hash="preserved-password-hash",
+                    role="branch",
+                    branch_id=branch.id,
+                )
+                user_id = employee.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            page = await client.get("/admin/users")
+            assert page.status_code == 200
+            assert "Role Transition Employee" in page.text
+
+            changed = await client.post(
+                f"/admin/users/{user_id}/edit",
+                data={
+                    "full_name": "Role Transition Employee Updated",
+                    "role": "viewer",
+                    "branch_id": "",
+                    "is_active": "true",
+                },
+                follow_redirects=False,
+            )
+            assert changed.status_code == 303
+            async with database.session_factory() as session:
+                employee = await session.get(User, user_id)
+                assert employee is not None
+                assert employee.role == "viewer"
+                assert employee.branch_id is None
+                assert employee.is_active is True
+                assert employee.full_name == "Role Transition Employee Updated"
+                assert employee.password_hash == "preserved-password-hash"
+
+            # The HTML endpoint must reject removing the current administrator's
+            # own administrative role, even when the account remains active.
+            self_demotion = await client.post(
+                f"/admin/users/{actor.id}/edit",
+                data={
+                    "full_name": actor.full_name,
+                    "role": "viewer",
+                    "branch_id": "",
+                    "is_active": "true",
+                },
+            )
+            assert self_demotion.status_code == 409
+            self_deactivation = await client.post(
+                f"/admin/users/{actor.id}/edit",
+                data={
+                    "full_name": actor.full_name,
+                    "role": "admin",
+                    "branch_id": "",
+                    "is_active": "false",
+                },
+            )
+            assert self_deactivation.status_code == 409
+    finally:
+        async with database.session_factory() as session:
+            if user_id is not None:
+                employee = await session.get(User, user_id)
+                if employee is not None:
+                    await session.delete(employee)
+                    await session.flush()
+            if branch_id is not None:
+                location = await session.scalar(
+                    select(Location).where(
+                        Location.kind == "branch", Location.branch_id == branch_id
+                    )
+                )
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
