@@ -418,7 +418,9 @@ async def admin_audit_page(
 ):
     """Read-only, paginated view of the append-only event journal."""
     page = max(1, page)
-    filters = []
+    # This page is specifically the administrative audit surface. Keep clinical
+    # workflow events (which may carry patient-related context) in their own views.
+    filters = [DomainEvent.event_type.like("admin.%")]
     parsed_from = None
     parsed_to = None
     try:
@@ -462,14 +464,14 @@ async def admin_audit_page(
         for event, actor_name, actor_username in rows
     ]
     event_types = list((await session.scalars(
-        select(DomainEvent.event_type).distinct().order_by(DomainEvent.event_type)
+        select(DomainEvent.event_type).where(DomainEvent.event_type.like("admin.%")).distinct().order_by(DomainEvent.event_type)
     )).all())
     aggregate_types = list((await session.scalars(
-        select(DomainEvent.aggregate_type).distinct().order_by(DomainEvent.aggregate_type)
+        select(DomainEvent.aggregate_type).where(DomainEvent.event_type.like("admin.%")).distinct().order_by(DomainEvent.aggregate_type)
     )).all())
     actors = list((await session.scalars(
         select(User).join(DomainEvent, DomainEvent.actor_user_id == User.id)
-        .distinct().order_by(User.full_name, User.username)
+        .where(DomainEvent.event_type.like("admin.%")).distinct().order_by(User.full_name, User.username)
     )).all())
     query = {
         "event_type": event_type,
