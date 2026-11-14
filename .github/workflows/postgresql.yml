@@ -54,7 +54,7 @@ jobs:
             cat > "$client_bin/$tool" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-docker_args=(--rm --network host)
+docker_args=(--rm --network host --user "$(id -u):$(id -g)")
 for name in PGHOST PGPORT PGDATABASE PGUSER PGSSLMODE PGPASSWORD; do
   if [[ -n "${!name:-}" ]]; then docker_args+=(--env "$name"); fi
 done
