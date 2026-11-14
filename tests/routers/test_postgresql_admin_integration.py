@@ -2528,3 +2528,105 @@ async def test_admin_user_api_rejects_invalid_role_branch_combinations_on_create
     finally:
         app.dependency_overrides.clear()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_admin_html_user_edit_rejects_invalid_role_branch_combinations():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.dependencies import get_pg_session
+
+    database = Database(DATABASE_URL)
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="html-user-edit-role-branch-validation-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"html-edit-admin-{uuid.uuid4().hex[:8]}",
+        password_hash="admin-test-hash",
+        full_name="HTML Edit Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    branch_id = user_id = None
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                service = PostgreSQLAdminService(session)
+                branch = await service.create_branch(
+                    code=f"HTML-EDIT-{uuid.uuid4().hex[:8]}",
+                    name="HTML edit validation branch",
+                )
+                branch_id = branch.id
+                employee = await service.create_user(
+                    username=f"html-edit-user-{uuid.uuid4().hex[:8]}",
+                    full_name="HTML Edit Employee",
+                    password_hash="original-password-hash",
+                    role="branch",
+                    branch_id=branch.id,
+                )
+                user_id = employee.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            invalid_payloads = (
+                {"role": "central_office", "branch_id": str(branch_id)},
+                {"role": "branch", "branch_id": ""},
+                {"role": "unknown_role", "branch_id": ""},
+            )
+            for invalid in invalid_payloads:
+                response = await client.post(
+                    f"/admin/users/{user_id}/edit",
+                    data={
+                        "full_name": "Should Not Persist",
+                        "role": invalid["role"],
+                        "branch_id": invalid["branch_id"],
+                        "is_active": "true",
+                    },
+                    follow_redirects=False,
+                )
+                assert response.status_code == 422, response.text
+
+                async with database.session_factory() as session:
+                    unchanged = await session.get(User, user_id)
+                    assert unchanged is not None
+                    assert unchanged.full_name == "HTML Edit Employee"
+                    assert unchanged.role == "branch"
+                    assert unchanged.branch_id == branch_id
+                    assert unchanged.is_active is True
+                    assert unchanged.password_hash == "original-password-hash"
+    finally:
+        async with database.session_factory() as session:
+            if user_id is not None:
+                employee = await session.get(User, user_id)
+                if employee is not None:
+                    await session.delete(employee)
+                    await session.flush()
+            if branch_id is not None:
+                location = await session.scalar(select(Location).where(
+                    Location.kind == "branch", Location.branch_id == branch_id
+                ))
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
