@@ -47,6 +47,30 @@ jobs:
         env:
           MEDARCHIVE_BACKUP_DIR: ${{ runner.temp }}/medarchive-backups
         run: |
+          # Use PostgreSQL 16 client tools to match the PostgreSQL 16 service.
+          client_bin="$RUNNER_TEMP/postgresql16-client"
+          mkdir -p "$client_bin"
+          for tool in pg_dump pg_restore; do
+            cat > "$client_bin/$tool" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+docker_args=(--rm --network host)
+for name in PGHOST PGPORT PGDATABASE PGUSER PGSSLMODE PGPASSWORD; do
+  if [[ -n "${!name:-}" ]]; then docker_args+=(--env "$name"); fi
+done
+if [[ -n "${PGPASSFILE:-}" && -f "$PGPASSFILE" ]]; then
+  docker_args+=(--volume "$PGPASSFILE:/tmp/medarchive.pgpass:ro" --env PGPASSFILE=/tmp/medarchive.pgpass)
+fi
+if [[ -n "${MEDARCHIVE_BACKUP_DIR:-}" ]]; then
+  docker_args+=(--volume "$MEDARCHIVE_BACKUP_DIR:$MEDARCHIVE_BACKUP_DIR")
+fi
+exec docker run "${docker_args[@]}" postgres:16 __TOOL__ "$@"
+SH
+            sed -i "s/__TOOL__/$tool/" "$client_bin/$tool"
+            chmod 0755 "$client_bin/$tool"
+          done
+          export PATH="$client_bin:$PATH"
+
           scripts/backup.sh
           backup_file="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-*.dump' -print -quit)"
           test -n "$backup_file"
