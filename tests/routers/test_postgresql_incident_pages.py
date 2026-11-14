@@ -287,7 +287,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     card_number=f"INC-CENTRAL-{suffix}",
                     full_name="Central Incident Patient",
                     date_of_birth=date(1985, 3, 4),
-                    origin_branch_id=branch.id,
+                    origin_branch_id=branch_id,
                     current_location_id=branch_location.id,
                     status="active",
                 )
