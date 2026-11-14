@@ -725,6 +725,16 @@ async def test_admin_html_courier_shelf_forms_and_validation_on_postgresql():
 
             response = await client.post(
                 "/admin/couriers",
+                data={"full_name": "   ", "phone": "+7 900 000-00-00"},
+            )
+            assert response.status_code == 422
+            async with database.session_factory() as session:
+                assert await session.scalar(
+                    select(Courier).where(Courier.full_name == "")
+                ) is None
+
+            response = await client.post(
+                "/admin/couriers",
                 data={"full_name": courier_name, "phone": "+7 900 000-00-00"},
             )
             assert response.status_code == 303
