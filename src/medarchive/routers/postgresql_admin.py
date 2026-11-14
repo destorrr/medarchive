@@ -32,7 +32,7 @@ class BranchInput(BaseModel):
 class UserCreateInput(BaseModel):
     username: str = Field(min_length=1, max_length=128)
     full_name: str = Field(min_length=1, max_length=255)
-    password: str = Field(min_length=12)
+    password: str = Field(min_length=4)
     role: str
     branch_id: uuid.UUID | None = None
 
@@ -41,7 +41,7 @@ class UserUpdateInput(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     role: str
     branch_id: uuid.UUID | None = None
-    password: str | None = Field(default=None, min_length=12)
+    password: str | None = Field(default=None, min_length=4)
     is_active: bool | None = None
 
 
