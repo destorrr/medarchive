@@ -51,15 +51,17 @@ if url.scheme != "postgresql+asyncpg":
     raise SystemExit("MEDARCHIVE_DATABASE_URL must use postgresql+asyncpg://")
 if not url.hostname or not url.path.strip("/"):
     raise SystemExit("MEDARCHIVE_DATABASE_URL must include a host and database name")
+if not url.username:
+    raise SystemExit("MEDARCHIVE_DATABASE_URL must include a database username")
 if url.fragment:
     raise SystemExit("URL fragments are not supported in MEDARCHIVE_DATABASE_URL")
 
 query = parse_qs(url.query, keep_blank_values=True)
-unknown = set(query) - {"ssl", "sslmode"}
+unknown = set(query) - {"sslmode"}
 if unknown:
     raise SystemExit("Unsupported PostgreSQL URL query parameter(s): " + ", ".join(sorted(unknown)))
 
-sslmode = (query.get("sslmode") or query.get("ssl") or [""])[0]
+sslmode = (query.get("sslmode") or [""])[0]
 if sslmode and sslmode not in {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}:
     raise SystemExit("Unsupported PostgreSQL SSL mode in MEDARCHIVE_DATABASE_URL")
 
@@ -74,7 +76,7 @@ password = unquote(url.password or "")
 passfile = os.environ["PGPASS_FILE"]
 
 with open(passfile, "w", encoding="utf-8") as stream:
-    stream.write(":".join(pgpass_escape(item) for item in (host, port, database, username, password)) + "\\n")
+    stream.write(":".join(pgpass_escape(item) for item in (host, port, database, username, password)) + "\n")
 os.chmod(passfile, 0o600)
 
 values = {
