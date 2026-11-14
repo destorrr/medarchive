@@ -2803,6 +2803,7 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
     ))
     database = await get_pg_database()
     actor_id = uuid.uuid4()
+    reporter_id = None
     courier_id = None
     shipment_id = None
     branch_id = None
@@ -2851,6 +2852,7 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
                 session.add_all([source, target, actor, reporter, courier])
                 await session.flush()
                 location_ids = [source.id, target.id]
+                reporter_id = reporter.id
                 courier_id = courier.id
 
                 # Build the incident through the real workflow: a non-empty
@@ -2932,10 +2934,7 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
                 if courier is not None:
                     await session.delete(courier)
                     await session.flush()
-            reporter = await session.scalar(
-                select(User).where(User.username.like("incident-reporter-%"))
-                .order_by(User.id.desc()).limit(1)
-            )
+            reporter = await session.get(User, reporter_id) if reporter_id is not None else None
             if reporter is not None:
                 await session.delete(reporter)
                 await session.flush()
