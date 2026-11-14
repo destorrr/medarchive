@@ -2915,7 +2915,7 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
             assert detail.status_code == 200
             assert "Incident Branch Reporter" in detail.text
             assert "Тестовый инцидент: повреждена упаковка" in detail.text
-            assert "Коробки в отправлении нет." in detail.text
+            assert "Коробок в отправлении нет." in detail.text
             assert "Incident Test Patient" in detail.text
 
             missing = await client.get(f"/admin/incidents/{uuid.uuid4()}")
