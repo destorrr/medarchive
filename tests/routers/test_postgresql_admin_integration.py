@@ -2845,12 +2845,20 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
                     branch_id=branch.id,
                     is_active=True,
                 )
+                receiver = User(
+                    username=f"incident-receiver-{uuid.uuid4().hex[:10]}",
+                    password_hash="test-only-hash",
+                    full_name="Incident Central Receiver",
+                    role="central_office",
+                    branch_id=None,
+                    is_active=True,
+                )
                 courier = Courier(
                     full_name=f"Incident Courier {uuid.uuid4().hex[:8]}",
                     phone=None,
                     is_active=True,
                 )
-                session.add_all([source, target, actor, reporter, courier])
+                session.add_all([source, target, actor, reporter, receiver, courier])
                 await session.flush()
                 location_ids = [source.id, target.id]
                 reporter_id = reporter.id
@@ -2893,6 +2901,46 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
                 )
                 shipment_id = shipment.id
 
+                # A resolved incident remains part of the administrative audit
+                # history after the shipment reaches its received state.
+                resolved_card = Card(
+                    card_number=f"INC-RESOLVED-{uuid.uuid4().hex[:10]}",
+                    full_name="Resolved Incident Patient",
+                    date_of_birth=date(1982, 2, 2),
+                    origin_branch_id=branch.id,
+                    current_location_id=source.id,
+                    current_shipment_id=None,
+                    created_by=reporter.id,
+                )
+                session.add(resolved_card)
+                await session.flush()
+                resolved_shipment = await workflow.create_draft(
+                    from_location_id=source.id,
+                    to_location_id=target.id,
+                    courier_id=courier.id,
+                    issued_by=reporter.id,
+                )
+                await workflow.add_standalone_card(
+                    shipment_id=resolved_shipment.id,
+                    card_id=resolved_card.id,
+                    actor_id=reporter.id,
+                )
+                await workflow.hand_over(
+                    shipment_id=resolved_shipment.id,
+                    actor_id=reporter.id,
+                )
+                await workflow.register_exception(
+                    shipment_id=resolved_shipment.id,
+                    actor_id=reporter.id,
+                    note="Тестовый разрешённый инцидент",
+                )
+                await workflow.resolve_exception(
+                    shipment_id=resolved_shipment.id,
+                    actor_id=receiver.id,
+                    resolution_note="Полный манифест проверен, отправление принято",
+                )
+                resolved_shipment_id = resolved_shipment.id
+
         async def admin_override():
             return actor
 
@@ -2910,6 +2958,18 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
             assert "Тестовый инцидент: повреждена упаковка" in listing.text
             assert "Incident Courier" in listing.text
             assert f"/admin/incidents/{shipment_id}" in listing.text
+            assert "Тестовый разрешённый инцидент" in listing.text
+            assert f"/admin/incidents/{resolved_shipment_id}" in listing.text
+            assert "received" in listing.text
+
+            resolved_detail = await client.get(
+                f"/admin/incidents/{resolved_shipment_id}"
+            )
+            assert resolved_detail.status_code == 200
+            assert "Тестовый разрешённый инцидент" in resolved_detail.text
+            assert "Полный манифест проверен, отправление принято" not in resolved_detail.text
+            assert "received" in resolved_detail.text
+            assert "Resolved Incident Patient" in resolved_detail.text
 
             detail = await client.get(f"/admin/incidents/{shipment_id}")
             assert detail.status_code == 200
