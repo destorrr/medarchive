@@ -388,7 +388,7 @@ async def incidents_page(
             .join(source, source.id == Shipment.from_location_id)
             .join(target, target.id == Shipment.to_location_id)
             .join(Courier, Courier.id == Shipment.courier_id)
-            .where(Shipment.status == "exception")
+            .where(Shipment.exception_at.is_not(None), Shipment.exception_note.is_not(None))
             .order_by(Shipment.exception_at.desc(), Shipment.shipment_number.desc())
         )
     ).all()
@@ -423,7 +423,11 @@ async def incident_detail_page(
         .join(target, target.id == Shipment.to_location_id)
         .join(Courier, Courier.id == Shipment.courier_id)
         .outerjoin(User, User.id == Shipment.exception_by)
-        .where(Shipment.id == shipment_id, Shipment.status == "exception")
+        .where(
+            Shipment.id == shipment_id,
+            Shipment.exception_at.is_not(None),
+            Shipment.exception_note.is_not(None),
+        )
     )
     detail = row.first()
     if detail is None:
