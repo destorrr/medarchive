@@ -1695,3 +1695,85 @@ async def test_admin_branch_code_uniqueness_is_preserved_on_create_and_edit():
             await session.commit()
         app.dependency_overrides.clear()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_inactive_branch_reactivation_restores_location_and_user_assignment():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+
+    database = Database(DATABASE_URL)
+    branch_id = user_id = None
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                service = PostgreSQLAdminService(session)
+                branch = await service.create_branch(
+                    code=f"REACT-{uuid.uuid4().hex[:12]}",
+                    name="Reactivation integration branch",
+                )
+                branch_id = branch.id
+                location = await session.scalar(
+                    select(Location).where(
+                        Location.kind == "branch",
+                        Location.branch_id == branch.id,
+                    )
+                )
+                assert location is not None and location.is_active is True
+
+                await service.set_branch_active(branch.id, False)
+                await session.refresh(branch)
+                await session.refresh(location)
+                assert branch.is_active is False
+                assert location.is_active is False
+
+                with pytest.raises(ValueError, match="действующий филиал"):
+                    await service.create_user(
+                        username=f"inactive-branch-{uuid.uuid4().hex[:12]}",
+                        full_name="Inactive Branch Employee",
+                        password_hash="test-hash",
+                        role="branch",
+                        branch_id=branch.id,
+                    )
+
+                await service.set_branch_active(branch.id, True)
+                await session.refresh(branch)
+                await session.refresh(location)
+                assert branch.is_active is True
+                assert location.is_active is True
+
+                employee = await service.create_user(
+                    username=f"reactivated-branch-{uuid.uuid4().hex[:12]}",
+                    full_name="Reactivated Branch Employee",
+                    password_hash="test-hash",
+                    role="branch",
+                    branch_id=branch.id,
+                )
+                user_id = employee.id
+                assert employee.is_active is True
+                assert employee.branch_id == branch.id
+                assert employee.role == "branch"
+    finally:
+        async with database.session_factory() as session:
+            if user_id is not None:
+                employee = await session.get(User, user_id)
+                if employee is not None:
+                    await session.delete(employee)
+                    await session.flush()
+            if branch_id is not None:
+                location = await session.scalar(
+                    select(Location).where(
+                        Location.kind == "branch",
+                        Location.branch_id == branch_id,
+                    )
+                )
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        await database.close()
