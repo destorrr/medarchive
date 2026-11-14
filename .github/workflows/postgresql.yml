@@ -41,6 +41,11 @@ jobs:
       - name: Verify core tables exist
         run: |
           psql "postgresql://medarchive:medarchive@localhost:5432/medarchive" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.cards') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL AND to_regclass('public.domain_events') IS NOT NULL AS schema_ready" | grep -qx t
+      - name: Validate operational shell scripts
+        run: |
+          for script in scripts/install.sh scripts/backup.sh scripts/pg16-client-wrapper.sh; do
+            bash -n "$script"
+          done
       - name: Run application tests
         run: pytest -q
       - name: Verify PostgreSQL backup and restore
