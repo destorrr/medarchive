@@ -96,8 +96,8 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
         ])
         await session.flush()
         branch_location_id = branch_location.id
-        branch_user_id = branch_user_id
-        courier_id = courier_id
+        branch_user_id = branch_user.id
+        courier_id = courier.id
         archive_location_id = archive_location.id
         central_location_id = central_location.id
 
