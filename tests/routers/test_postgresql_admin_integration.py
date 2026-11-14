@@ -2630,3 +2630,117 @@ async def test_admin_html_user_edit_rejects_invalid_role_branch_combinations():
             await session.commit()
         app.dependency_overrides.clear()
         await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_admin_html_courier_deactivation_is_blocked_by_draft_shipment():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.dependencies import get_pg_session
+    from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+
+    database = Database(DATABASE_URL)
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="html-courier-deactivation-guard-secret",
+    ))
+    admin = User(
+        id=uuid.uuid4(),
+        username=f"courier-html-admin-{uuid.uuid4().hex[:8]}",
+        password_hash="admin-test-hash",
+        full_name="Courier HTML Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return admin
+
+    async def session_override():
+        yield session
+
+    app.dependency_overrides[admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+
+    try:
+        async with session.begin():
+            branch = Branch(
+                code=f"COURIER-HTML-{uuid.uuid4().hex[:8]}",
+                name="Courier HTML guard branch",
+                is_active=True,
+            )
+            session.add(branch)
+            await session.flush()
+            source = Location(
+                kind="branch", branch_id=branch.id,
+                name=branch.name, is_active=True,
+            )
+            actor = User(
+                username=f"courier-html-actor-{uuid.uuid4().hex[:8]}",
+                password_hash="test-hash",
+                full_name="Courier HTML Branch Actor",
+                role="branch",
+                branch_id=branch.id,
+                is_active=True,
+            )
+            courier = Courier(
+                full_name=f"Courier HTML {uuid.uuid4().hex[:8]}",
+                is_active=True,
+            )
+            session.add_all([source, actor, courier])
+            await session.flush()
+            target = await session.scalar(
+                select(Location).where(
+                    Location.kind == "central_office",
+                    Location.is_active.is_(True),
+                )
+            )
+            if target is None:
+                target = Location(
+                    kind="central_office", branch_id=None,
+                    name="Test Central Office", is_active=True,
+                )
+                session.add(target)
+                await session.flush()
+
+            shipment = await PostgreSQLShipmentWorkflow(session).create_draft(
+                from_location_id=source.id,
+                to_location_id=target.id,
+                courier_id=courier.id,
+                issued_by=actor.id,
+            )
+            courier_id = courier.id
+            shipment_id = shipment.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                f"/admin/couriers/{courier_id}/status",
+                data={"is_active": "false"},
+                follow_redirects=False,
+            )
+            assert response.status_code == 409, response.text
+
+        persisted_courier = await session.get(Courier, courier_id)
+        persisted_shipment = await session.get(Shipment, shipment_id)
+        assert persisted_courier is not None and persisted_courier.is_active is True
+        assert persisted_shipment is not None and persisted_shipment.status == "draft"
+    finally:
+        app.dependency_overrides.clear()
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
+        await database.close()
