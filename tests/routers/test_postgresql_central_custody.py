@@ -83,6 +83,24 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         branch_id=None,
         is_active=True,
     )
+    branch_actor = User(
+        id=uuid.uuid4(),
+        username=f"branch-custody-{uuid.uuid4().hex[:10]}",
+        password_hash="test-only-hash",
+        full_name="Branch Custody Operator",
+        role="branch",
+        branch_id=branch.id,
+        is_active=True,
+    )
+    viewer_actor = User(
+        id=uuid.uuid4(),
+        username=f"viewer-custody-{uuid.uuid4().hex[:10]}",
+        password_hash="test-only-hash",
+        full_name="Viewer Custody Operator",
+        role="viewer",
+        branch_id=None,
+        is_active=True,
+    )
     archive = Location(
         id=uuid.uuid4(), kind="archive", branch_id=None,
         name="Custody Archive", is_active=True,
@@ -120,12 +138,14 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
         async with session.begin():
             # Persist locations before the box that references the Central
             # Office location; SQLAlchemy has no ORM relationship to order these.
-            session.add_all([branch, central, archive, archive_shelf, actor, archive_actor, courier])
+            session.add_all([branch, central, archive, archive_shelf, actor, archive_actor, branch_actor, viewer_actor, courier])
             await session.flush()
             session.add_all([empty_box, card])
 
         token = get_auth().create_session_token(actor)
         archive_token = get_auth().create_session_token(archive_actor)
+        branch_token = get_auth().create_session_token(branch_actor)
+        viewer_token = get_auth().create_session_token(viewer_actor)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             client.cookies.set("session", token)
@@ -257,6 +277,25 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert forbidden_page.status_code == 403
             assert forbidden_mark.status_code == 403
             assert forbidden_return.status_code == 403
+
+            for denied_token in (branch_token, viewer_token):
+                client.cookies.set("session", denied_token)
+                denied_page = await client.get("/central/custody")
+                denied_mark = await client.post(
+                    "/central/custody/mark",
+                    data={
+                        "card_id": str(card_id),
+                        "custody_status": "at_court",
+                        "organization": "Unauthorized",
+                    },
+                )
+                denied_return = await client.post(
+                    "/central/custody/return",
+                    data={"card_id": str(card_id)},
+                )
+                assert denied_page.status_code == 403
+                assert denied_mark.status_code == 403
+                assert denied_return.status_code == 403
 
             client.cookies.set("session", token)
             returned = await client.post(
