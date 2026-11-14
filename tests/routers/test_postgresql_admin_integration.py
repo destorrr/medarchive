@@ -2068,3 +2068,134 @@ async def test_admin_user_api_activation_and_last_admin_guard_on_postgresql():
             await session.commit()
         app.dependency_overrides.clear()
         await database.close()
+
+
+
+@pytest.mark.asyncio
+async def test_admin_html_user_creation_validates_branch_and_normalizes_login():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.adapters.postgresql.database import Database
+    from medarchive.dependencies import get_pg_session
+
+    database = Database(DATABASE_URL)
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="admin-html-user-create-integration-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"html-create-admin-{uuid.uuid4().hex[:10]}",
+        password_hash="admin-test-hash",
+        full_name="HTML Create Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    branch_id = user_id = None
+    username = f"html-user-{uuid.uuid4().hex[:10]}"
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                branch = await PostgreSQLAdminService(session).create_branch(
+                    code=f"HTML-USER-{uuid.uuid4().hex[:10]}",
+                    name="HTML user creation branch",
+                )
+                branch_id = branch.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            missing_branch = await client.post(
+                "/admin/users",
+                data={
+                    "username": f"missing-{uuid.uuid4().hex[:8]}",
+                    "full_name": "Branch Without Location",
+                    "password": "abcd",
+                    "role": "branch",
+                    "branch_id": "",
+                },
+            )
+            assert missing_branch.status_code == 422
+
+            created = await client.post(
+                "/admin/users",
+                data={
+                    "username": username.upper(),
+                    "full_name": "HTML Created Employee",
+                    "password": "abcd",
+                    "role": "branch",
+                    "branch_id": str(branch_id),
+                },
+                follow_redirects=False,
+            )
+            assert created.status_code == 303
+
+            async with database.session_factory() as session:
+                employee = await session.scalar(
+                    select(User).where(User.username == username.lower())
+                )
+                assert employee is not None
+                user_id = employee.id
+                assert employee.full_name == "HTML Created Employee"
+                assert employee.role == "branch"
+                assert employee.branch_id == branch_id
+                assert employee.is_active is True
+                assert employee.password_hash != "abcd"
+
+            duplicate = await client.post(
+                "/admin/users",
+                data={
+                    "username": username,
+                    "full_name": "Duplicate Employee",
+                    "password": "abcd",
+                    "role": "viewer",
+                    "branch_id": "",
+                },
+            )
+            assert duplicate.status_code == 422
+
+            page = await client.get("/admin/users")
+            assert page.status_code == 200
+            assert "HTML Created Employee" in page.text
+
+        async with database.session_factory() as session:
+            employee = await session.get(User, user_id)
+            assert employee is not None
+            assert employee.username == username.lower()
+            assert employee.full_name == "HTML Created Employee"
+            assert employee.role == "branch"
+            assert employee.branch_id == branch_id
+    finally:
+        async with database.session_factory() as session:
+            if user_id is not None:
+                employee = await session.get(User, user_id)
+                if employee is not None:
+                    await session.delete(employee)
+                    await session.flush()
+            if branch_id is not None:
+                location = await session.scalar(
+                    select(Location).where(
+                        Location.kind == "branch", Location.branch_id == branch_id
+                    )
+                )
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
