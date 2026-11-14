@@ -1777,3 +1777,147 @@ async def test_inactive_branch_reactivation_restores_location_and_user_assignmen
                     await session.delete(branch)
             await session.commit()
         await database.close()
+
+@pytest.mark.asyncio
+async def test_admin_user_api_create_update_and_self_protection_on_postgresql():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.dependencies import get_pg_session
+    from medarchive.routers.postgresql_admin import admin_only as api_admin_only
+
+    database = await get_pg_database()
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="admin-user-api-integration-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"user-api-admin-{uuid.uuid4().hex[:10]}",
+        password_hash="admin-test-hash",
+        full_name="User API Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[api_admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    branch_id = user_id = None
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                branch = await PostgreSQLAdminService(session).create_branch(
+                    code=f"USER-API-{uuid.uuid4().hex[:10]}",
+                    name="User API integration branch",
+                )
+                branch_id = branch.id
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            too_short = await client.post(
+                "/api/admin/users",
+                json={
+                    "username": f"short-{uuid.uuid4().hex[:8]}",
+                    "full_name": "Short Password",
+                    "password": "abc",
+                    "role": "viewer",
+                    "branch_id": None,
+                },
+            )
+            assert too_short.status_code == 422
+
+            created = await client.post(
+                "/api/admin/users",
+                json={
+                    "username": f"user-api-{uuid.uuid4().hex[:10]}",
+                    "full_name": "API Branch Employee",
+                    "password": "abcd",
+                    "role": "branch",
+                    "branch_id": str(branch_id),
+                },
+            )
+            assert created.status_code == 201, created.text
+            payload = created.json()
+            user_id = uuid.UUID(payload["id"])
+            assert payload["role"] == "branch"
+            assert payload["branch_id"] == str(branch_id)
+            assert payload["is_active"] is True
+            assert "password_hash" not in payload
+
+            async with database.session_factory() as session:
+                employee = await session.get(User, user_id)
+                assert employee is not None
+                original_hash = employee.password_hash
+                assert original_hash != "abcd"
+
+            changed = await client.put(
+                f"/api/admin/users/{user_id}",
+                json={
+                    "full_name": "API Employee Updated",
+                    "role": "viewer",
+                    "branch_id": None,
+                },
+            )
+            assert changed.status_code == 200, changed.text
+            assert changed.json()["role"] == "viewer"
+            assert changed.json()["branch_id"] is None
+            assert changed.json()["is_active"] is True
+
+            async with database.session_factory() as session:
+                employee = await session.get(User, user_id)
+                assert employee is not None
+                assert employee.full_name == "API Employee Updated"
+                assert employee.role == "viewer"
+                assert employee.branch_id is None
+                assert employee.is_active is True
+                assert employee.password_hash == original_hash
+
+            self_demotion = await client.put(
+                f"/api/admin/users/{actor.id}",
+                json={
+                    "full_name": actor.full_name,
+                    "role": "viewer",
+                    "branch_id": None,
+                },
+            )
+            assert self_demotion.status_code == 409
+
+            self_deactivation = await client.put(
+                f"/api/admin/users/{actor.id}",
+                json={
+                    "full_name": actor.full_name,
+                    "role": "admin",
+                    "branch_id": None,
+                    "is_active": False,
+                },
+            )
+            assert self_deactivation.status_code == 409
+    finally:
+        async with database.session_factory() as session:
+            if user_id is not None:
+                employee = await session.get(User, user_id)
+                if employee is not None:
+                    await session.delete(employee)
+                    await session.flush()
+            if branch_id is not None:
+                location = await session.scalar(select(Location).where(
+                    Location.kind == "branch", Location.branch_id == branch_id
+                ))
+                if location is not None:
+                    await session.delete(location)
+                    await session.flush()
+                branch = await session.get(Branch, branch_id)
+                if branch is not None:
+                    await session.delete(branch)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
