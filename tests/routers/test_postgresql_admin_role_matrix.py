@@ -53,7 +53,8 @@ async def test_non_admin_roles_cannot_open_postgresql_admin_pages_or_api():
 
         html_paths = (
             "/admin", "/admin/branches", "/admin/users",
-            "/admin/couriers", "/admin/sections",
+            "/admin/couriers", "/admin/sections", "/admin/incidents",
+            f"/admin/incidents/{uuid.uuid4()}",
         )
         api_paths = ("/api/admin/branches", "/api/admin/users")
         transport = httpx.ASGITransport(app=app)
@@ -71,6 +72,53 @@ async def test_non_admin_roles_cannot_open_postgresql_admin_pages_or_api():
                     data={"full_name": f"Forbidden courier {role}"},
                 )
                 assert response.status_code == 403, role
+
+                # Exercise every administrative HTML mutation family, not only
+                # courier creation. Random IDs ensure a missing guard cannot
+                # accidentally mutate the fixtures above.
+                html_mutations = (
+                    ("/admin/branches", {"code": f"DENY-{uuid.uuid4().hex[:8]}", "name": "Forbidden"}),
+                    (f"/admin/branches/{uuid.uuid4()}/edit", {"code": "DENY-EDIT", "name": "Forbidden"}),
+                    (f"/admin/branches/{uuid.uuid4()}/status", {"is_active": "false"}),
+                    ("/admin/users", {
+                        "username": f"denied-{uuid.uuid4().hex[:10]}",
+                        "full_name": "Forbidden User", "password": "abcd",
+                        "role": "viewer", "branch_id": "",
+                    }),
+                    (f"/admin/users/{uuid.uuid4()}/edit", {
+                        "full_name": "Forbidden User", "role": "viewer",
+                        "branch_id": "", "password": "", "is_active": "true",
+                    }),
+                    (f"/admin/couriers/{uuid.uuid4()}/status", {"is_active": "false"}),
+                    ("/admin/sections", {
+                        "section_name": "Forbidden", "shelf_name": uuid.uuid4().hex[:8],
+                    }),
+                    (f"/admin/sections/{uuid.uuid4()}/status", {"is_active": "false"}),
+                )
+                for path, data in html_mutations:
+                    response = await client.post(path, data=data)
+                    assert response.status_code == 403, (role, path)
+
+                api_mutations = (
+                    ("POST", "/api/admin/branches", {
+                        "code": f"DENY-{uuid.uuid4().hex[:8]}", "name": "Forbidden",
+                    }),
+                    ("PUT", f"/api/admin/branches/{uuid.uuid4()}", {
+                        "code": "DENY-EDIT", "name": "Forbidden",
+                    }),
+                    ("POST", "/api/admin/users", {
+                        "username": f"denied-{uuid.uuid4().hex[:10]}",
+                        "full_name": "Forbidden User", "password": "abcd",
+                        "role": "viewer", "branch_id": None,
+                    }),
+                    ("PUT", f"/api/admin/users/{uuid.uuid4()}", {
+                        "full_name": "Forbidden User", "role": "viewer",
+                        "branch_id": None, "is_active": True,
+                    }),
+                )
+                for method, path, payload in api_mutations:
+                    response = await client.request(method, path, json=payload)
+                    assert response.status_code == 403, (role, method, path)
     finally:
         async with database.session_factory() as session:
             for user_id in user_ids:
