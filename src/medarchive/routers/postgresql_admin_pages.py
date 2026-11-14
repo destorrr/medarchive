@@ -353,6 +353,31 @@ async def shelves_create(
     return _redirect("/admin/sections")
 
 
+@router.post("/admin/sections/{shelf_id}/edit")
+async def shelves_edit(
+    shelf_id: uuid.UUID,
+    section_name: str = Form(...),
+    shelf_name: str = Form(...),
+    _: User = Depends(admin_only),
+    session: AsyncSession = Depends(get_pg_session),
+):
+    try:
+        await PostgreSQLAdminService(session).update_shelf(
+            shelf_id, section_name=section_name, shelf_name=shelf_name
+        )
+        await session.commit()
+    except LookupError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="Такая полка уже существует") from exc
+    return _redirect("/admin/sections")
+
+
 @router.post("/admin/sections/{shelf_id}/status")
 async def shelves_status(
     shelf_id: uuid.UUID,
