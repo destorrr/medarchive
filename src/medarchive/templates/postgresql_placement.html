@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🗂 Размещение в архиве</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<div class="card">
+    <form method="post" action="/placement/new-internal-box">
+        <button class="btn btn-secondary" type="submit">Создать пустую внутреннюю коробку</button>
+    </form>
+</div>
+<div class="card">
+    <h3>Внутренние коробки без размещения</h3>
+    {% if boxes %}
+    {% for item in box_items %}
+    <div style="border-bottom:1px solid #ddd;padding:12px 0">
+        <strong>Коробка {{ item.box.box_number }}</strong>
+        <a class="btn btn-primary" href="/boxes/{{ item.box.id }}/label" target="_blank" rel="noopener">QR-этикетка / повторная печать</a>
+        {% if item.cards %}
+        <ul>{% for card in item.cards %}<li>{{ card.card_number }} · {{ card.full_name }}
+            <form method="post" action="/placement/remove-card-from-box" style="display:inline">
+                <input type="hidden" name="box_id" value="{{ item.box.id }}">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <button class="btn btn-secondary" type="submit">Извлечь</button>
+            </form>
+        </li>{% endfor %}</ul>
+        {% else %}
+        <p class="muted">Коробка пустая.</p>
+        <form method="post" action="/placement/write-off-box" onsubmit="return confirm('Списать пустую коробку? Повторное использование будет запрещено.');">
+            <input type="hidden" name="box_id" value="{{ item.box.id }}">
+            <button class="btn btn-danger-ghost" type="submit">Списать пустую коробку</button>
+        </form>
+        {% endif %}
+        {% if cards %}
+        <form method="post" action="/placement/add-card" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+            <input type="hidden" name="box_id" value="{{ item.box.id }}">
+            <select name="card_id" required><option value="">— Добавить карту —</option>
+                {% for card in cards %}<option value="{{ card.id }}">{{ card.card_number }} · {{ card.full_name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-secondary" type="submit">Добавить</button>
+        </form>
+        {% endif %}
+        {% if shelves %}
+        <form method="post" action="/placement/box">
+            <input type="hidden" name="box_id" value="{{ item.box.id }}">
+            <select name="shelf_id" required><option value="">— Полка —</option>
+                {% for shelf in shelves %}<option value="{{ shelf.id }}">{{ shelf.section_name }} / {{ shelf.shelf_name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">Разместить коробку</button>
+        </form>
+        {% else %}<p class="muted">Полки не настроены.</p>{% endif %}
+    </div>
+    {% endfor %}
+    {% else %}<p class="muted">Нет внутренних коробок, ожидающих размещения.</p>{% endif %}
+</div>
+
+<div class="card">
+    <h3>Отдельные карты без размещения</h3>
+    {% if cards %}
+    <p class="muted">Можно разместить карту отдельно или объединить выбранные карты во внутреннюю коробку хранения. Внутренние коробки архива не используются для отправки в ЦО.</p>
+    <table class="data"><thead><tr><th>В коробку</th><th>№ карты</th><th>ФИО</th><th>Размещение</th></tr></thead><tbody>
+    {% for card in cards %}<tr>
+        <td><input type="checkbox" name="card_ids" value="{{ card.id }}" form="internal-box-form"></td>
+        <td>{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>
+            {% if shelves %}
+            <form method="post" action="/placement/card">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <select name="shelf_id" required><option value="">— Полка —</option>
+                    {% for shelf in shelves %}<option value="{{ shelf.id }}">{{ shelf.section_name }} / {{ shelf.shelf_name }}</option>{% endfor %}
+                </select>
+                <button class="btn btn-primary" type="submit">На полку</button>
+            </form>
+            {% else %}<span class="muted">Полки не настроены</span>{% endif %}
+        </td>
+    </tr>{% endfor %}
+    </tbody></table>
+    <form id="internal-box-form" method="post" action="/placement/new-internal-box" style="margin-top:12px">
+        <button class="btn btn-primary" type="submit">Создать внутреннюю коробку из выбранных карт</button>
+    </form>
+    {% else %}<p class="muted">Нет отдельных карт, ожидающих размещения.</p>{% endif %}
+</div>
+
+<div class="card">
+    <h3>Коробки на полках</h3>
+    {% if placed_boxes %}
+    <table class="data"><thead><tr><th>Коробка</th><th>Место</th><th>Действие</th></tr></thead><tbody>
+    {% for box, placement, shelf in placed_boxes %}<tr>
+        <td>{{ box.box_number }}<br><a href="/boxes/{{ box.id }}/label" target="_blank" rel="noopener">QR-этикетка / повторная печать</a></td><td>{{ shelf.section_name }} / {{ shelf.shelf_name }}</td><td>
+            <form method="post" action="/placement/remove-box">
+                <input type="hidden" name="box_id" value="{{ box.id }}">
+                <button class="btn btn-secondary" type="submit">Снять с полки</button>
+            </form>
+        </td>
+    </tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Размещённых коробок пока нет.</p>{% endif %}
+</div>
+<div class="card">
+    <h3>Отдельные карты на полках</h3>
+    {% if placed_cards %}
+    <table class="data"><thead><tr><th>№ карты</th><th>ФИО</th><th>Место</th><th>Действие</th></tr></thead><tbody>
+    {% for card, placement, shelf in placed_cards %}<tr>
+        <td>{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>{{ shelf.section_name }} / {{ shelf.shelf_name }}</td><td>
+            <form method="post" action="/placement/remove-card">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <button class="btn btn-secondary" type="submit">Снять с полки</button>
+            </form>
+        </td>
+    </tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Отдельных карт на полках пока нет.</p>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🗂 Архивные секции и полки</h1>
+<div class="card">
+    <h3>Добавить полку</h3>
+    <form method="post" action="/admin/sections">
+        <div class="form-group">
+            <label for="section_name">Секция</label>
+            <input id="section_name" name="section_name" required>
+        </div>
+        <div class="form-group">
+            <label for="shelf_name">Полка</label>
+            <input id="shelf_name" name="shelf_name" required>
+        </div>
+        <button class="btn btn-primary" type="submit">Добавить полку</button>
+    </form>
+</div>
+<div class="card">
+    <h3>Список полок</h3>
+    {% if shelves %}
+    <table class="data">
+        <thead><tr><th>Секция</th><th>Полка</th><th>Статус</th><th>Действие</th></tr></thead>
+        <tbody>
+        {% for shelf in shelves %}
+        <tr>
+            <td><input name="section_name" value="{{ shelf.section_name }}" form="shelf-{{ shelf.id }}" required></td>
+            <td><input name="shelf_name" value="{{ shelf.shelf_name }}" form="shelf-{{ shelf.id }}" required></td>
+            <td>{{ "Активна" if shelf.is_active else "Отключена" }}</td>
+            <td>
+                <form id="shelf-{{ shelf.id }}" method="post" action="/admin/sections/{{ shelf.id }}/edit" style="display:inline">
+                    <button class="btn btn-primary" type="submit">Сохранить</button>
+                </form>
+                <form method="post" action="/admin/sections/{{ shelf.id }}/status">
+                    <input type="hidden" name="is_active" value="{{ 'false' if shelf.is_active else 'true' }}">
+                    <button class="btn btn-secondary" type="submit">{{ "Отключить" if shelf.is_active else "Включить" }}</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="muted">Полки ещё не настроены.</p>
+    {% endif %}
+</div>
+{% endblock %}

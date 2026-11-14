@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📥 Приёмка отправлений в ЦО</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<div class="card">
+    <h3>Отправления в пути в центральный офис</h3>
+    {% if incoming %}
+    <table class="data"><thead><tr><th>№</th><th>Откуда</th><th>Курьер</th><th>Коробки</th><th>Карты</th><th>Передано</th><th>Манифест</th><th>Приёмка</th></tr></thead><tbody>
+    {% for shipment in incoming %}<tr>
+        <td>{{ shipment.number }}</td><td>{{ shipment.source }}</td><td>{{ shipment.courier }}</td>
+        <td>{{ shipment.box_count }}</td><td>{{ shipment.card_count }}</td><td>{{ shipment.handed_over_at }}</td>
+        <td><details><summary>Показать</summary>
+            {% for box in shipment.boxes %}
+            <p><strong>Коробка {{ box.box_number }}</strong></p>
+            <ul>{% for card in box.cards %}<li>{{ card.card_number }} · {{ card.full_name }}</li>{% endfor %}</ul>
+            {% endfor %}
+            {% if shipment.standalone_cards %}<p><strong>Отдельные карты</strong></p>
+            <ul>{% for card in shipment.standalone_cards %}<li>{{ card.card_number }} · {{ card.full_name }}</li>{% endfor %}</ul>{% endif %}
+        </details></td>
+        <td><form method="post" action="/central/receive/confirm">
+            <input type="hidden" name="shipment_id" value="{{ shipment.id }}">
+            <label style="display:block;font-size:12px;margin-bottom:6px">
+                <input type="checkbox" name="confirmed" value="true" required>
+                Проверил всё отправление, расхождений нет
+            </label>
+            <button class="btn btn-primary" type="submit">Принять целиком</button>
+        </form></td>
+    </tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Нет отправлений, ожидающих приёмки.</p>{% endif %}
+</div>
+
+<div class="card">
+    <h3>Инциденты, ожидающие проверки</h3>
+    {% if incidents %}
+    <table class="data">
+        <thead><tr><th>№</th><th>Откуда</th><th>Курьер</th><th>Причина инцидента</th><th>Дата регистрации</th><th>Манифест</th><th>Результат проверки и приёмка</th></tr></thead>
+        <tbody>
+        {% for shipment in incidents %}
+        <tr>
+            <td>{{ shipment.number }}</td><td>{{ shipment.source }}</td><td>{{ shipment.courier }}</td>
+            <td>{{ shipment.exception_note }}</td><td>{{ shipment.exception_at }}</td>
+            <td><details><summary>Показать состав ({{ shipment.box_count }} коробок, {{ shipment.card_count }} карт)</summary>
+                {% for box in shipment.boxes %}
+                <p><strong>Коробка {{ box.box_number }}</strong></p>
+                <ul>{% for card in box.cards %}<li>{{ card.card_number }} · {{ card.full_name }}</li>{% endfor %}</ul>
+                {% endfor %}
+                {% if shipment.standalone_cards %}<p><strong>Отдельные карты</strong></p>
+                <ul>{% for card in shipment.standalone_cards %}<li>{{ card.card_number }} · {{ card.full_name }}</li>{% endfor %}</ul>{% endif %}
+            </details></td>
+            <td><form method="post" action="/central/receive/resolve">
+                <input type="hidden" name="shipment_id" value="{{ shipment.id }}">
+                <label style="display:block;font-size:12px;margin-bottom:6px">
+                    <input type="checkbox" name="confirmed" value="true" required>
+                    Проверил полный состав, расхождений нет
+                </label>
+                <label>Результат проверки
+                    <textarea name="resolution_note" maxlength="2000" rows="3" required placeholder="Опишите, что проверено и почему отправление можно принять"></textarea>
+                </label>
+                <button class="btn btn-primary" type="submit">Разрешить инцидент и принять целиком</button>
+            </form></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="muted">Нет инцидентов, ожидающих проверки.</p>{% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📦 Упаковка в центральном офисе</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<div class="card">
+    <h3>Создать коробку</h3>
+    <p class="muted">Отметьте карты для новой коробки или создайте пустую коробку.</p>
+    <form id="new-box-form" method="post" action="/central/packing/new-box">
+        <button class="btn btn-primary" type="submit">Создать коробку из выбранных карт</button>
+    </form>
+</div>
+<div class="card">
+    <h3>Карты на балансе ЦО без коробки</h3>
+    {% if cards %}
+    <table class="data"><thead><tr><th>В новую коробку</th><th>Номер</th><th>ФИО</th><th>Дата рождения</th></tr></thead><tbody>
+    {% for card in cards %}<tr>
+        <td><input type="checkbox" name="card_ids" value="{{ card.id }}" form="new-box-form"></td>
+        <td>{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>{{ card.date_of_birth }}</td>
+    </tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Нет отдельных карт, доступных для упаковки.</p>{% endif %}
+</div>
+<div class="card">
+    <h3>Коробки на балансе ЦО</h3>
+    {% if boxes %}
+    {% for item in box_items %}
+    <div style="border-bottom:1px solid #ddd;padding:12px 0">
+        <strong>Коробка {{ item.box.box_number }}</strong>
+        <a class="btn btn-primary" href="/boxes/{{ item.box.id }}/label" target="_blank" rel="noopener">QR-этикетка / повторная печать</a>
+        {% if item.cards %}
+        <ul>{% for card in item.cards %}<li>{{ card.card_number }} · {{ card.full_name }}
+            <form method="post" action="/central/packing/remove-card" style="display:inline">
+                <input type="hidden" name="box_id" value="{{ item.box.id }}">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <button class="btn btn-secondary" type="submit">Извлечь</button>
+            </form>
+        </li>{% endfor %}</ul>
+        {% else %}
+        <p class="muted">Коробка пустая.</p>
+        <form method="post" action="/central/packing/write-off-box" onsubmit="return confirm('Списать пустую коробку? Повторное использование будет запрещено.');">
+            <input type="hidden" name="box_id" value="{{ item.box.id }}">
+            <button class="btn btn-danger-ghost" type="submit">Списать пустую коробку</button>
+        </form>
+        {% endif %}
+        {% if cards %}
+        <form method="post" action="/central/packing/add-card" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="hidden" name="box_id" value="{{ item.box.id }}">
+            <select name="card_id" required>
+                <option value="">— Добавить отдельную карту —</option>
+                {% for card in cards %}<option value="{{ card.id }}">{{ card.card_number }} · {{ card.full_name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-secondary" type="submit">Добавить</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}<p class="muted">Коробок на балансе ЦО пока нет.</p>{% endif %}
+</div>
+{% endblock %}

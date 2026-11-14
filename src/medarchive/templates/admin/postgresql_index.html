@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>⚙️ Администрирование</h1>
+<div class="card">
+    <p>Управление справочниками и учётными записями в PostgreSQL.</p>
+    <p style="margin-top:12px"><a href="/admin/branches">🏢 Филиалы</a></p>
+    <p style="margin-top:8px"><a href="/admin/users">👤 Пользователи</a></p>
+    <p style="margin-top:8px"><a href="/admin/couriers">🚚 Курьеры</a></p>
+    <p style="margin-top:8px"><a href="/admin/sections">🗂 Архивные секции и полки</a></p>
+    <p style="margin-top:8px"><a href="/admin/incidents">🚨 Инциденты отправлений</a></p>
+    <p style="margin-top:8px"><a href="/admin/audit">📋 Журнал административных действий</a></p>
+</div>
+{% endblock %}

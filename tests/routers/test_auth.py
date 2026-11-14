@@ -44,6 +44,10 @@ class TestAuthRouter:
         r = await client.post("/login", data={"username": "test_branch", "password": "test123"}, follow_redirects=False)
         assert r.status_code == 303
         assert r.headers["location"] == "/dashboard"
+        cookie = r.headers["set-cookie"].lower()
+        assert "httponly" in cookie
+        assert "samesite=lax" in cookie
+        assert "path=/" in cookie
 
     async def test_login_wrong_password(self, client):
         r = await client.post("/login", data={"username": "test_branch", "password": "wrong"})
@@ -56,6 +60,8 @@ class TestAuthRouter:
         r = await client.get("/logout", follow_redirects=False)
         assert r.status_code == 303
         assert r.headers["location"] == "/login"
+        assert "session" in r.headers.get("set-cookie", "").lower()
+        assert "max-age=0" in r.headers.get("set-cookie", "").lower()
 
     async def test_protected_page_redirects_to_login(self, client):
         r = await client.get("/dashboard", follow_redirects=False)

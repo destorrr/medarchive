@@ -1,9 +1,21 @@
 [Unit]
-Description=МедАрхив — ежечасный бэкап БД
+Description=МедАрхив — проверенный резервный дамп PostgreSQL
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=oneshot
 User=medarchive
 Group=medarchive
-Environment=MEDARCHIVE_DB_PATH=/var/lib/medarchive/medarchive.db
+WorkingDirectory=/opt/medarchive
+EnvironmentFile=/etc/medarchive/medarchive.env
+Environment=MEDARCHIVE_BACKUP_DIR=/var/lib/medarchive/backups
+Environment=MEDARCHIVE_BACKUP_RETENTION=24
+UMask=0077
 ExecStart=/opt/medarchive/scripts/backup.sh
+
+# The backup process can write only to its protected backup directory.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/medarchive/backups

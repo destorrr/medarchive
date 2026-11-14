@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📜 Журнал движений</h1>
+<p class="muted">События системы в хронологическом порядке. История сохраняется и не редактируется.</p>
+<div class="card">
+    {% if history_items %}
+    <table class="data">
+        <thead><tr><th>Время</th><th>Объект</th><th>Действие</th><th>Откуда</th><th>Куда</th><th>Сотрудник</th></tr></thead>
+        <tbody>
+        {% for item in history_items %}
+        <tr>
+            <td class="date">{{ item.timestamp.strftime('%d.%m.%Y %H:%M:%S') if item.timestamp else '—' }}</td>
+            <td>{{ item.subject }}</td>
+            <td>{{ item.action }}</td>
+            <td>{{ item.from_location or '—' }}</td>
+            <td>{{ item.to_location or '—' }}</td>
+            <td>{{ item.actor }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="muted">В журнале пока нет событий.</p>
+    {% endif %}
+    <div class="table-footer" style="display:flex;justify-content:space-between;align-items:center">
+        <span class="muted">Всего событий: {{ total_events }} · Страница {{ page }}</span>
+        <span>
+            {% if has_previous %}<a class="btn btn-secondary" href="/history?page={{ page - 1 }}">← Новее</a>{% endif %}
+            {% if has_next %}<a class="btn btn-secondary" href="/history?page={{ page + 1 }}">Старее →</a>{% endif %}
+        </span>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+name: PostgreSQL foundation
+
+on:
+  push:
+    branches: [master, docs/target-architecture-spec]
+  pull_request:
+    branches: [master]
+
+jobs:
+  postgres-schema:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: medarchive
+          POSTGRES_USER: medarchive
+          POSTGRES_PASSWORD: medarchive
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medarchive -d medarchive"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      MEDARCHIVE_DATABASE_URL: postgresql+asyncpg://medarchive:medarchive@localhost:5432/medarchive
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Apply Alembic schema
+        run: alembic upgrade head
+      - name: Verify Alembic revision
+        run: alembic current
+      - name: Verify core tables exist
+        run: |
+          psql "postgresql://medarchive:medarchive@localhost:5432/medarchive" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.cards') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL AND to_regclass('public.domain_events') IS NOT NULL AS schema_ready" | grep -qx t
+      - name: Validate operational shell scripts
+        run: |
+          for script in scripts/install.sh scripts/backup.sh scripts/pg16-client-wrapper.sh; do
+            bash -n "$script"
+          done
+      - name: Run application tests
+        run: pytest -q
+      - name: Verify PostgreSQL backup and restore
+        env:
+          MEDARCHIVE_BACKUP_DIR: ${{ runner.temp }}/medarchive-backups
+        run: |
+          # Use PostgreSQL 16 client tools to match the PostgreSQL 16 service.
+          client_bin="$RUNNER_TEMP/postgresql16-client"
+          mkdir -p "$client_bin"
+          cp scripts/pg16-client-wrapper.sh "$client_bin/pg_dump"
+          cp scripts/pg16-client-wrapper.sh "$client_bin/pg_restore"
+          chmod 0755 "$client_bin/pg_dump" "$client_bin/pg_restore"
+          export PATH="$client_bin:$PATH"
+
+          # Seed old completed archives to exercise retention in the real script.
+          mkdir -p "$MEDARCHIVE_BACKUP_DIR"
+          umask 077
+          for i in $(seq 1 26); do
+            touch "$MEDARCHIVE_BACKUP_DIR/medarchive-old-$i.dump"
+            touch -d "2000-01-01 00:00:$i UTC" "$MEDARCHIVE_BACKUP_DIR/medarchive-old-$i.dump"
+          done
+
+          scripts/backup.sh
+          backup_count="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-*.dump' | wc -l)"
+          test "$backup_count" -eq 24
+          backup_file="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-????????T??????Z.dump' -print -quit)"
+          test -n "$backup_file"
+          test "$(stat -c '%a' "$backup_file")" = "600"
+          export PGPASSWORD=medarchive
+          createdb --host=localhost --username=medarchive medarchive_restore_check
+          pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=medarchive --dbname=medarchive_restore_check "$backup_file"
+          psql "postgresql://medarchive:medarchive@localhost:5432/medarchive_restore_check" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.domain_events') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL" | grep -qx t
+          dropdb --host=localhost --username=medarchive medarchive_restore_check

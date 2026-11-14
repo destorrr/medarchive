@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>⚖️ Внешнее хранение карт</h1>
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<div class="card">
+    <h3>Карты на балансе ЦО</h3>
+    {% if cards %}
+    <table class="data"><thead><tr><th>Номер</th><th>ФИО</th><th>Состояние</th><th>Действие</th></tr></thead><tbody>
+    {% for card in cards %}<tr>
+        <td>{{ card.card_number }}</td><td>{{ card.full_name }}</td>
+        <td>
+            {% if card.custody_status == "available" %}В ЦО{% elif card.custody_status == "at_court" %}В суде{% elif card.custody_status == "at_insurance" %}В страховой{% else %}В другой организации{% endif %}
+            {% if card.external_organization %}<br><small>{{ card.external_organization }}</small>{% endif %}
+        </td>
+        <td>
+            {% if card.custody_status == "available" %}
+            <form method="post" action="/central/custody/mark">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <select name="custody_status" required>
+                    <option value="at_court">Суд</option>
+                    <option value="at_insurance">Страховая</option>
+                    <option value="at_external_organization">Другая организация</option>
+                </select>
+                <input name="organization" placeholder="Название организации" required>
+                <input name="comment" placeholder="Комментарий (необязательно)">
+                <button class="btn btn-secondary" type="submit">Отметить передачу</button>
+            </form>
+            {% else %}
+            <form method="post" action="/central/custody/return">
+                <input type="hidden" name="card_id" value="{{ card.id }}">
+                <input name="comment" placeholder="Комментарий о возврате (необязательно)">
+                <button class="btn btn-primary" type="submit">Вернуть на баланс ЦО</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="muted">Нет карт на балансе ЦО.</p>{% endif %}
+</div>
+{% endblock %}
