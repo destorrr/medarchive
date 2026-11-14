@@ -1311,6 +1311,22 @@ async def test_branch_with_unfinished_shipments_cannot_be_deactivated():
                 shipment_id=shipment.id, card_id=card.id, actor_id=actor.id
             )
             await workflow.hand_over(shipment_id=shipment.id, actor_id=actor.id)
+
+            # In-transit shipments independently prevent branch deactivation.
+            actor.is_active = False
+            await session.flush()
+            with pytest.raises(ValueError, match="незавершённые отправления"):
+                await PostgreSQLAdminService(session).set_branch_active(
+                    branch.id, False
+                )
+            assert branch.is_active is True
+            assert source.is_active is True
+            assert shipment.status == "in_transit"
+
+            # Restore the actor only to register the incident, then verify the
+            # same guard continues to protect exception-state shipments.
+            actor.is_active = True
+            await session.flush()
             await workflow.register_exception(
                 shipment_id=shipment.id,
                 actor_id=actor.id,
