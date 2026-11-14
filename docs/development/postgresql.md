@@ -31,7 +31,7 @@ Alembic owns schema transactions. The initial revision contains a frozen copy of
 
 `medarchive.adapters.postgresql.database.Database` owns an async SQLAlchemy engine, bounded connection pool, and async session factory. Use one session/transaction per application use case. Repositories must not commit; transaction ownership belongs to the service layer.
 
-The adapter is now available through an opt-in FastAPI dependency and is managed by the application startup/shutdown lifecycle. Set `MEDARCHIVE_POSTGRES_ENABLED=true` to create the PostgreSQL pool and run a startup health check; `get_pg_session` provides an `AsyncSession` to PostgreSQL routes and leaves transaction ownership to the service layer. The existing business routers still use SQLite during this staged migration. Login can be switched independently with MEDARCHIVE_AUTH_BACKEND=postgresql; this requires MEDARCHIVE_POSTGRES_ENABLED=true. Do not enable either flag in an environment without a reachable PostgreSQL database.
+The adapter is managed by the application startup/shutdown lifecycle. Set `MEDARCHIVE_POSTGRES_ENABLED=true` to create the PostgreSQL pool and run a startup health check; `get_pg_session` provides an `AsyncSession` to PostgreSQL routes and leaves transaction ownership to the service layer. Operational and administrative routers use this adapter when `MEDARCHIVE_AUTH_BACKEND=postgresql`; legacy SQLite routers are mounted only when the SQLite backend is selected. Do not enable PostgreSQL mode in an environment without a reachable PostgreSQL database.
 
 ## Status
 
@@ -82,7 +82,7 @@ A card can return to the archive as a standalone item, not only inside a box. Th
 When the last active card is removed from a box, its usage cycle is closed. Reusing that physical box starts the next numbered cycle; previous membership rows and cycle records remain intact.
 
 
-## PostgreSQL authentication (staged)
+## PostgreSQL authentication
 
 The login form can now authenticate against PostgreSQL when explicitly selected:
 
@@ -94,7 +94,7 @@ export MEDARCHIVE_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_u
 export MEDARCHIVE_COOKIE_SECURE=true  # required behind HTTPS in production
 ```
 
-The default `MEDARCHIVE_AUTH_BACKEND=sqlite` is intentionally retained until the remaining application routes and user administration have moved to PostgreSQL. PostgreSQL authentication requires `MEDARCHIVE_POSTGRES_ENABLED=true`.
+The default `MEDARCHIVE_AUTH_BACKEND=sqlite` remains for legacy development compatibility. The production systemd unit sets `MEDARCHIVE_AUTH_BACKEND=postgresql` and `MEDARCHIVE_POSTGRES_ENABLED=true`; PostgreSQL authentication requires both the flag and a reachable database.
 
 For a completely empty PostgreSQL `users` table, create the first administrator once:
 
