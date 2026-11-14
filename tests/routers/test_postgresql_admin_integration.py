@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import (
     ArchiveShelf, Box, BoxCardMembership, BoxCycle, BoxPlacement, Branch,
-    Card, CardPlacement, Courier, Location, Shipment, User,
+    Card, CardPlacement, Courier, DomainEvent, Location, Shipment, User,
 )
 from medarchive.config import Config
 from medarchive.dependencies import get_pg_database
@@ -89,6 +89,17 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
                 assert location is not None
                 assert location.name == branch.name
                 assert location.is_active is True
+                branch_event = await session.scalar(
+                    select(DomainEvent).where(
+                        DomainEvent.aggregate_type == "branch",
+                        DomainEvent.aggregate_id == branch.id,
+                        DomainEvent.event_type == "admin.branch_created",
+                    )
+                )
+                assert branch_event is not None
+                assert branch_event.payload == {
+                    "code": branch_code, "name": "Интеграционный филиал"
+                }
 
             # Create an employee, assigning the branch and the branch role.
             response = await client.post(
