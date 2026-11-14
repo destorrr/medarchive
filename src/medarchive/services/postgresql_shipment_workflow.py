@@ -472,6 +472,7 @@ class PostgreSQLShipmentWorkflow:
 
         # Archive issues to the central office are allowed only for cards covered
         # by active central-office requests. The request remains open until receipt.
+        fulfilled_requests: list[ArchiveRequest] = []
         if source.kind == "archive" and target.kind == "central_office":
             card_ids = [card.id for card, _ in boxed_cards] + [row.card_id for row in standalone_rows]
             now = datetime.now(timezone.utc)
@@ -493,6 +494,7 @@ class PostgreSQLShipmentWorkflow:
                 request.fulfillment_shipment_id = shipment.id
                 request.fulfilled_by = actor.id
                 request.updated_at = now
+                fulfilled_requests.append(request)
 
         # Ensure each transported card has exactly one manifest row and that its
         # containing box is explicit. A duplicate is rejected by the PK as well.
@@ -522,6 +524,14 @@ class PostgreSQLShipmentWorkflow:
         shipment.status = "in_transit"
         shipment.handed_over_at = now
         await self.session.flush()
+        for archive_request in fulfilled_requests:
+            await self._event(
+                "archive_request.fulfillment_started", "archive_request",
+                archive_request.id, actor.id, {
+                    "card_id": str(archive_request.card_id),
+                    "shipment_id": str(shipment.id),
+                },
+            )
         await self._event("shipment.handed_over", "shipment", shipment.id, actor.id, {
             "boxes": [str(box.id) for box in boxes],
             "boxed_cards": [str(card.id) for card, _ in boxed_cards],
@@ -707,6 +717,7 @@ class PostgreSQLShipmentWorkflow:
         shipment.received_by = actor.id
         shipment.received_at = now
 
+        completed_archive_requests: list[ArchiveRequest] = []
         if target.kind == "central_office" and source.kind == "archive":
             for card in cards:
                 request = await self.session.scalar(
@@ -721,8 +732,17 @@ class PostgreSQLShipmentWorkflow:
                 request.status = "completed"
                 request.completed_at = now
                 request.updated_at = now
+                completed_archive_requests.append(request)
 
         await self.session.flush()
+        for archive_request in completed_archive_requests:
+            await self._event(
+                "archive_request.completed", "archive_request",
+                archive_request.id, actor.id, {
+                    "card_id": str(archive_request.card_id),
+                    "shipment_id": str(shipment.id),
+                },
+            )
         if exception_resolution_note is None:
             event_type = "shipment.received"
             event_payload = {
