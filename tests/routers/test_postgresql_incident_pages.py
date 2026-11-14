@@ -102,17 +102,26 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
         archive_location_id = archive_location.id
         central_location_id = central_location.id
 
+        first_card_id, second_card_id = sorted((uuid.uuid4(), uuid.uuid4()), key=str)
         card = Card(
-            card_number=f"INC-CARD-{suffix}", full_name="Incident Test Patient",
-            date_of_birth=date(1980, 1, 2), origin_branch_id=branch.id,
-            current_location_id=branch_location_id, status="active",
+            id=first_card_id, card_number=f"INC-CARD-{suffix}",
+            full_name="Incident Test Patient", date_of_birth=date(1980, 1, 2),
+            origin_branch_id=branch.id, current_location_id=branch_location_id,
+            status="active",
         )
-        session.add(card)
+        second_card = Card(
+            id=second_card_id, card_number=f"INC-CARD-SECOND-{suffix}",
+            full_name="Second Incident Test Patient", date_of_birth=date(1982, 2, 3),
+            origin_branch_id=branch.id, current_location_id=branch_location_id,
+            status="active",
+        )
+        session.add_all([card, second_card])
         await session.flush()
 
         workflow = PostgreSQLShipmentWorkflow(session)
         box = await workflow.create_box(
-            location_id=branch_location_id, actor_id=branch_user_id, card_ids=[card.id],
+            location_id=branch_location_id, actor_id=branch_user_id,
+            card_ids=[card.id, second_card.id],
         )
         shipment = await workflow.create_draft(
             from_location_id=branch_location_id,
@@ -152,7 +161,9 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 assert detail.status_code == 200
                 assert "Incident Reporter" in detail.text
                 assert "Incident Test Patient" in detail.text
+                assert "Second Incident Test Patient" in detail.text
                 assert f"INC-CARD-{suffix}" in detail.text
+                assert f"INC-CARD-SECOND-{suffix}" in detail.text
                 assert box_number in detail.text
 
                 missing = await client.get(f"/admin/incidents/{uuid.uuid4()}")
@@ -178,6 +189,7 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 assert "Инциденты, ожидающие проверки" in receive_page.text
                 assert "Интеграционная проверка инцидента" in receive_page.text
                 assert f"INC-CARD-{suffix}" in receive_page.text
+                assert f"INC-CARD-SECOND-{suffix}" in receive_page.text
 
                 blank_result = await client.post(
                     "/receive/resolve",
@@ -207,13 +219,15 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 await session.refresh(shipment)
                 await session.refresh(card)
                 await session.refresh(box)
-                persisted_manifest = await session.scalar(select(ShipmentCard).where(
-                    ShipmentCard.shipment_id == shipment_id,
-                    ShipmentCard.card_id == card.id,
-                ))
-                assert persisted_manifest is not None
+                persisted_manifest_rows = list((await session.scalars(
+                    select(ShipmentCard).where(ShipmentCard.shipment_id == shipment_id)
+                )).all())
+                assert {row.card_id for row in persisted_manifest_rows} == {
+                    card.id, second_card.id,
+                }
                 assert shipment.status == "exception"
                 assert card.current_shipment_id == shipment_id
+                assert second_card.current_shipment_id == shipment_id
                 assert box.current_shipment_id == shipment_id
                 assert card.current_location_id is None
                 assert box.current_location_id is None
@@ -222,16 +236,17 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     DomainEvent.aggregate_id == shipment_id,
                 )) is None
 
-                # Even with an immutable manifest, a cargo item's live transit
-                # pointer can be inconsistent. Resolution must reject the whole
-                # shipment rather than receive the remaining items.
+                # Even with an immutable manifest, one cargo item's live transit
+                # pointer can be inconsistent. The first card is deliberately
+                # ordered before the corrupted second card; resolution must reject
+                # the whole shipment rather than partially receive the first card.
                 with pytest.raises(
                     ShipmentWorkflowError,
                     match="Состояние карты не соответствует отправлению",
                 ):
                     async with session.begin_nested():
-                        card.current_location_id = archive_location_id
-                        card.current_shipment_id = None
+                        second_card.current_location_id = archive_location_id
+                        second_card.current_shipment_id = None
                         await session.flush()
                         await workflow.resolve_exception(
                             shipment_id=shipment_id,
@@ -240,10 +255,13 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                         )
 
                 await session.refresh(card)
+                await session.refresh(second_card)
                 await session.refresh(box)
                 await session.refresh(shipment)
                 assert card.current_location_id is None
                 assert card.current_shipment_id == shipment_id
+                assert second_card.current_location_id is None
+                assert second_card.current_shipment_id == shipment_id
                 assert box.current_location_id is None
                 assert box.current_shipment_id == shipment_id
                 assert shipment.status == "exception"
@@ -285,8 +303,11 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                     DomainEvent.aggregate_id == shipment_id,
                 )) == 1
                 await session.refresh(card)
+                await session.refresh(second_card)
                 assert card.current_location_id == archive_location_id
                 assert card.current_shipment_id is None
+                assert second_card.current_location_id == archive_location_id
+                assert second_card.current_shipment_id is None
 
                 # The Central Office is also a receiving location and must be
                 # able to inspect and resolve incidents on branch shipments.
