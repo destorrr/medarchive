@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from medarchive.main import create_app
 from medarchive.config import Config
-from medarchive.routers.postgresql_admin import BranchInput, UserCreateInput
+from medarchive.routers.postgresql_admin import BranchInput, UserCreateInput, UserUpdateInput
 from medarchive.services.postgresql_admin_service import PostgreSQLAdminService
 
 
@@ -82,4 +82,19 @@ def test_user_input_rejects_three_character_password():
         UserCreateInput(
             username="operator", full_name="Иванов Иван",
             password="abc", role="admin",
+        )
+
+
+@pytest.mark.parametrize("password", ["abcd", "a1b2"])
+def test_user_update_input_accepts_four_character_password(password):
+    payload = UserUpdateInput(
+        full_name="Иванов Иван", role="admin", password=password,
+    )
+    assert payload.password == password
+
+
+def test_user_update_input_rejects_three_character_password():
+    with pytest.raises(ValidationError):
+        UserUpdateInput(
+            full_name="Иванов Иван", role="admin", password="abc",
         )
