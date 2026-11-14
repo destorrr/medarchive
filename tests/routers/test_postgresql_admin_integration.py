@@ -1921,3 +1921,150 @@ async def test_admin_user_api_create_update_and_self_protection_on_postgresql():
             await session.commit()
         app.dependency_overrides.clear()
         await database.close()
+
+@pytest.mark.asyncio
+async def test_admin_user_api_activation_and_last_admin_guard_on_postgresql():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    from medarchive.dependencies import get_pg_session
+    from medarchive.routers.postgresql_admin import admin_only as api_admin_only
+
+    database = await get_pg_database()
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="admin-user-state-api-integration-secret",
+    ))
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"user-state-api-actor-{uuid.uuid4().hex[:8]}",
+        password_hash="admin-test-hash",
+        full_name="User State API Admin",
+        role="admin",
+        is_active=True,
+    )
+    target_admin = User(
+        id=uuid.uuid4(),
+        username=f"target-admin-{uuid.uuid4().hex[:8]}",
+        password_hash="test-hash",
+        full_name="Target Admin",
+        role="admin",
+        is_active=True,
+    )
+    standby_admin = User(
+        id=uuid.uuid4(),
+        username=f"standby-admin-{uuid.uuid4().hex[:8]}",
+        password_hash="test-hash",
+        full_name="Standby Admin",
+        role="admin",
+        is_active=False,
+    )
+    employee = User(
+        id=uuid.uuid4(),
+        username=f"state-employee-{uuid.uuid4().hex[:8]}",
+        password_hash="test-hash",
+        full_name="State Employee",
+        role="viewer",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[api_admin_only] = admin_override
+    app.dependency_overrides[get_pg_session] = session_override
+    try:
+        async with database.session_factory() as session:
+            session.add_all([target_admin, standby_admin, employee])
+            await session.commit()
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            last_admin = await client.put(
+                f"/api/admin/users/{target_admin.id}",
+                json={
+                    "full_name": target_admin.full_name,
+                    "role": "viewer",
+                    "branch_id": None,
+                },
+            )
+            assert last_admin.status_code == 409
+            assert "последнего активного администратора" in last_admin.json()["detail"]
+
+            activate_admin = await client.put(
+                f"/api/admin/users/{standby_admin.id}",
+                json={
+                    "full_name": standby_admin.full_name,
+                    "role": "admin",
+                    "branch_id": None,
+                    "is_active": True,
+                },
+            )
+            assert activate_admin.status_code == 200, activate_admin.text
+            assert activate_admin.json()["is_active"] is True
+
+            demote = await client.put(
+                f"/api/admin/users/{target_admin.id}",
+                json={
+                    "full_name": target_admin.full_name,
+                    "role": "viewer",
+                    "branch_id": None,
+                },
+            )
+            assert demote.status_code == 200, demote.text
+            assert demote.json()["role"] == "viewer"
+
+            deactivate = await client.put(
+                f"/api/admin/users/{employee.id}",
+                json={
+                    "full_name": employee.full_name,
+                    "role": "viewer",
+                    "branch_id": None,
+                    "is_active": False,
+                },
+            )
+            assert deactivate.status_code == 200, deactivate.text
+            assert deactivate.json()["is_active"] is False
+
+            reactivate = await client.put(
+                f"/api/admin/users/{employee.id}",
+                json={
+                    "full_name": employee.full_name,
+                    "role": "viewer",
+                    "branch_id": None,
+                    "is_active": True,
+                },
+            )
+            assert reactivate.status_code == 200, reactivate.text
+            assert reactivate.json()["is_active"] is True
+
+        async with database.session_factory() as session:
+            persisted = {
+                item.id: item
+                for item in (
+                    await session.execute(
+                        select(User).where(User.id.in_([
+                            target_admin.id, standby_admin.id, employee.id
+                        ]))
+                    )
+                ).scalars().all()
+            }
+            assert persisted[target_admin.id].role == "viewer"
+            assert persisted[standby_admin.id].role == "admin"
+            assert persisted[standby_admin.id].is_active is True
+            assert persisted[employee.id].is_active is True
+    finally:
+        async with database.session_factory() as session:
+            for user_id in (target_admin.id, standby_admin.id, employee.id):
+                user = await session.get(User, user_id)
+                if user is not None:
+                    await session.delete(user)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
