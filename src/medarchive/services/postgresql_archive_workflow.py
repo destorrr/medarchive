@@ -98,16 +98,27 @@ class PostgreSQLArchiveWorkflow:
         note = note.strip()
         if not note:
             raise ArchiveWorkflowError("Укажите пояснение, почему карта не найдена")
+        # Use the same Card -> ArchiveRequest lock order as hand_over().
+        # Read the immutable card reference first, then acquire both row locks
+        # in that order to avoid a request/card deadlock with concurrent fulfilment.
+        card_id = await self.session.scalar(
+            select(ArchiveRequest.card_id).where(ArchiveRequest.id == request_id)
+        )
+        if card_id is None:
+            raise ArchiveWorkflowError("Активная заявка не найдена или уже обрабатывается")
+        card = await self.session.scalar(
+            select(Card).where(Card.id == card_id).with_for_update()
+        )
         request = await self.session.scalar(
             select(ArchiveRequest).where(
                 ArchiveRequest.id == request_id
             ).with_for_update()
         )
-        if request is None or request.status != "new":
+        if (
+            card is None or request is None
+            or request.card_id != card_id or request.status != "new"
+        ):
             raise ArchiveWorkflowError("Активная заявка не найдена или уже обрабатывается")
-        card = await self.session.scalar(
-            select(Card).where(Card.id == request.card_id).with_for_update()
-        )
         archive = await self.session.scalar(
             select(Location).where(Location.kind == "archive")
         )
