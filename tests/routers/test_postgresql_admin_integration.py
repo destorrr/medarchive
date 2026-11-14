@@ -3026,3 +3026,104 @@ async def test_admin_incident_list_and_detail_render_exception_shipment_on_postg
         await outer_transaction.rollback()
         await connection.close()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_admin_audit_page_filters_and_renders_append_only_events_on_postgresql():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    app = create_app(Config(
+        database_url=DATABASE_URL,
+        postgres_enabled=True,
+        auth_backend="postgresql",
+        secret_key="integration-test-secret",
+    ))
+    database = await get_pg_database()
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"audit-admin-{uuid.uuid4().hex[:10]}",
+        password_hash="test-only-hash",
+        full_name="Audit Journal Admin",
+        role="admin",
+        is_active=True,
+    )
+    target_id = uuid.uuid4()
+    try:
+        async with session.begin():
+            session.add(actor)
+            await session.flush()
+            session.add_all([
+                DomainEvent(
+                    event_type="admin.audit_test_created",
+                    aggregate_type="audit_test_object",
+                    aggregate_id=target_id,
+                    actor_user_id=actor.id,
+                    payload={"marker": "visible-audit-marker", "changed": True},
+                ),
+                DomainEvent(
+                    event_type="admin.audit_test_other",
+                    aggregate_type="audit_test_object",
+                    aggregate_id=uuid.uuid4(),
+                    actor_user_id=None,
+                    payload={"marker": "other-audit-marker"},
+                ),
+            ])
+            await session.flush()
+
+        async def admin_override():
+            return actor
+
+        async def session_override():
+            yield session
+
+        app.dependency_overrides[admin_only] = admin_override
+        from medarchive.dependencies import get_pg_session
+        app.dependency_overrides[get_pg_session] = session_override
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            listing = await client.get("/admin/audit")
+            assert listing.status_code == 200, listing.text
+            assert "visible-audit-marker" in listing.text
+            assert "other-audit-marker" in listing.text
+            assert "Audit Journal Admin" in listing.text
+            assert "Найдено событий:" in listing.text
+
+            filtered = await client.get(
+                "/admin/audit",
+                params={
+                    "event_type": "admin.audit_test_created",
+                    "aggregate_type": "audit_test_object",
+                    "actor_id": str(actor.id),
+                    "date_from": date.today().isoformat(),
+                    "date_to": date.today().isoformat(),
+                },
+            )
+            assert filtered.status_code == 200, filtered.text
+            assert "visible-audit-marker" in filtered.text
+            assert "other-audit-marker" not in filtered.text
+
+            invalid_date = await client.get(
+                "/admin/audit", params={"date_from": "not-a-date"}
+            )
+            assert invalid_date.status_code == 422
+            reversed_dates = await client.get(
+                "/admin/audit",
+                params={"date_from": "2026-11-15", "date_to": "2026-11-14"},
+            )
+            assert reversed_dates.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+        await session.rollback()
+        await session.close()
+        await outer_transaction.rollback()
+        await connection.close()
+        await database.close()
