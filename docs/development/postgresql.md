@@ -92,11 +92,11 @@ export MEDARCHIVE_AUTH_BACKEND=postgresql
 export MEDARCHIVE_DATABASE_URL='postgresql+asyncpg://...'
 export MEDARCHIVE_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 export MEDARCHIVE_COOKIE_SECURE=true  # required behind HTTPS in production
-# PostgreSQL production mode refuses startup unless the cookie flag is true
-# and MEDARCHIVE_SECRET_KEY contains at least 32 characters.
+export MEDARCHIVE_ENVIRONMENT=production
+# Strict cookie/secret validation applies only when MEDARCHIVE_ENVIRONMENT=production.
 ```
 
-The default `MEDARCHIVE_AUTH_BACKEND=sqlite` remains for legacy development compatibility. The production systemd unit sets `MEDARCHIVE_AUTH_BACKEND=postgresql` and `MEDARCHIVE_POSTGRES_ENABLED=true`; PostgreSQL authentication requires both the flag and a reachable database.
+The default `MEDARCHIVE_AUTH_BACKEND=sqlite` remains for legacy development compatibility. The production systemd unit sets `MEDARCHIVE_AUTH_BACKEND=postgresql`, `MEDARCHIVE_POSTGRES_ENABLED=true`, and `MEDARCHIVE_ENVIRONMENT=production`. In production, startup also requires `MEDARCHIVE_COOKIE_SECURE=true` and a `MEDARCHIVE_SECRET_KEY` of at least 32 characters. Development and test environments can use PostgreSQL without production-only cookie/secret constraints.
 
 For a completely empty PostgreSQL `users` table, create the first administrator once:
 
