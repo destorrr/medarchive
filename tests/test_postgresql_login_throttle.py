@@ -93,6 +93,8 @@ async def test_postgresql_login_throttle_persists_and_blocks_when_database_is_av
 
     database_url = os.environ.get("MEDARCHIVE_DATABASE_URL")
     if not database_url:
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            pytest.fail("GitHub Actions must provide MEDARCHIVE_DATABASE_URL")
         pytest.skip("PostgreSQL integration URL is not configured")
 
     engine = create_async_engine(database_url)
