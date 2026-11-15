@@ -1,4 +1,6 @@
 """Сервис аутентификации: хеширование паролей и сессионные токены."""
+import hashlib
+
 from passlib.context import CryptContext
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from medarchive.domain.models import User
@@ -27,10 +29,15 @@ class AuthService:
             "username": user.username,
             "role": user.role.value if hasattr(user.role, "value") else user.role,
         }
+        password_hash = getattr(user, "password_hash", None)
+        if password_hash:
+            # A one-way credential fingerprint revokes previously issued sessions
+            # after a password reset without exposing the password hash in the cookie.
+            payload["credential_version"] = hashlib.sha256(password_hash.encode()).hexdigest()
         return self._serializer.dumps(payload)
 
     def verify_session_token(self, token: str) -> dict | None:
         try:
-            return self._serializer.loads(token, max_age=86400 * 7)  # 7 days
+            return self._serializer.loads(token, max_age=86400 * 12)  # 12 hours
         except (BadSignature, SignatureExpired):
             return None
