@@ -79,7 +79,7 @@ jobs:
           backup_file="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-????????T??????Z.dump.age' -print -quit)"
           test -n "$backup_file"
           test "$(stat -c '%a' "$backup_file")" = "600"
-          decrypted_file="$RUNNER_TEMP/medarchive-restored.dump"
+          decrypted_file="$MEDARCHIVE_BACKUP_DIR/.medarchive-restored.dump"
           age --decrypt --identity "$RUNNER_TEMP/medarchive-test.agekey" --output "$decrypted_file" "$backup_file"
           test "$(stat -c '%a' "$decrypted_file")" = "600"
           pg_restore --list "$decrypted_file" >/dev/null
@@ -88,3 +88,4 @@ jobs:
           pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=medarchive --dbname=medarchive_restore_check "$decrypted_file"
           psql "postgresql://medarchive:medarchive@localhost:5432/medarchive_restore_check" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.domain_events') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL" | grep -qx t
           dropdb --host=localhost --username=medarchive medarchive_restore_check
+          rm -f "$decrypted_file" "$RUNNER_TEMP/medarchive-test.agekey"
