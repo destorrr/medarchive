@@ -34,6 +34,7 @@ async def login(
                 throttle = PostgreSQLLoginThrottle(
                     pg_session, config.effective_secret_key
                 )
+                await throttle.lock_buckets(username, client_ip)
                 retry_after = await throttle.retry_after(username, client_ip)
                 if retry_after is None:
                     pg_auth = PostgreSQLAuthService(UserRepository(pg_session), auth)
