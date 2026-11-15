@@ -1,5 +1,5 @@
 [Unit]
-Description=МедАрхив — проверенный резервный дамп PostgreSQL
+Description=МедАрхив — зашифрованная резервная копия PostgreSQL
 Wants=network-online.target
 After=network-online.target
 
