@@ -58,7 +58,7 @@ async def login(
         httponly=True,
         secure=config.cookie_secure,
         samesite="lax",
-        max_age=86400 * 12,
+        max_age=60 * 60 * 12,
         path="/",
     )
     return response
