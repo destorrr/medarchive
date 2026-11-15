@@ -1,11 +1,28 @@
 """Точка входа FastAPI-приложения."""
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse
 from medarchive.config import Config
 from medarchive.dependencies import init_dependencies, get_current_user
+
+
+def _origin_tuple(value: str) -> tuple[str, str, int] | None:
+    """Normalize an Origin or Referer URL to scheme/host/port."""
+    try:
+        parsed = urlsplit(value)
+        scheme = parsed.scheme.lower()
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return None
+    if scheme not in {"http", "https"} or not hostname:
+        return None
+    if port is None:
+        port = 443 if scheme == "https" else 80
+    return scheme, hostname.rstrip(".").casefold(), port
 
 
 def create_app(config: Config | None = None) -> FastAPI:
@@ -50,6 +67,23 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     app = FastAPI(title="МедАрхив", version="0.1.0", lifespan=lifespan)
     app.state.config = config
+
+    @app.middleware("http")
+    async def protect_state_changing_requests(request: Request, call_next):
+        """Reject browser state changes initiated from a different origin."""
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            fetch_site = request.headers.get("sec-fetch-site", "").lower()
+            if fetch_site == "cross-site":
+                return HTMLResponse("Cross-site request rejected", status_code=403)
+
+            source = request.headers.get("origin")
+            if source is None:
+                source = request.headers.get("referer")
+            if source is not None:
+                if _origin_tuple(source) != _origin_tuple(str(request.base_url)):
+                    return HTMLResponse("Cross-site request rejected", status_code=403)
+
+        return await call_next(request)
 
     # Jinja2 templates
     app.state.templates = Jinja2Templates(directory="src/medarchive/templates")
