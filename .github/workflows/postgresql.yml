@@ -47,7 +47,7 @@ jobs:
             bash -n "$script"
           done
       - name: Run application tests
-        run: pytest -q
+        run: pytest -q -rs
       - name: Verify PostgreSQL backup and restore
         env:
           MEDARCHIVE_BACKUP_DIR: ${{ runner.temp }}/medarchive-backups
