@@ -38,6 +38,6 @@ class AuthService:
 
     def verify_session_token(self, token: str) -> dict | None:
         try:
-            return self._serializer.loads(token, max_age=86400 * 12)  # 12 hours
+            return self._serializer.loads(token, max_age=60 * 60 * 12)  # 12 hours
         except (BadSignature, SignatureExpired):
             return None
