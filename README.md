@@ -82,12 +82,12 @@ medarchive-admin create-admin --username admin --full-name "Имя Фамили�
 
 1. Подготовить PostgreSQL и отдельную БД/роль приложения с минимально необходимыми правами.
 2. Развернуть код в `/opt/medarchive`, создать виртуальное окружение и установить пакет.
-3. Выполнить `sudo bash scripts/install.sh`; заполнить `/etc/medarchive/medarchive.env` уникальным секретом и production URL PostgreSQL.
+3. Выполнить `sudo bash scripts/install.sh`, чтобы создать `/etc/medarchive/medarchive.env`; заполнить уникальный секрет и production URL PostgreSQL.
 4. Установить PostgreSQL client tools той же основной версии, что и сервер, а также пакет `age`.
-5. Выполнить Alembic migrations и создать первого администратора.
-6. Включить и проверить `medarchive` и `medarchive-backup.timer`.
-7. Настроить TLS reverse proxy перед приложением. Не публиковать порт приложения напрямую в Интернет; ограничить сетевой доступ к нему и к PostgreSQL.
-8. Создать age identity вне сервера, указать только публичный recipient в `MEDARCHIVE_BACKUP_AGE_RECIPIENT`, сохранить закрытый ключ отдельно и провести пробное восстановление.
+5. Создать age identity на отдельной доверенной машине; указать только публичный recipient в `MEDARCHIVE_BACKUP_AGE_RECIPIENT`, закрытый ключ хранить вне сервера. Повторно выполнить `sudo bash scripts/install.sh`, чтобы включить backup timer.
+6. Выполнить Alembic migrations и создать первого администратора.
+7. Включить и проверить `medarchive` и `medarchive-backup.timer`; провести пробное восстановление зашифрованной копии.
+8. Настроить TLS reverse proxy перед приложением. Не публиковать порт приложения напрямую в Интернет; ограничить сетевой доступ к нему и к PostgreSQL.
 
 Production-конфигурация требует `MEDARCHIVE_COOKIE_SECURE=true` и `MEDARCHIVE_SECRET_KEY` длиной не менее 32 символов. Секреты нельзя хранить в репозитории или передавать в тикетах/логах.
 
