@@ -3,6 +3,7 @@
 set -Eeuo pipefail
 
 : "${MEDARCHIVE_DATABASE_URL:?Set MEDARCHIVE_DATABASE_URL in /etc/medarchive/medarchive.env}"
+: "${MEDARCHIVE_BACKUP_AGE_RECIPIENT:?Set MEDARCHIVE_BACKUP_AGE_RECIPIENT in /etc/medarchive/medarchive.env}"
 
 BACKUP_DIR="${MEDARCHIVE_BACKUP_DIR:-/var/lib/medarchive/backups}"
 RETENTION="${MEDARCHIVE_BACKUP_RETENTION:-24}"
@@ -12,7 +13,7 @@ if [[ ! "$RETENTION" =~ ^[1-9][0-9]*$ ]]; then
     exit 2
 fi
 
-for command in pg_dump pg_restore python3 flock; do
+for command in pg_dump pg_restore age python3 flock; do
     if ! command -v "$command" >/dev/null 2>&1; then
         echo "ОШИБКА: не найдена обязательная команда: $command" >&2
         exit 127
@@ -29,10 +30,14 @@ fi
 PGPASS_FILE="$(mktemp "$BACKUP_DIR/.pgpass.XXXXXX")"
 export PGPASS_FILE
 TEMP_FILE=""
+ENCRYPTED_TEMP_FILE=""
 cleanup() {
     rm -f -- "$PGPASS_FILE"
     if [[ -n "$TEMP_FILE" ]]; then
         rm -f -- "$TEMP_FILE"
+    fi
+    if [[ -n "$ENCRYPTED_TEMP_FILE" ]]; then
+        rm -f -- "$ENCRYPTED_TEMP_FILE"
     fi
 }
 trap cleanup EXIT
@@ -95,17 +100,27 @@ PY
 eval "$PG_ENV"
 
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-BACKUP_FILE="$BACKUP_DIR/medarchive-$TIMESTAMP.dump"
-TEMP_FILE="$(mktemp "$BACKUP_DIR/.medarchive-backup.XXXXXX")"
+BACKUP_FILE="$BACKUP_DIR/medarchive-$TIMESTAMP.dump.age"
+TEMP_FILE="$(mktemp "$BACKUP_DIR/.medarchive-plain.XXXXXX")"
+ENCRYPTED_TEMP_FILE="$(mktemp "$BACKUP_DIR/.medarchive-encrypted.XXXXXX")"
+chmod 0600 "$TEMP_FILE" "$ENCRYPTED_TEMP_FILE"
 
 pg_dump --format=custom --no-owner --no-acl --file="$TEMP_FILE"
-# A successful pg_dump exit is not enough: ensure the archive can be read.
+# Validate the PostgreSQL archive before encryption.
 pg_restore --list "$TEMP_FILE" >/dev/null
-mv -- "$TEMP_FILE" "$BACKUP_FILE"
-TEMP_FILE=""
-chmod 0600 "$BACKUP_FILE"
 
-# Keep the newest N completed archives. Temporary and lock files are excluded.
+# Encrypt before publishing the completed backup. The server needs only the
+# public recipient; the matching private age identity must be kept offline.
+age --encrypt --recipient "$MEDARCHIVE_BACKUP_AGE_RECIPIENT" \
+    --output "$ENCRYPTED_TEMP_FILE" "$TEMP_FILE"
+test -s "$ENCRYPTED_TEMP_FILE"
+chmod 0600 "$ENCRYPTED_TEMP_FILE"
+mv -- "$ENCRYPTED_TEMP_FILE" "$BACKUP_FILE"
+ENCRYPTED_TEMP_FILE=""
+rm -f -- "$TEMP_FILE"
+TEMP_FILE=""
+
+# Keep the newest N completed encrypted archives. Temporary and lock files are excluded.
 python3 - "$BACKUP_DIR" "$RETENTION" <<'PY'
 import sys
 from pathlib import Path
@@ -113,13 +128,13 @@ from pathlib import Path
 directory = Path(sys.argv[1])
 retention = int(sys.argv[2])
 backups = sorted(
-    directory.glob("medarchive-*.dump"),
+    directory.glob("medarchive-*.dump.age"),
     key=lambda item: item.stat().st_mtime,
     reverse=True,
 )
 for stale in backups[retention:]:
     stale.unlink()
-print(f"Ротация: оставлено {min(len(backups), retention)} копий")
+print(f"Ротация: оставлено {min(len(backups), retention)} зашифрованных копий")
 PY
 
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] PostgreSQL-бэкап создан: $BACKUP_FILE"
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Зашифрованный PostgreSQL-бэкап создан: $BACKUP_FILE"
