@@ -98,7 +98,7 @@ async def test_postgresql_login_throttle_persists_and_blocks_when_database_is_av
     engine = create_async_engine(database_url)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     username = f"throttle-test-{uuid.uuid4()}"
-    client_ip = "203.0.113.10"
+    client_ip = f"203.0.113.{uuid.uuid4().int % 254 + 1}"
 
     try:
         async with session_factory() as session:
@@ -115,5 +115,11 @@ async def test_postgresql_login_throttle_persists_and_blocks_when_database_is_av
 
                 await throttle.clear_identity_failures(username, client_ip)
                 assert await throttle.retry_after(username, client_ip) is None
+                ip_key, identity_key = throttle._keys(username, client_ip)
+                from sqlalchemy import text
+                await session.execute(
+                    text("DELETE FROM auth_login_throttles WHERE throttle_key IN (:ip_key, :identity_key)"),
+                    {"ip_key": ip_key, "identity_key": identity_key},
+                )
     finally:
         await engine.dispose()
