@@ -31,7 +31,13 @@ class TestSmoke:
         assert "htmx" in htmx.text[:500].lower()
 
     async def test_shared_template_uses_local_assets(self, app_client):
-        response = await app_client.get("/login")
+        login = await app_client.post(
+            "/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        response = await app_client.get("/dashboard")
         assert response.status_code == 200
         assert "/static/app.css" in response.text
         assert "/static/htmx.min.js" in response.text
