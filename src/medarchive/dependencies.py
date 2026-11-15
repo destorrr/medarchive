@@ -85,6 +85,11 @@ async def get_current_user(request: Request) -> User:
         raise HTTPException(status_code=401, detail="User not found")
 
     user = User.from_row(row)
+    if payload.get("credential_version") is not None:
+        import hashlib
+        current_version = hashlib.sha256(user.password_hash.encode()).hexdigest()
+        if payload["credential_version"] != current_version:
+            raise HTTPException(status_code=401, detail="Session revoked")
     user.branch_name = row["branch_name"]
     if user.role == UserRole.archive:
         cnt = await db.fetch_one(
@@ -115,6 +120,11 @@ async def get_pg_current_user(
     user = await UserRepository(session).get_by_id(user_id)
     if user is None or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive")
+    if payload.get("credential_version") is not None:
+        import hashlib
+        current_version = hashlib.sha256(user.password_hash.encode()).hexdigest()
+        if payload["credential_version"] != current_version:
+            raise HTTPException(status_code=401, detail="Session revoked")
     return user
 
 
