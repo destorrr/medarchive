@@ -72,3 +72,30 @@ class TestAuthRouter:
         r = await client.get("/dashboard", follow_redirects=False)
         assert r.status_code == 303
         assert "/login" in r.headers["location"]
+
+    async def test_logout_rejects_cross_origin_post(self, client):
+        r = await client.post(
+            "/logout",
+            headers={"origin": "https://attacker.example"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 403
+
+    async def test_logout_rejects_cross_site_fetch_metadata(self, client):
+        r = await client.post(
+            "/logout",
+            headers={"sec-fetch-site": "cross-site"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 403
+
+    async def test_logout_accepts_same_origin_post(self, client):
+        r = await client.post(
+            "/logout",
+            headers={
+                "origin": "http://test",
+                "sec-fetch-site": "same-origin",
+            },
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
