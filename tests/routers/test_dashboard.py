@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -111,7 +113,7 @@ class TestSidebarProfile:
         # Логотип: текст + подпись, без эмодзи/иконки (в пунктах меню эмодзи допустимы).
         assert '<div class="brand"><b>МедАрхив</b><span>учёт медкарт</span></div>' in r.text
         # Профиль: аватар-инициалы из ФИО, строка ФИО, строка филиала, пилюля роли.
-        assert 'class="avatar">ИП</div>' in r.text
+        assert re.search(r'<div class="avatar"[^>]*>ИП</div>', r.text)
         assert '<div class="name">Иванова П.С.</div>' in r.text
         assert '<div class="branch">Test Branch</div>' in r.text
         assert 'class="role-pill">Филиал</div>' in r.text
@@ -123,7 +125,7 @@ class TestSidebarProfile:
         r = await client.get("/dashboard")
         assert r.status_code == 200
         assert '<div class="name">admin_user</div>' in r.text
-        assert 'class="avatar">A</div>' in r.text
+        assert re.search(r'<div class="avatar"[^>]*>A</div>', r.text)
         assert '<div class="branch">Администратор</div>' in r.text
         assert 'class="role-pill">Администратор</div>' in r.text
 
