@@ -130,3 +130,17 @@ Validate the restored schema and application data before directing the applicati
 The backup directory is private to the service account, but PostgreSQL custom archives are not encrypted by `pg_dump`. Place the directory on encrypted storage and maintain an additional encrypted off-host copy. A local hourly backup alone is not a disaster-recovery strategy.
 
 The session cookie is HTTP-only and SameSite=Lax. Set `MEDARCHIVE_COOKIE_SECURE=true` whenever the application is served over HTTPS. The same signing secret must be used by all application instances.
+
+### Failed-login throttling
+
+PostgreSQL authentication uses the `auth_login_throttles` table. Failed attempts are counted in PostgreSQL, so limits are shared by application workers and survive process restarts:
+
+- 5 failed attempts for a username/client-IP pair in a 15-minute window trigger a 15-minute block for that pair.
+- 20 failed attempts from one client IP in a 15-minute window trigger a 15-minute IP block.
+- A successful login clears the username/IP counter. The IP-wide counter is intentionally retained.
+- A block response is HTTP 429 and includes `Retry-After`.
+- Throttle identifiers are HMAC-SHA256 digests keyed by `MEDARCHIVE_SECRET_KEY`; raw usernames and IP addresses are not stored in the throttle table. Expired rows are periodically pruned during failed-login processing.
+
+The counters use atomic PostgreSQL upserts and transaction-scoped advisory locks so concurrent requests from the same IP cannot all pass the check before the failure counter is updated. The throttle table is created by Alembic revision `0011_login_throttles`.
+
+The IP used by the limiter is the client address exposed by the ASGI server. When deploying behind a reverse proxy, configure Uvicorn to trust forwarded headers only from the exact proxy addresses; never trust arbitrary client-supplied `X-Forwarded-For` values. The legacy SQLite compatibility login does not use this PostgreSQL throttle; production must use `MEDARCHIVE_AUTH_BACKEND=postgresql`.
