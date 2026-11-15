@@ -130,6 +130,7 @@ sudo ls -l /var/lib/medarchive/backups
 To restore, stop the application and decrypt the selected archive with the private age identity on a trusted recovery machine. Then restore the plaintext dump into a fresh or explicitly prepared PostgreSQL database. For example:
 
 ```bash
+umask 077
 age --decrypt --identity /secure/offline/medarchive-backup.agekey \
   --output /secure/restore/medarchive.dump \
   /var/lib/medarchive/backups/medarchive-YYYYMMDDTHHMMSSZ.dump.age
