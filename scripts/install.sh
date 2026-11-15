@@ -48,12 +48,58 @@ cp scripts/medarchive-backup.timer /etc/systemd/system/
 systemctl daemon-reload
 
 # Enable encrypted backups only after all required settings and age are ready.
-if grep -q '^MEDARCHIVE_SECRET_KEY=$' "$ENV_FILE" \
+if grep -q '^MEDARCHIVE_SECRET_KEY=else
+    systemctl enable --now medarchive-backup.timer
+    echo "Почасовой зашифрованный PostgreSQL backup timer включён"
+fi
+
+echo ""
+echo "=== Установка завершена ==="
+echo ""
+echo "Обязательные действия перед запуском:"
+echo "1. Отредактируйте $ENV_FILE: задайте MEDARCHIVE_SECRET_KEY и MEDARCHIVE_DATABASE_URL."
+echo "2. Установите PostgreSQL client той же основной версии, что и сервер (pg_dump и pg_restore), а также age."
+echo "3. Создайте age identity вне сервера; добавьте только публичный recipient в $ENV_FILE."
+echo "4. Убедитесь, что пользователь medarchive может подключиться к PostgreSQL."
+echo "5. Запустите и проверьте резервное копирование:"
+echo "   sudo systemctl start medarchive-backup.service"
+echo "   sudo systemctl status medarchive-backup.service"
+echo "   sudo ls -l /var/lib/medarchive/backups"
+echo "6. Запустите приложение: sudo systemctl enable --now medarchive"
+echo ""
+echo "Перед эксплуатацией проверьте восстановление дампа на отдельной тестовой БД."
+echo "Держите закрытый age identity отдельно от сервера и регулярно проверяйте его доступность."
+echo "Для аварийного восстановления храните дополнительную зашифрованную копию вне сервера."
+ "$ENV_FILE" \
     || ! grep -q '^MEDARCHIVE_DATABASE_URL=postgresql+asyncpg://' "$ENV_FILE" \
     || grep -q 'USER:PASSWORD@HOST' "$ENV_FILE" \
-    || ! grep -Eq '^MEDARCHIVE_BACKUP_AGE_RECIPIENT=age1[0-9a-z]+$' "$ENV_FILE"; then
+    || ! grep -Eq '^MEDARCHIVE_BACKUP_AGE_RECIPIENT=age1[0-9a-z]+else
+    systemctl enable --now medarchive-backup.timer
+    echo "Почасовой зашифрованный PostgreSQL backup timer включён"
+fi
+
+echo ""
+echo "=== Установка завершена ==="
+echo ""
+echo "Обязательные действия перед запуском:"
+echo "1. Отредактируйте $ENV_FILE: задайте MEDARCHIVE_SECRET_KEY и MEDARCHIVE_DATABASE_URL."
+echo "2. Установите PostgreSQL client той же основной версии, что и сервер (pg_dump и pg_restore), а также age."
+echo "3. Создайте age identity вне сервера; добавьте только публичный recipient в $ENV_FILE."
+echo "4. Убедитесь, что пользователь medarchive может подключиться к PostgreSQL."
+echo "5. Запустите и проверьте резервное копирование:"
+echo "   sudo systemctl start medarchive-backup.service"
+echo "   sudo systemctl status medarchive-backup.service"
+echo "   sudo ls -l /var/lib/medarchive/backups"
+echo "6. Запустите приложение: sudo systemctl enable --now medarchive"
+echo ""
+echo "Перед эксплуатацией проверьте восстановление дампа на отдельной тестовой БД."
+echo "Держите закрытый age identity отдельно от сервера и регулярно проверяйте его доступность."
+echo "Для аварийного восстановления храните дополнительную зашифрованную копию вне сервера."
+ "$ENV_FILE"; then
+    systemctl disable --now medarchive-backup.timer 2>/dev/null || true
     echo "Таймер бэкапа пока не запущен: задайте секрет, PostgreSQL URL и публичный age recipient в $ENV_FILE"
 elif ! command -v age >/dev/null 2>&1; then
+    systemctl disable --now medarchive-backup.timer 2>/dev/null || true
     echo "Таймер бэкапа пока не запущен: установите age и повторно выполните установку"
 else
     systemctl enable --now medarchive-backup.timer
