@@ -58,13 +58,13 @@ async def login(
         httponly=True,
         secure=config.cookie_secure,
         samesite="lax",
-        max_age=86400 * 7,
+        max_age=86400 * 12,
         path="/",
     )
     return response
 
 
-@router.get("/logout")
+@router.post("/logout")
 async def logout():
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("session", path="/")
