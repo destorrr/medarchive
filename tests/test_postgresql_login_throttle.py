@@ -69,3 +69,17 @@ async def test_success_clears_only_username_ip_bucket():
 
     params = session.execute.await_args.args[1]
     assert params["throttle_key"] == throttle._keys("user", "192.0.2.10")[1]
+
+@pytest.mark.asyncio
+async def test_login_throttle_locks_buckets_in_deterministic_order():
+    session = AsyncMock()
+    throttle = PostgreSQLLoginThrottle(session, "a-test-secret")
+
+    await throttle.lock_buckets("user", "192.0.2.10")
+
+    assert session.execute.await_count == 2
+    lock_ids = [
+        call.args[1]["lock_id"] for call in session.execute.await_args_list
+    ]
+    assert lock_ids == sorted(lock_ids)
+    assert all(-(2**63) <= value < 2**63 for value in lock_ids)
