@@ -108,9 +108,18 @@ The command prompts for the password twice, stores only a bcrypt hash, and refus
 
 ## Production PostgreSQL backup and restore
 
-The systemd backup timer uses `scripts/backup.sh` and `pg_dump` in PostgreSQL custom-archive format. It reads the same `MEDARCHIVE_DATABASE_URL` as the application, creates a mode-0600 archive, validates it with `pg_restore --list`, and retains the newest 24 completed archives by default. A lock prevents overlapping runs. A failed dump or archive validation leaves no completed backup file.
+The systemd backup timer uses `scripts/backup.sh`, `pg_dump` in PostgreSQL custom-archive format, and `age` encryption. It validates the plaintext dump with `pg_restore --list`, encrypts it to a `.dump.age` archive, sets mode 0600, and retains the newest 24 completed encrypted archives by default. Plaintext is held only in a mode-0600 temporary file inside the private backup directory and is removed after successful encryption; the cleanup trap also removes it on failure. A lock prevents overlapping runs. The script fails closed if an age recipient is not configured or encryption fails.
 
-The installer creates `/etc/medarchive/medarchive.env` with mode 0640 (root:medarchive). Configure `MEDARCHIVE_DATABASE_URL` and a unique `MEDARCHIVE_SECRET_KEY` there; URL-encode reserved characters in database credentials. Install the PostgreSQL client tools matching the server's major version. Then run:
+Generate an age identity on a trusted offline machine, not on the application server:
+
+```bash
+age-keygen -o medarchive-backup.agekey
+age-keygen -y medarchive-backup.agekey
+```
+
+Copy only the public `age1...` recipient printed by the second command into `MEDARCHIVE_BACKUP_AGE_RECIPIENT` in `/etc/medarchive/medarchive.env`. Keep the private identity file outside the server, separate from the backups, and maintain a tested recovery copy of it. The application server needs only the public recipient to encrypt backups.
+
+The installer creates `/etc/medarchive/medarchive.env` with mode 0640 (root:medarchive). Configure `MEDARCHIVE_DATABASE_URL`, a unique `MEDARCHIVE_SECRET_KEY`, and `MEDARCHIVE_BACKUP_AGE_RECIPIENT` there; URL-encode reserved characters in database credentials. Install the PostgreSQL client tools matching the server's major version and the `age` package. The timer is enabled only when the database URL, secret, age recipient, and age executable are available. Then run:
 
 ```bash
 sudo systemctl start medarchive-backup.service
@@ -118,16 +127,20 @@ sudo systemctl status medarchive-backup.service
 sudo ls -l /var/lib/medarchive/backups
 ```
 
-To restore, stop the application and restore the selected archive into a fresh or explicitly prepared PostgreSQL database. For example, after configuring the usual libpq connection variables (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD` or `PGPASSFILE`):
+To restore, stop the application and decrypt the selected archive with the private age identity on a trusted recovery machine. Then restore the plaintext dump into a fresh or explicitly prepared PostgreSQL database. For example:
 
 ```bash
+age --decrypt --identity /secure/offline/medarchive-backup.agekey \
+  --output /secure/restore/medarchive.dump \
+  /var/lib/medarchive/backups/medarchive-YYYYMMDDTHHMMSSZ.dump.age
+
 createdb medarchive_restore
-pg_restore --no-owner --no-acl --exit-on-error --dbname=medarchive_restore /var/lib/medarchive/backups/medarchive-YYYYMMDDTHHMMSSZ.dump
+pg_restore --no-owner --no-acl --exit-on-error --dbname=medarchive_restore /secure/restore/medarchive.dump
 ```
 
-Validate the restored schema and application data before directing the application to it. Do not restore over a live production database without a separately reviewed maintenance and rollback plan. CI creates a real PostgreSQL dump and restores it into a second database on every workflow run.
+Validate the restored schema and application data before directing the application to it. Do not restore over a live production database without a separately reviewed maintenance and rollback plan. CI generates a temporary age identity, creates an encrypted PostgreSQL dump, decrypts it with the private identity, and restores it into a second database on every workflow run.
 
-The backup directory is private to the service account, but PostgreSQL custom archives are not encrypted by `pg_dump`. Place the directory on encrypted storage and maintain an additional encrypted off-host copy. A local hourly backup alone is not a disaster-recovery strategy.
+New backups are encrypted before they are published. Existing `.dump` files created by older versions remain plaintext and must be migrated to encrypted storage or securely retired before treating the backup directory as protected. Maintain an additional encrypted off-host copy; a local hourly backup alone is not a disaster-recovery strategy.
 
 The session cookie is HTTP-only and SameSite=Lax. Set `MEDARCHIVE_COOKIE_SECURE=true` whenever the application is served over HTTPS. The same signing secret must be used by all application instances.
 
