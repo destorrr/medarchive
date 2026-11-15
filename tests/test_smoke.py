@@ -22,6 +22,21 @@ async def app_client(test_config, db):
 
 
 class TestSmoke:
+    async def test_local_frontend_assets_are_served_without_cdn(self, app_client):
+        css = await app_client.get("/static/app.css")
+        htmx = await app_client.get("/static/htmx.min.js")
+        assert css.status_code == 200
+        assert "var(--color-primary)" in css.text
+        assert htmx.status_code == 200
+        assert "htmx" in htmx.text[:500].lower()
+
+    async def test_shared_template_uses_local_assets(self, app_client):
+        response = await app_client.get("/login")
+        assert response.status_code == 200
+        assert "/static/app.css" in response.text
+        assert "/static/htmx.min.js" in response.text
+        assert "unpkg.com" not in response.text
+
     async def test_root_redirects_to_login(self, app_client):
         r = await app_client.get("/", follow_redirects=False)
         assert r.status_code == 303
