@@ -85,6 +85,11 @@ def create_app(config: Config | None = None) -> FastAPI:
 
         return await call_next(request)
 
+    @app.get("/", include_in_schema=False)
+    async def root():
+        """Send visitors to the sign-in page instead of FastAPI's JSON 404."""
+        return RedirectResponse(url="/login", status_code=303)
+
     # Jinja2 templates
     app.state.templates = Jinja2Templates(directory="src/medarchive/templates")
 
