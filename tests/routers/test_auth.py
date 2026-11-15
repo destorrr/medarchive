@@ -99,3 +99,80 @@ class TestAuthRouter:
             follow_redirects=False,
         )
         assert r.status_code == 303
+
+    async def test_postgresql_login_returns_retry_after_when_throttled(self, monkeypatch):
+        from types import SimpleNamespace
+        from starlette.requests import Request
+
+        from medarchive.config import Config
+        from medarchive.routers import auth as auth_router
+        from medarchive.services.auth_service import AuthService
+
+        class AsyncContext:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+        class FakeSession(AsyncContext):
+            def begin(self):
+                return AsyncContext()
+
+        class FakeDatabase:
+            def session_factory(self):
+                return FakeSession()
+
+        class FakeThrottle:
+            def __init__(self, _session, _secret):
+                pass
+
+            async def lock_buckets(self, _username, _client_ip):
+                return None
+
+            async def retry_after(self, _username, _client_ip):
+                return 60
+
+        class FakeTemplates:
+            def TemplateResponse(self, _request, _name, _context, status_code=200, headers=None):
+                return SimpleNamespace(status_code=status_code, headers=headers or {})
+
+        async def fake_get_pg_database():
+            return FakeDatabase()
+
+        monkeypatch.setattr(auth_router, "get_pg_database", fake_get_pg_database)
+        monkeypatch.setattr(
+            "medarchive.services.postgresql_login_throttle.PostgreSQLLoginThrottle",
+            FakeThrottle,
+        )
+
+        config = Config(
+            auth_backend="postgresql",
+            postgres_enabled=True,
+            secret_key="test-secret",
+            environment="test",
+        )
+        app = SimpleNamespace(
+            state=SimpleNamespace(config=config, templates=FakeTemplates())
+        )
+        request = Request({
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/login",
+            "raw_path": b"/login",
+            "query_string": b"",
+            "headers": [],
+            "client": ("192.0.2.44", 12345),
+            "server": ("test", 80),
+            "app": app,
+        })
+
+        response = await auth_router.login(
+            request, "staff", "incorrect", AuthService("test-secret")
+        )
+
+        assert response.status_code == 429
+        assert response.headers["Retry-After"] == "60"
