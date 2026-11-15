@@ -31,7 +31,7 @@ shopt -s nullglob
 LEGACY_PLAINTEXT_BACKUPS=("$BACKUP_DIR"/medarchive-*.dump)
 if (( ${#LEGACY_PLAINTEXT_BACKUPS[@]} > 0 )); then
     echo "ОШИБКА: найдены незашифрованные старые резервные копии:" >&2
-    printf '  %s\\n' "${LEGACY_PLAINTEXT_BACKUPS[@]}" >&2
+    printf '  %s\n' "${LEGACY_PLAINTEXT_BACKUPS[@]}" >&2
     echo "Сначала зашифруйте, проверьте и безопасно удалите исходные .dump-файлы." >&2
     exit 2
 fi
