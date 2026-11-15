@@ -103,7 +103,8 @@ TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_FILE="$BACKUP_DIR/medarchive-$TIMESTAMP.dump.age"
 TEMP_FILE="$(mktemp "$BACKUP_DIR/.medarchive-plain.XXXXXX")"
 ENCRYPTED_TEMP_FILE="$(mktemp "$BACKUP_DIR/.medarchive-encrypted.XXXXXX")"
-chmod 0600 "$TEMP_FILE" "$ENCRYPTED_TEMP_FILE"
+chmod 0600 "$TEMP_FILE"
+rm -f -- "$ENCRYPTED_TEMP_FILE"
 
 pg_dump --format=custom --no-owner --no-acl --file="$TEMP_FILE"
 # Validate the PostgreSQL archive before encryption.
