@@ -34,6 +34,21 @@ class PostgreSQLLoginThrottle:
             self._digest("identity-ip", f"{normalized_username}\0{normalized_ip}"),
         )
 
+    async def lock_buckets(self, username: str, client_ip: str) -> None:
+        """Serialize checks and counter updates for the same IP/identity pair."""
+        keys = self._keys(username, client_ip)
+        lock_ids = []
+        for key in keys:
+            value = int(key[:16], 16)
+            if value >= 2**63:
+                value -= 2**64
+            lock_ids.append(value)
+        for lock_id in sorted(set(lock_ids)):
+            await self.session.execute(
+                text("SELECT pg_advisory_xact_lock(:lock_id)"),
+                {"lock_id": lock_id},
+            )
+
     async def retry_after(self, username: str, client_ip: str) -> int | None:
         ip_key, identity_key = self._keys(username, client_ip)
         result = await self.session.execute(
