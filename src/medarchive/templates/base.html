@@ -91,7 +91,7 @@
             </div>
             <div class="role-pill{% if role_label == 'Архив' %} alt{% endif %}">{{ user_role_pill }}</div>
         </div>
-        <div class="logout"><a href="/logout">Выход</a></div>
+        <div class="logout"><form method="post" action="/logout"><button type="submit" style="background:none;border:0;padding:0;color:#8899aa;cursor:pointer;font:inherit;font-size:12px;">Выход</button></form></div>
     </aside>
     <div class="main" id="main-content">
         {% if error %}<div class="flash">{{ error }}</div>{% endif %}
