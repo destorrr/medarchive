@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from medarchive.config import Config
 from medarchive.dependencies import init_dependencies, get_current_user
 
@@ -67,6 +68,9 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     app = FastAPI(title="МедАрхив", version="0.1.0", lifespan=lifespan)
     app.state.config = config
+
+    # Serve versioned frontend assets locally; the application must work without CDN access.
+    app.mount("/static", StaticFiles(directory="src/medarchive/static"), name="static")
 
     @app.middleware("http")
     async def protect_state_changing_requests(request: Request, call_next):
