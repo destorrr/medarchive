@@ -46,7 +46,7 @@ class TestSmoke:
         assert "администратор" in r.text.lower()
 
         # 4. Logout
-        r = await app_client.get("/logout", follow_redirects=False)
+        r = await app_client.post("/logout", follow_redirects=False)
         assert r.status_code == 303
         assert r.headers["location"] == "/login"
 
