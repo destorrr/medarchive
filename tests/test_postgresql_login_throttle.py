@@ -30,7 +30,7 @@ async def test_login_throttle_uses_hmac_keys_and_returns_retry_after():
         b"a-test-secret", b"ip:192.0.2.10", hashlib.sha256
     ).hexdigest()
     assert params["identity_key"] == hmac.new(
-        b"a-test-secret", b"identity-ip:archive.user\\x00192.0.2.10", hashlib.sha256
+        b"a-test-secret", b"identity-ip:archive.user\x00192.0.2.10", hashlib.sha256
     ).hexdigest()
     assert "Archive.User" not in repr(params)
     assert "192.0.2.10" not in repr(params)
