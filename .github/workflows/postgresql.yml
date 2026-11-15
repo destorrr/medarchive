@@ -48,10 +48,15 @@ jobs:
           done
       - name: Run application tests
         run: pytest -q -rs
-      - name: Verify PostgreSQL backup and restore
+      - name: Verify encrypted PostgreSQL backup and restore
         env:
           MEDARCHIVE_BACKUP_DIR: ${{ runner.temp }}/medarchive-backups
         run: |
+          sudo apt-get update
+          sudo apt-get install -y age
+          age-keygen -o "$RUNNER_TEMP/medarchive-test.agekey"
+          export MEDARCHIVE_BACKUP_AGE_RECIPIENT="$(age-keygen -y "$RUNNER_TEMP/medarchive-test.agekey")"
+
           # Use PostgreSQL 16 client tools to match the PostgreSQL 16 service.
           client_bin="$RUNNER_TEMP/postgresql16-client"
           mkdir -p "$client_bin"
@@ -64,18 +69,22 @@ jobs:
           mkdir -p "$MEDARCHIVE_BACKUP_DIR"
           umask 077
           for i in $(seq 1 26); do
-            touch "$MEDARCHIVE_BACKUP_DIR/medarchive-old-$i.dump"
-            touch -d "2000-01-01 00:00:$i UTC" "$MEDARCHIVE_BACKUP_DIR/medarchive-old-$i.dump"
+            touch "$MEDARCHIVE_BACKUP_DIR/medarchive-old-$i.dump.age"
+            touch -d "2000-01-01 00:00:$i UTC" "$MEDARCHIVE_BACKUP_DIR/medarchive-old-$i.dump.age"
           done
 
           scripts/backup.sh
-          backup_count="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-*.dump' | wc -l)"
+          backup_count="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-*.dump.age' | wc -l)"
           test "$backup_count" -eq 24
-          backup_file="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-????????T??????Z.dump' -print -quit)"
+          backup_file="$(find "$MEDARCHIVE_BACKUP_DIR" -maxdepth 1 -type f -name 'medarchive-????????T??????Z.dump.age' -print -quit)"
           test -n "$backup_file"
           test "$(stat -c '%a' "$backup_file")" = "600"
+          decrypted_file="$RUNNER_TEMP/medarchive-restored.dump"
+          age --decrypt --identity "$RUNNER_TEMP/medarchive-test.agekey" --output "$decrypted_file" "$backup_file"
+          test "$(stat -c '%a' "$decrypted_file")" = "600"
+          pg_restore --list "$decrypted_file" >/dev/null
           export PGPASSWORD=medarchive
           createdb --host=localhost --username=medarchive medarchive_restore_check
-          pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=medarchive --dbname=medarchive_restore_check "$backup_file"
+          pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=medarchive --dbname=medarchive_restore_check "$decrypted_file"
           psql "postgresql://medarchive:medarchive@localhost:5432/medarchive_restore_check" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.domain_events') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL" | grep -qx t
           dropdb --host=localhost --username=medarchive medarchive_restore_check
