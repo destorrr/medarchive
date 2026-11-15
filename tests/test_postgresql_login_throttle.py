@@ -86,6 +86,7 @@ async def test_login_throttle_locks_buckets_in_deterministic_order():
 
 @pytest.mark.asyncio
 async def test_postgresql_login_throttle_persists_and_blocks_when_database_is_available():
+    import asyncio
     import os
     import uuid
 
@@ -106,17 +107,29 @@ async def test_postgresql_login_throttle_persists_and_blocks_when_database_is_av
         async with session_factory() as session:
             async with session.begin():
                 throttle = PostgreSQLLoginThrottle(session, "integration-test-secret")
-                await throttle.lock_buckets(username, client_ip)
-                assert await throttle.retry_after(username, client_ip) is None
+                await asyncio.wait_for(
+                    throttle.lock_buckets(username, client_ip), timeout=10
+                )
+                assert await asyncio.wait_for(
+                    throttle.retry_after(username, client_ip), timeout=10
+                ) is None
                 for _ in range(throttle.IDENTITY_FAILURE_LIMIT):
-                    await throttle.record_failure(username, client_ip)
+                    await asyncio.wait_for(
+                        throttle.record_failure(username, client_ip), timeout=10
+                    )
 
-                retry_after = await throttle.retry_after(username, client_ip)
+                retry_after = await asyncio.wait_for(
+                    throttle.retry_after(username, client_ip), timeout=10
+                )
                 assert retry_after is not None
                 assert 1 <= retry_after <= throttle.BLOCK_MINUTES * 60
 
-                await throttle.clear_identity_failures(username, client_ip)
-                assert await throttle.retry_after(username, client_ip) is None
+                await asyncio.wait_for(
+                    throttle.clear_identity_failures(username, client_ip), timeout=10
+                )
+                assert await asyncio.wait_for(
+                    throttle.retry_after(username, client_ip), timeout=10
+                ) is None
                 ip_key, identity_key = throttle._keys(username, client_ip)
                 from sqlalchemy import text
                 await session.execute(
