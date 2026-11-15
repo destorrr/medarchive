@@ -103,3 +103,35 @@ async def test_postgresql_current_user_rejects_legacy_integer_session_id():
     assert error.value.status_code == 401
     from medarchive.dependencies import get_pg_database
     await (await get_pg_database()).close()
+
+
+@pytest.mark.asyncio
+async def test_password_change_revokes_existing_postgresql_session():
+    config = Config(
+        database_url="postgresql+asyncpg://user:pass@localhost:5432/medarchive",
+        postgres_enabled=True,
+        secret_key="test-secret",
+    )
+    init_dependencies(config)
+    credentials = AuthService("test-secret")
+    user_id = uuid.uuid4()
+    original_hash = credentials.hash_password("original-password")
+    token_user = SimpleNamespace(
+        id=user_id, username="archive", role="archive",
+        is_active=True, password_hash=original_hash,
+    )
+    token = credentials.create_session_token(token_user)
+
+    changed_user = SimpleNamespace(
+        id=user_id, username="archive", role="archive",
+        is_active=True, password_hash=credentials.hash_password("new-password"),
+    )
+    session = AsyncMock()
+    session.get.return_value = changed_user
+
+    with pytest.raises(HTTPException) as error:
+        await get_pg_current_user(make_request(token), session)
+    assert error.value.status_code == 401
+    assert error.value.detail == "Session revoked"
+    from medarchive.dependencies import get_pg_database
+    await (await get_pg_database()).close()
