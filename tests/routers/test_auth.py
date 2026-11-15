@@ -48,6 +48,7 @@ class TestAuthRouter:
         assert "httponly" in cookie
         assert "samesite=lax" in cookie
         assert "path=/" in cookie
+        assert "max-age=43200" in cookie
 
     async def test_login_wrong_password(self, client):
         r = await client.post("/login", data={"username": "test_branch", "password": "wrong"})
@@ -57,11 +58,15 @@ class TestAuthRouter:
     async def test_logout_clears_session(self, client):
         # Login first
         await client.post("/login", data={"username": "test_branch", "password": "test123"})
-        r = await client.get("/logout", follow_redirects=False)
+        r = await client.post("/logout", follow_redirects=False)
         assert r.status_code == 303
         assert r.headers["location"] == "/login"
         assert "session" in r.headers.get("set-cookie", "").lower()
         assert "max-age=0" in r.headers.get("set-cookie", "").lower()
+
+    async def test_logout_get_is_not_supported(self, client):
+        r = await client.get("/logout", follow_redirects=False)
+        assert r.status_code == 405
 
     async def test_protected_page_redirects_to_login(self, client):
         r = await client.get("/dashboard", follow_redirects=False)
