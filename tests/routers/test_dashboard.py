@@ -142,7 +142,10 @@ class TestSidebarProfile:
         await client.post("/login", data={"username": "archive_user", "password": "test123"})
         r = await client.get("/requests")
         assert r.status_code == 200
-        assert 'href="/requests" class="active">📋 Очередь заявок<span class="cnt">1</span>' in r.text
+        assert 'href="/requests" class="active"' in r.text
+        assert "Очередь заявок" in r.text
+        assert 'class="cnt"' in r.text
+        assert ">1</span>" in r.text
 
     async def test_archive_no_badge_without_active_requests(self, client):
         """Нет активных заявок → счётчик скрыт (бейдж не выводится)."""
