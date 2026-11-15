@@ -22,6 +22,11 @@ async def app_client(test_config, db):
 
 
 class TestSmoke:
+    async def test_root_redirects_to_login(self, app_client):
+        r = await app_client.get("/", follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers["location"] == "/login"
+
     async def test_login_to_dashboard_flow(self, app_client):
         """Полный цикл: GET /login → POST login → GET /dashboard → logout."""
         # 1. Login page renders
