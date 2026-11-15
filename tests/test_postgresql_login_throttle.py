@@ -83,3 +83,37 @@ async def test_login_throttle_locks_buckets_in_deterministic_order():
     ]
     assert lock_ids == sorted(lock_ids)
     assert all(-(2**63) <= value < 2**63 for value in lock_ids)
+
+@pytest.mark.asyncio
+async def test_postgresql_login_throttle_persists_and_blocks_when_database_is_available():
+    import os
+    import uuid
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    database_url = os.environ.get("MEDARCHIVE_DATABASE_URL")
+    if not database_url:
+        pytest.skip("PostgreSQL integration URL is not configured")
+
+    engine = create_async_engine(database_url)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    username = f"throttle-test-{uuid.uuid4()}"
+    client_ip = "203.0.113.10"
+
+    try:
+        async with session_factory() as session:
+            async with session.begin():
+                throttle = PostgreSQLLoginThrottle(session, "integration-test-secret")
+                await throttle.lock_buckets(username, client_ip)
+                assert await throttle.retry_after(username, client_ip) is None
+                for _ in range(throttle.IDENTITY_FAILURE_LIMIT):
+                    await throttle.record_failure(username, client_ip)
+
+                retry_after = await throttle.retry_after(username, client_ip)
+                assert retry_after is not None
+                assert 1 <= retry_after <= throttle.BLOCK_MINUTES * 60
+
+                await throttle.clear_identity_failures(username, client_ip)
+                assert await throttle.retry_after(username, client_ip) is None
+    finally:
+        await engine.dispose()
