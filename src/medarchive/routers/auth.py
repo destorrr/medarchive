@@ -25,9 +25,31 @@ async def login(
     config = request.app.state.config
     if config.auth_backend == "postgresql":
         pg_db = await get_pg_database()
+        client_ip = request.client.host if request.client is not None else "unknown"
+        from medarchive.services.postgresql_login_throttle import PostgreSQLLoginThrottle
+
+        retry_after = None
         async with pg_db.session_factory() as pg_session:
-            pg_auth = PostgreSQLAuthService(UserRepository(pg_session), auth)
-            user = await pg_auth.authenticate(username, password)
+            async with pg_session.begin():
+                throttle = PostgreSQLLoginThrottle(
+                    pg_session, config.effective_secret_key
+                )
+                retry_after = await throttle.retry_after(username, client_ip)
+                if retry_after is None:
+                    pg_auth = PostgreSQLAuthService(UserRepository(pg_session), auth)
+                    user = await pg_auth.authenticate(username, password)
+                    if user is None:
+                        await throttle.record_failure(username, client_ip)
+                    else:
+                        await throttle.clear_identity_failures(username, client_ip)
+        if retry_after is not None:
+            return request.app.state.templates.TemplateResponse(
+                request,
+                "login.html",
+                {"error": "Слишком много попыток входа. Повторите позже."},
+                status_code=429,
+                headers={"Retry-After": str(retry_after)},
+            )
         if user is None:
             return request.app.state.templates.TemplateResponse(
                 request,
