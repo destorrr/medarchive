@@ -119,7 +119,7 @@ age-keygen -y medarchive-backup.agekey
 
 Copy only the public `age1...` recipient printed by the second command into `MEDARCHIVE_BACKUP_AGE_RECIPIENT` in `/etc/medarchive/medarchive.env`. Keep the private identity file outside the server, separate from the backups, and maintain a tested recovery copy of it. The application server needs only the public recipient to encrypt backups.
 
-The installer creates `/etc/medarchive/medarchive.env` with mode 0640 (root:medarchive). Configure `MEDARCHIVE_DATABASE_URL`, a unique `MEDARCHIVE_SECRET_KEY`, and `MEDARCHIVE_BACKUP_AGE_RECIPIENT` there; URL-encode reserved characters in database credentials. Install the PostgreSQL client tools matching the server's major version and the `age` package. The timer is enabled only when the database URL, secret, age recipient, and age executable are available. Then run:
+The installer creates `/etc/medarchive/medarchive.env` with mode 0640 (root:medarchive). Configure `MEDARCHIVE_DATABASE_URL`, a unique `MEDARCHIVE_SECRET_KEY`, and `MEDARCHIVE_BACKUP_AGE_RECIPIENT` there; URL-encode reserved characters in database credentials. Install the PostgreSQL client tools matching the server's major version and the `age` package. Then rerun `sudo bash scripts/install.sh`: the timer is enabled only when the database URL, secret, age recipient, and age executable are available. If any prerequisite is missing, the installer disables the backup timer.
 
 ```bash
 sudo systemctl start medarchive-backup.service
@@ -141,7 +141,7 @@ pg_restore --no-owner --no-acl --exit-on-error --dbname=medarchive_restore /secu
 
 Validate the restored schema and application data before directing the application to it. Do not restore over a live production database without a separately reviewed maintenance and rollback plan. CI generates a temporary age identity, creates an encrypted PostgreSQL dump, decrypts it with the private identity, and restores it into a second database on every workflow run.
 
-New backups are encrypted before they are published. Existing `.dump` files created by older versions remain plaintext and must be migrated to encrypted storage or securely retired before treating the backup directory as protected. Maintain an additional encrypted off-host copy; a local hourly backup alone is not a disaster-recovery strategy.
+New backups are encrypted before they are published. The backup script refuses to run while any legacy `medarchive-*.dump` plaintext archive remains in the backup directory. Encrypt and verify those old files, then securely retire the plaintext originals before restarting the timer. Maintain an additional encrypted off-host copy; a local hourly backup alone is not a disaster-recovery strategy.
 
 The session cookie is HTTP-only and SameSite=Lax. Set `MEDARCHIVE_COOKIE_SECURE=true` whenever the application is served over HTTPS. The same signing secret must be used by all application instances.
 
