@@ -1,6 +1,7 @@
 """PostgreSQL-backed login throttling shared by all application workers."""
 import hashlib
 import hmac
+import ipaddress
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,10 @@ class PostgreSQLLoginThrottle:
     def _keys(self, username: str, client_ip: str) -> tuple[str, str]:
         normalized_username = username.strip().casefold()
         normalized_ip = client_ip.strip() or "unknown"
+        try:
+            normalized_ip = ipaddress.ip_address(normalized_ip).compressed
+        except ValueError:
+            pass
         return (
             self._digest("ip", normalized_ip),
             self._digest("identity-ip", f"{normalized_username}\0{normalized_ip}"),
