@@ -144,3 +144,9 @@ PostgreSQL authentication uses the `auth_login_throttles` table. Failed attempts
 The counters use atomic PostgreSQL upserts and transaction-scoped advisory locks so concurrent requests from the same IP cannot all pass the check before the failure counter is updated. The throttle table is created by Alembic revision `0011_login_throttles`.
 
 The IP used by the limiter is the client address exposed by the ASGI server. When deploying behind a reverse proxy, configure Uvicorn to trust forwarded headers only from the exact proxy addresses; never trust arbitrary client-supplied `X-Forwarded-For` values. The legacy SQLite compatibility login does not use this PostgreSQL throttle; production must use `MEDARCHIVE_AUTH_BACKEND=postgresql`.
+
+### Cross-origin request protection
+
+All state-changing HTTP methods (`POST`, `PUT`, `PATCH`, and `DELETE`) are checked by application middleware. Requests marked `Sec-Fetch-Site: cross-site` are rejected, and supplied `Origin` or `Referer` origins must match the application's origin. The check applies to both PostgreSQL and legacy routes, including login and logout. Browser requests without cross-origin metadata remain compatible; non-browser API clients that omit these headers are not blocked by the origin check.
+
+The session cookie also remains `SameSite=Lax`, and logout is POST-only. Keep the reverse proxy's host and forwarded-scheme configuration correct so the application compares the browser origin against the externally served HTTPS origin.
