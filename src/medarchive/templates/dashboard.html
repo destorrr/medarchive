@@ -1,20 +1,85 @@
 {% extends "base.html" %}
+{% block title %}Панель управления — МедАрхив{% endblock %}
 {% block content %}
-<h1>📊 Панель управления</h1>
+<header class="page-header dashboard-header">
+    <div>
+        <p class="eyebrow">{{ role_label }}</p>
+        <h1>Панель управления</h1>
+        <p class="page-description">Текущее состояние медицинских карт и операций в системе.</p>
+    </div>
+    <a class="btn btn-primary dashboard-search-link" href="/search">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg>
+        Найти карту или коробку
+    </a>
+</header>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;">
-    <div class="card" style="text-align:center;"><h2>{{ total_cards }}</h2><p>Карт всего</p></div>
-    <div class="card" style="text-align:center;"><h2>{{ cards_placed }}</h2><p>В архиве</p></div>
-    <div class="card" style="text-align:center;"><h2>{{ cards_in_branch }}</h2><p>В филиалах</p></div>
-    <div class="card" style="text-align:center;"><h2>{{ cards_in_transit }}</h2><p>В пути</p></div>
-    <div class="card" style="text-align:center;"><h2>{{ total_boxes }}</h2><p>Коробок всего</p></div>
-    <div class="card" style="text-align:center;"><h2>{{ open_requests }}</h2><p>Открытых заявок</p></div>
-</div>
+<section class="dashboard-stats" aria-label="Сводные показатели">
+    <article class="stat-card">
+        <div class="stat-label">Карт всего</div>
+        <div class="stat-value">{{ total_cards }}</div>
+        <div class="stat-note">В доступном контуре</div>
+    </article>
+    <article class="stat-card stat-card-success">
+        <div class="stat-label">В архиве</div>
+        <div class="stat-value">{{ cards_placed }}</div>
+        <div class="stat-note">На архивном хранении</div>
+    </article>
+    <article class="stat-card">
+        <div class="stat-label">В филиалах</div>
+        <div class="stat-value">{{ cards_in_branch }}</div>
+        <div class="stat-note">На стороне филиалов</div>
+    </article>
+    <article class="stat-card stat-card-warning">
+        <div class="stat-label">В пути</div>
+        <div class="stat-value">{{ cards_in_transit }}</div>
+        <div class="stat-note">В активных отправлениях</div>
+    </article>
+    <article class="stat-card">
+        <div class="stat-label">Коробок всего</div>
+        <div class="stat-value">{{ total_boxes }}</div>
+        <div class="stat-note">В доступном контуре</div>
+    </article>
+    <article class="stat-card{% if open_requests %} stat-card-attention{% endif %}">
+        <div class="stat-label">Открытых заявок</div>
+        <div class="stat-value">{{ open_requests }}</div>
+        <div class="stat-note">Ожидают обработки</div>
+    </article>
+</section>
 
-<h2>Последние движения</h2>
-{% if recent_movements %}
-<table><thead><tr><th>Время</th><th>Карта</th><th>Действие</th><th>Куда</th></tr></thead><tbody>
-{% for m in recent_movements %}<tr><td>{{ m.timestamp or m.created_at or '—' }}</td><td>{{ m.card_name }}</td><td>{{ m.action }}</td><td>{{ m.to_location or '—' }}</td></tr>{% endfor %}
-</tbody></table>
-{% else %}<p>Нет записей о движениях</p>{% endif %}
+<section class="dashboard-section" aria-labelledby="recent-movements-title">
+    <div class="section-heading">
+        <div>
+            <h2 id="recent-movements-title">Последние движения</h2>
+            <p>Недавние события, доступные в рамках вашей роли.</p>
+        </div>
+        <a class="text-link" href="/history">Открыть журнал</a>
+    </div>
+    <div class="dashboard-table-wrap">
+        {% if recent_movements %}
+        <table class="dashboard-table">
+            <thead>
+                <tr><th scope="col">Время</th><th scope="col">Карта / объект</th><th scope="col">Событие</th><th scope="col">Назначение</th></tr>
+            </thead>
+            <tbody>
+                {% for m in recent_movements %}
+                <tr>
+                    <td class="dashboard-time">{{ m.timestamp or m.created_at or '—' }}</td>
+                    <td class="dashboard-subject">{{ m.card_name }}</td>
+                    <td>{{ m.action }}</td>
+                    <td>{{ m.to_location or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="dashboard-empty">
+            <span class="empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v13H4z"></path><path d="M8 9h8M8 12.5h5"></path></svg>
+            </span>
+            <strong>Пока нет движений</strong>
+            <span>Когда в системе появятся операции, последние события отобразятся здесь.</span>
+        </div>
+        {% endif %}
+    </div>
+</section>
 {% endblock %}
