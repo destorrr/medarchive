@@ -61,12 +61,12 @@
 <section class="card operation-panel placement-panel">
     <div class="panel-heading"><div><p class="eyebrow">Поштучное хранение</p><h2>Отдельные карты без размещения</h2><p class="page-description">Выберите полку для каждой карты или объедините несколько карт во внутреннюю коробку.</p></div><span class="badge badge-neutral">{{ cards|length }} карт</span></div>
     {% if cards %}
-    <form id="internal-box-form" method="post" action="/placement/new-internal-box" class="placement-selection-form">
+    <div class="placement-selection-form">
         <div class="table-wrap"><table class="data operation-data-table placement-table"><thead><tr><th>В коробку</th><th>Номер карты</th><th>Пациент</th><th>Размещение</th></tr></thead><tbody>
         {% for card in cards %}<tr><td><input type="checkbox" name="card_ids" value="{{ card.id }}" aria-label="Выбрать карту {{ card.card_number }} для внутренней коробки"></td><td class="operation-card-number">{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>{% if shelves %}<form method="post" action="/placement/card" class="placement-inline-form"><input type="hidden" name="card_id" value="{{ card.id }}"><label class="sr-only" for="card-shelf-{{ card.id }}">Полка для карты {{ card.card_number }}</label><select id="card-shelf-{{ card.id }}" name="shelf_id" required><option value="">— Полка —</option>{% for shelf in shelves %}<option value="{{ shelf.id }}">{{ shelf.section_name }} / {{ shelf.shelf_name }}</option>{% endfor %}</select><button class="btn btn-primary" type="submit">На полку</button></form>{% else %}<span class="text-muted">Полки не настроены</span>{% endif %}</td></tr>{% endfor %}
         </tbody></table></div>
-        <div class="operation-form-footer"><p class="form-help">Отмеченные карты будут объединены в одну внутреннюю коробку хранения. Пустой выбор создаёт пустую коробку.</p><button class="btn btn-primary" type="submit">Создать коробку из выбранных карт</button></div>
-    </form>
+        <div class="operation-form-footer"><p class="form-help">Отмеченные карты будут объединены в одну внутреннюю коробку хранения. Пустой выбор создаёт пустую коробку.</p><form id="internal-box-form" method="post" action="/placement/new-internal-box"><button class="btn btn-primary" type="submit">Создать коробку из выбранных карт</button></form></div>
+    </div>
     {% else %}<div class="empty-state compact-empty"><strong>Нет отдельных карт без размещения</strong><span>Поступившие и извлечённые карты будут доступны здесь.</span></div>{% endif %}
 </section>
 
