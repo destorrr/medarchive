@@ -267,3 +267,55 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
 
 
 .badge-neutral { color: #475467; background: #f0f2f5; }
+
+
+/* Shipment receipt: branch, archive and central office */
+.receipt-page-header { margin-bottom:20px; }
+.receipt-panel { margin-bottom:16px; }
+.receipt-panel .panel-heading { margin-bottom:15px; }
+.receipt-panel .panel-heading .badge { flex-shrink:0; }
+.receipt-table-wrap { border:1px solid var(--color-border); border-radius:var(--radius-sm); }
+.receipt-table { min-width:850px; }
+.receipt-table th { padding:11px 13px; }
+.receipt-table td { padding:13px; }
+.receipt-shipment-number { display:block; color:#26364d; font-size:13px; font-variant-numeric:tabular-nums; }
+.receipt-source { display:block; color:#344054; font-weight:650; }
+.receipt-secondary { display:block; margin-top:4px; color:var(--color-muted); font-size:11px; }
+.receipt-count { display:block; color:#344054; font-size:12px; font-weight:650; white-space:nowrap; }
+.receipt-date { color:var(--color-muted); font-size:11px; white-space:nowrap; }
+.manifest-details { margin-top:7px; color:var(--color-primary); font-size:11px; }
+.manifest-details summary { width:max-content; max-width:100%; cursor:pointer; font-weight:650; }
+.manifest-content { max-width:420px; max-height:250px; overflow:auto; margin-top:9px; padding:10px 12px; color:var(--color-text); background:var(--color-surface-muted); border:1px solid var(--color-border); border-radius:var(--radius-sm); }
+.manifest-group + .manifest-group { margin-top:10px; padding-top:9px; border-top:1px solid var(--color-border); }
+.manifest-group strong { color:#344054; font-size:11px; }
+.manifest-group ul { margin:5px 0 0; padding-left:17px; }
+.manifest-group li { margin:3px 0; color:var(--color-muted); font-size:11px; }
+.manifest-group li span { color:#344054; font-weight:650; font-variant-numeric:tabular-nums; }
+.receipt-confirm-form { display:grid; min-width:185px; gap:9px; }
+.receipt-check { display:flex; align-items:flex-start; gap:7px; color:#475467; font-size:11px; font-weight:500; line-height:1.4; }
+.receipt-check input { flex:0 0 auto; margin:2px 0 0; }
+.receipt-confirm-form .btn, .receipt-resolve-footer .btn { width:max-content; max-width:100%; }
+.receipt-empty { min-height:180px; gap:8px; }
+.receipt-empty strong { color:#344054; font-size:13px; }
+.receipt-empty > span:last-child { max-width:470px; font-size:12px; }
+.receipt-incident-list { display:grid; gap:12px; }
+.receipt-incident { padding:16px; background:#fffdf7; border:1px solid #f0dfb5; border-radius:var(--radius-sm); }
+.receipt-incident-header { display:flex; align-items:flex-start; justify-content:space-between; gap:15px; }
+.receipt-incident-header .badge { flex-shrink:0; }
+.receipt-incident-meta { display:grid; grid-template-columns:1.2fr 1fr .8fr; gap:12px; margin-top:14px; }
+.receipt-incident-meta > div { min-width:0; }
+.receipt-incident-meta span { display:block; margin-bottom:3px; color:var(--color-muted); font-size:10px; font-weight:650; text-transform:uppercase; letter-spacing:.04em; }
+.receipt-incident-meta strong { display:block; color:#344054; font-size:12px; font-weight:600; overflow-wrap:anywhere; }
+.incident-manifest { margin-top:13px; }
+.receipt-resolve-form { margin-top:14px; padding-top:13px; border-top:1px solid #eee2c7; }
+.receipt-resolve-form .form-group { margin-bottom:10px; }
+.receipt-resolve-form textarea { display:block; width:100%; min-height:76px; }
+.receipt-resolve-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+@media (max-width:700px) {
+  .receipt-incident { padding:13px; }
+  .receipt-incident-header { flex-direction:column; gap:8px; }
+  .receipt-incident-meta { grid-template-columns:1fr 1fr; }
+  .receipt-resolve-footer { align-items:flex-start; flex-direction:column; }
+  .receipt-resolve-footer .btn { width:100%; }
+  .receipt-confirm-form .btn { width:100%; }
+}
