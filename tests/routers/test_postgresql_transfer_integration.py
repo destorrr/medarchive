@@ -50,7 +50,7 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
             receive = await client.get("/branch/receive", cookies={"session": token})
             assert response.status_code == 200
             assert "Передача курьеру" in response.text
-            assert 'class="operation-panel transfer-panel"' in response.text
+            assert 'class="card operation-panel transfer-panel"' in response.text
             assert 'action="/transfer/confirm"' in response.text
             assert 'name="box_id"' in response.text
             assert 'name="to_location_id"' in response.text
