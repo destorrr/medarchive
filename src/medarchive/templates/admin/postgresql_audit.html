@@ -1,9 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>📋 Журнал административных действий</h1>
-<div class="card">
-    <p class="muted">Неизменяемая история событий системы. Записи доступны только для просмотра.</p>
-    <form method="get" action="/admin/audit" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:16px;align-items:end">
+<section class="page-header admin-page-header">
+    <div>
+        <div class="eyebrow">Администрирование · Контроль</div>
+        <h1>Журнал административных действий</h1>
+        <p class="page-description">Неизменяемая история операций с учётными записями и справочниками системы</p>
+    </div>
+    <a class="btn btn-secondary" href="/admin">К настройкам</a>
+</section>
+
+<section class="panel audit-filter-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Фильтры журнала</h2>
+            <p class="page-description">Отбор событий по типу операции, объекту, сотруднику и дате</p>
+        </div>
+        <span class="status-pill status-pill-muted">Только просмотр</span>
+    </div>
+    <form method="get" action="/admin/audit" class="audit-filter-form">
         <div class="form-group">
             <label for="event_type">Тип события</label>
             <select id="event_type" name="event_type">
@@ -27,47 +41,62 @@
         </div>
         <div class="form-group">
             <label for="date_from">С даты</label>
-            <input id="date_from" name="date_from" type="date" value="{{ date_from }}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px">
+            <input id="date_from" name="date_from" type="date" value="{{ date_from }}">
         </div>
         <div class="form-group">
             <label for="date_to">По дату</label>
-            <input id="date_to" name="date_to" type="date" value="{{ date_to }}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px">
+            <input id="date_to" name="date_to" type="date" value="{{ date_to }}">
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:16px">
+        <div class="audit-filter-actions">
             <button class="btn btn-primary" type="submit">Применить</button>
-            <a class="btn" href="/admin/audit" style="background:#eee;color:#333">Сбросить</a>
+            <a class="btn btn-quiet" href="/admin/audit">Сбросить</a>
         </div>
     </form>
-    <p class="muted">Найдено событий: {{ total }}. На странице отображается до {{ page_size }} записей.</p>
-</div>
-<div class="card">
-    {% if events %}
-    <div style="overflow-x:auto">
-    <table class="data" style="min-width:900px">
-        <thead><tr><th>Дата и время</th><th>Событие</th><th>Объект</th><th>Идентификатор</th><th>Сотрудник</th><th>Данные события</th></tr></thead>
-        <tbody>
-        {% for item in events %}
-            <tr>
-                <td class="date">{{ item.event.occurred_at }}</td>
-                <td><strong>{{ item.event.event_type }}</strong></td>
-                <td>{{ item.event.aggregate_type }}</td>
-                <td style="font-size:11px;overflow-wrap:anywhere">{{ item.event.aggregate_id }}</td>
-                <td>{{ item.actor_name }}{% if item.actor_username %}<div class="muted">{{ item.actor_username }}</div>{% endif %}</td>
-                <td><details><summary>Показать</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-width:420px;margin-top:8px;font-size:12px">{{ item.event.payload | tojson(indent=2) }}</pre></details></td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+</section>
+
+<section class="panel admin-table-panel audit-results-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Записи журнала</h2>
+            <p class="page-description">События отсортированы от новых к старым</p>
+        </div>
+        <span class="admin-record-count">Найдено: {{ total }}</span>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px">
-        <span class="muted">Страница {{ page }}</span>
-        <div style="display:flex;gap:8px">
-            {% if has_previous %}<a class="btn" href="{{ previous_url }}" style="background:#eee;color:#333">← Назад</a>{% endif %}
-            {% if has_next %}<a class="btn btn-primary" href="{{ next_url }}">Далее →</a>{% endif %}
+    {% if events %}
+    <div class="table-wrap">
+        <table class="admin-audit-table">
+            <thead><tr><th>Дата и время</th><th>Событие</th><th>Объект</th><th>Идентификатор</th><th>Сотрудник</th><th>Данные</th></tr></thead>
+            <tbody>
+            {% for item in events %}
+                <tr>
+                    <td class="audit-date">{{ item.event.occurred_at }}</td>
+                    <td><span class="audit-event-type">{{ item.event.event_type }}</span></td>
+                    <td>{{ item.event.aggregate_type }}</td>
+                    <td class="audit-aggregate-id">{{ item.event.aggregate_id }}</td>
+                    <td><div class="audit-actor"><strong>{{ item.actor_name }}</strong>{% if item.actor_username %}<span>{{ item.actor_username }}</span>{% endif %}</div></td>
+                    <td>
+                        <details class="audit-payload-details">
+                            <summary>Показать данные</summary>
+                            <pre>{{ item.event.payload | tojson(indent=2) }}</pre>
+                        </details>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="audit-pagination">
+        <span>Страница {{ page }} · до {{ page_size }} записей на странице</span>
+        <div>
+            {% if has_previous %}<a class="btn btn-quiet btn-sm" href="{{ previous_url }}">Назад</a>{% endif %}
+            {% if has_next %}<a class="btn btn-secondary btn-sm" href="{{ next_url }}">Далее</a>{% endif %}
         </div>
     </div>
     {% else %}
-    <p style="color:#888">Событий по заданным условиям не найдено.</p>
+    <div class="empty-state audit-empty-state">
+        <strong>События не найдены</strong>
+        <span>Попробуйте изменить параметры фильтра или сбросить их, чтобы увидеть другие административные записи.</span>
+    </div>
     {% endif %}
-</div>
+</section>
 {% endblock %}
