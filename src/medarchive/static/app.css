@@ -616,3 +616,26 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
 .courier-empty-state span { max-width:520px; color:var(--color-muted); font-size:12px; line-height:1.55; }
 @media(max-width:850px) { .courier-create-form { grid-template-columns:1fr 1fr; } .courier-create-submit { grid-column:1/-1; } }
 @media(max-width:600px) { .courier-create-form { grid-template-columns:1fr; } .courier-create-submit { grid-column:auto; } .courier-create-submit .btn { width:100%; } .courier-list-panel>.panel-heading { align-items:flex-start; flex-direction:column; } }
+
+
+/* Archive shelf administration */
+.shelf-create-panel,.shelf-list-panel { margin-bottom:18px; }
+.shelf-create-form { display:grid; grid-template-columns:minmax(200px,.9fr) minmax(180px,.8fr) auto; align-items:end; gap:14px; }
+.shelf-create-form .form-group { display:grid; gap:6px; margin:0; min-width:0; }
+.shelf-create-form .form-group label { margin:0; font-size:12px; }
+.shelf-create-form input { width:100%; min-width:0; }
+.shelf-create-submit { padding-bottom:1px; }
+.shelf-create-submit .btn { white-space:nowrap; }
+.admin-shelves-table { min-width:760px; }
+.admin-shelves-table th { white-space:nowrap; }
+.admin-shelves-table td { vertical-align:middle; }
+.shelf-section-input { width:100%; min-width:150px; }
+.shelf-name-input { width:100%; min-width:120px; }
+.shelf-row-actions { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+.shelf-row-actions form { margin:0; }
+.shelf-list-note { margin:12px 0 0; color:var(--color-muted); font-size:11px; line-height:1.5; }
+.shelf-empty-state { min-height:170px; }
+.shelf-empty-state strong { color:#344054; font-size:13px; }
+.shelf-empty-state span { max-width:540px; color:var(--color-muted); font-size:12px; line-height:1.55; }
+@media(max-width:850px) { .shelf-create-form { grid-template-columns:1fr 1fr; } .shelf-create-submit { grid-column:1/-1; } }
+@media(max-width:600px) { .shelf-create-form { grid-template-columns:1fr; } .shelf-create-submit { grid-column:auto; } .shelf-create-submit .btn { width:100%; } .shelf-list-panel>.panel-heading { align-items:flex-start; flex-direction:column; } }
