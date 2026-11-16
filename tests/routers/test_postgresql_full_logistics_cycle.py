@@ -146,6 +146,13 @@ async def test_card_moves_branch_archive_central_archive_through_http_routes():
                 parse_qs(urlparse(created_box.headers["location"]).query)["box_id"][0]
             )
             client.cookies.set("session", branch_token)
+            label = await client.get(f"/boxes/{branch_box_id}/label")
+            assert label.status_code == 200
+            assert "Этикетка транспортной коробки" in label.text
+            assert "box-label" in label.text
+            assert f"MEDARCHIVE:BOX:{branch_box_id}" in label.text
+            assert "Full Flow Test Patient" not in label.text
+            client.cookies.set("session", branch_token)
             scanned = await client.post(
                 "/packing/scan-card",
                 data={"box_id": str(branch_box_id), "qr_payload": qr_payload},
