@@ -1,43 +1,75 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>🚚 Курьеры</h1>
-<div class="card">
-    <h3>Добавить курьера</h3>
-    <form method="post" action="/admin/couriers">
+<section class="page-header admin-page-header">
+    <div>
+        <div class="eyebrow">Администрирование</div>
+        <h1>Курьеры</h1>
+        <p class="page-description">Справочник сотрудников доставки, участвующих в передаче отправлений между площадками</p>
+    </div>
+    <a class="btn btn-secondary" href="/admin">К настройкам</a>
+</section>
+
+<section class="panel admin-form-panel courier-create-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Добавить курьера</h2>
+            <p class="page-description">Курьер — отдельная сущность системы, ему не требуется учётная запись</p>
+        </div>
+        <span class="badge badge-info">Новая запись</span>
+    </div>
+    <form method="post" action="/admin/couriers" class="courier-create-form">
         <div class="form-group">
-            <label for="full_name">ФИО</label>
-            <input id="full_name" name="full_name" required>
+            <label for="courier-full-name">ФИО курьера</label>
+            <input id="courier-full-name" name="full_name" maxlength="255" autocomplete="name" placeholder="Фамилия Имя Отчество" required>
         </div>
         <div class="form-group">
-            <label for="phone">Телефон (необязательно)</label>
-            <input id="phone" name="phone" type="tel">
+            <label for="courier-phone">Телефон</label>
+            <input id="courier-phone" name="phone" type="tel" maxlength="64" autocomplete="tel" placeholder="+7 (___) ___-__-__">
+            <span class="field-hint">Необязательное поле</span>
         </div>
-        <button class="btn btn-primary" type="submit">Добавить</button>
+        <div class="courier-create-submit">
+            <button type="submit" class="btn btn-primary">Добавить курьера</button>
+        </div>
     </form>
-</div>
-<div class="card">
-    <h3>Список курьеров</h3>
+</section>
+
+<section class="panel admin-table-panel courier-list-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Список курьеров</h2>
+            <p class="page-description">Неактивные курьеры сохраняются в истории и недоступны для новых отправлений</p>
+        </div>
+        <span class="admin-record-count">{{ couriers|length }} записей</span>
+    </div>
     {% if couriers %}
-    <table class="data">
-        <thead><tr><th>ФИО</th><th>Телефон</th><th>Статус</th><th>Действие</th></tr></thead>
-        <tbody>
-        {% for courier in couriers %}
-        <tr>
-            <td>{{ courier.full_name }}</td>
-            <td>{{ courier.phone or "—" }}</td>
-            <td>{{ "Активен" if courier.is_active else "Отключён" }}</td>
-            <td>
-                <form method="post" action="/admin/couriers/{{ courier.id }}/status">
-                    <input type="hidden" name="is_active" value="{{ 'false' if courier.is_active else 'true' }}">
-                    <button class="btn btn-secondary" type="submit">{{ "Отключить" if courier.is_active else "Включить" }}</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table class="admin-couriers-table">
+            <thead><tr><th>Курьер</th><th>Телефон</th><th>Статус</th><th>Действие</th></tr></thead>
+            <tbody>
+            {% for courier in couriers %}
+            <tr>
+                <td><div class="courier-identity"><span class="courier-avatar" aria-hidden="true">{{ courier.full_name[:1]|upper }}</span><strong>{{ courier.full_name }}</strong></div></td>
+                <td class="courier-phone">{{ courier.phone or "Не указан" }}</td>
+                <td>
+                    {% if courier.is_active %}<span class="status-pill status-pill-success">Активен</span>
+                    {% else %}<span class="status-pill status-pill-muted">Отключён</span>{% endif %}
+                </td>
+                <td>
+                    <form class="courier-status-form" method="post" action="/admin/couriers/{{ courier.id }}/status">
+                        <input type="hidden" name="is_active" value="{{ 'false' if courier.is_active else 'true' }}">
+                        <button type="submit" class="btn btn-quiet btn-sm">{{ "Отключить" if courier.is_active else "Восстановить" }}</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
-    <p class="muted">Курьеры ещё не добавлены.</p>
+    <div class="empty-state courier-empty-state">
+        <strong>Курьеры ещё не добавлены</strong>
+        <span>Добавьте сотрудников доставки. После этого их можно будет выбирать при оформлении отправлений.</span>
+    </div>
     {% endif %}
-</div>
+</section>
 {% endblock %}
