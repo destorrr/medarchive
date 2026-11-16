@@ -1,41 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>⚖️ Внешнее хранение карт</h1>
-{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
-{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
-<div class="card">
-    <h3>Карты на балансе ЦО</h3>
-    {% if cards %}
-    <table class="data"><thead><tr><th>Номер</th><th>ФИО</th><th>Состояние</th><th>Действие</th></tr></thead><tbody>
-    {% for card in cards %}<tr>
-        <td>{{ card.card_number }}</td><td>{{ card.full_name }}</td>
-        <td>
-            {% if card.custody_status == "available" %}В ЦО{% elif card.custody_status == "at_court" %}В суде{% elif card.custody_status == "at_insurance" %}В страховой{% else %}В другой организации{% endif %}
-            {% if card.external_organization %}<br><small>{{ card.external_organization }}</small>{% endif %}
-        </td>
-        <td>
-            {% if card.custody_status == "available" %}
-            <form method="post" action="/central/custody/mark">
-                <input type="hidden" name="card_id" value="{{ card.id }}">
-                <select name="custody_status" required>
-                    <option value="at_court">Суд</option>
-                    <option value="at_insurance">Страховая</option>
-                    <option value="at_external_organization">Другая организация</option>
-                </select>
-                <input name="organization" placeholder="Название организации" required>
-                <input name="comment" placeholder="Комментарий (необязательно)">
-                <button class="btn btn-secondary" type="submit">Отметить передачу</button>
-            </form>
-            {% else %}
-            <form method="post" action="/central/custody/return">
-                <input type="hidden" name="card_id" value="{{ card.id }}">
-                <input name="comment" placeholder="Комментарий о возврате (необязательно)">
-                <button class="btn btn-primary" type="submit">Вернуть на баланс ЦО</button>
-            </form>
-            {% endif %}
-        </td>
-    </tr>{% endfor %}
-    </tbody></table>
-    {% else %}<p class="muted">Нет карт на балансе ЦО.</p>{% endif %}
-</div>
+<header class="page-header operation-page-header">
+    <div><p class="eyebrow">Ответственное хранение</p><h1>Внешнее хранение карт</h1><p class="page-description">Фиксируйте передачу карт в суд, страховую или другую организацию и возвращайте их на баланс центрального офиса.</p></div>
+</header>
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success" role="status">{{ success }}</div>{% endif %}
+<section class="operation-summary"><div class="operation-summary-main"><p class="eyebrow">Баланс центрального офиса</p><h2>Контроль внешнего хранения</h2><p class="page-description">Внешняя передача не меняет учётную локацию карты: она остаётся на балансе ЦО.</p></div><div class="operation-metric"><span class="operation-metric-value">{{ cards|length }}</span><span class="operation-metric-label">Карт на балансе ЦО</span></div></section>
+<section class="card operation-panel custody-panel">
+    <div class="panel-heading"><div><p class="eyebrow">Состояние и действия</p><h2>Карты центрального офиса</h2><p class="page-description">Действия зависят от текущего статуса ответственного хранения.</p></div></div>
+    {% if cards %}<div class="table-wrap"><table class="data operation-data-table custody-table"><thead><tr><th>Карта</th><th>Состояние</th><th>Внешняя организация</th><th>Действие</th></tr></thead><tbody>
+    {% for card in cards %}<tr><td><strong class="operation-card-number">{{ card.card_number }}</strong><span class="receipt-secondary">{{ card.full_name }}</span></td>
+    <td>{% if card.custody_status == "available" %}<span class="badge badge-success">На балансе ЦО</span>{% elif card.custody_status == "at_court" %}<span class="badge badge-warning">В суде</span>{% elif card.custody_status == "at_insurance" %}<span class="badge badge-info">В страховой</span>{% else %}<span class="badge badge-neutral">В другой организации</span>{% endif %}</td>
+    <td>{% if card.external_organization %}<strong>{{ card.external_organization }}</strong><span class="receipt-secondary">{{ card.external_since }}</span>{% else %}<span class="text-muted">Не передана</span>{% endif %}</td>
+    <td>{% if card.custody_status == "available" %}<form method="post" action="/central/custody/mark" class="custody-action-form"><input type="hidden" name="card_id" value="{{ card.id }}"><label class="sr-only" for="custody-status-{{ card.id }}">Куда передаётся карта {{ card.card_number }}</label><select id="custody-status-{{ card.id }}" name="custody_status" required><option value="at_court">Суд</option><option value="at_insurance">Страховая</option><option value="at_external_organization">Другая организация</option></select><label class="sr-only" for="custody-org-{{ card.id }}">Название организации</label><input id="custody-org-{{ card.id }}" name="organization" placeholder="Название организации" required><label class="sr-only" for="custody-comment-{{ card.id }}">Комментарий к передаче</label><input id="custody-comment-{{ card.id }}" name="comment" placeholder="Комментарий (необязательно)"><button class="btn btn-secondary" type="submit">Отметить передачу</button></form>{% else %}<form method="post" action="/central/custody/return" class="custody-action-form"><input type="hidden" name="card_id" value="{{ card.id }}"><label class="sr-only" for="custody-return-{{ card.id }}">Комментарий к возврату карты {{ card.card_number }}</label><input id="custody-return-{{ card.id }}" name="comment" placeholder="Комментарий о возврате (необязательно)"><button class="btn btn-primary" type="submit">Вернуть на баланс ЦО</button></form>{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<div class="empty-state compact-empty"><strong>Нет карт на балансе ЦО</strong><span>Карты появятся после поступления из архива или филиалов.</span></div>{% endif %}
+</section>
 {% endblock %}
