@@ -81,6 +81,14 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
             assert "Список пользователей" in users_page.text
             assert 'name="username"' in users_page.text
 
+            # Verify the redesigned branch workspace and its empty state.
+            branches_page = await client.get("/admin/branches")
+            assert branches_page.status_code == 200, branches_page.text
+            assert "Добавить филиал" in branches_page.text
+            assert "Список филиалов" in branches_page.text
+            assert 'id="branch-code"' in branches_page.text
+            assert "Филиалы ещё не добавлены" in branches_page.text
+
             # Create a branch through the same HTML form used by an administrator.
             response = await client.post(
                 "/admin/branches",
