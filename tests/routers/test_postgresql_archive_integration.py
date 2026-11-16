@@ -76,7 +76,7 @@ async def test_postgresql_archive_pages_render_with_archive_role():
         assert receive.status_code == 200
         assert "Приёмка отправлений" in receive.text
         assert placement.status_code == 200
-        assert "Размещение в архиве" in placement.text
+        assert "Размещение на полках" in placement.text
         assert requests.status_code == 200
         assert "Заявки центрального офиса" in requests.text
         assert "Archive UI Integration" in receive.text
@@ -215,7 +215,7 @@ async def test_postgresql_archive_individual_card_shelf_placement_is_audited_and
             page = await client.get("/placement")
             assert page.status_code == 200
             assert card.card_number in page.text
-            assert "Отдельных карт на полках пока нет." in page.text
+            assert "Отдельных карт на полках пока нет" in page.text
 
             # Inactive storage locations must be rejected without creating
             # a placement or audit event.
