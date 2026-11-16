@@ -81,6 +81,10 @@ class TestDashboard:
         r = await client.get("/dashboard")
         assert r.status_code == 200
         assert "Карт всего" in r.text
+        assert "Найти карту или коробку" in r.text
+        assert "Сводные показатели" in r.text
+        assert "Последние движения" in r.text
+        assert "dashboard-stats" in r.text
 
 
     async def test_dashboard_shows_recent_movements(self, client, db):
