@@ -1,40 +1,75 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>📋 Запросить карты из архива</h1>
-{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
-{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
-<div class="card">
-    <form method="get" action="/requests/new">
+<header class="page-header operation-page-header central-request-header">
+    <div>
+        <p class="eyebrow">Логистика центрального офиса</p>
+        <h1>Запрос карт из архива</h1>
+        <p class="page-description">Найдите карты в архиве и создайте заявки на их выдачу в центральный офис. Заявка создаётся отдельно для каждой выбранной карты.</p>
+    </div>
+</header>
+
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success" role="status">{{ success }}</div>{% endif %}
+
+<section class="card operation-panel central-request-search-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Поиск в архивном фонде</p>
+            <h2>Найти медицинские карты</h2>
+            <p class="page-description">Поиск по номеру карты или ФИО пациента. В результатах отображаются только карты, доступные для новой заявки.</p>
+        </div>
+        <span class="badge badge-info">Только ЦО</span>
+    </div>
+    <form method="get" action="/requests/new" class="central-request-search-form" role="search">
         <div class="form-group">
             <label for="query">Номер карты или ФИО пациента</label>
-            <input id="query" name="query" value="{{ query }}" placeholder="Введите номер карты или ФИО">
+            <input id="query" name="query" value="{{ query }}" placeholder="Введите номер карты или ФИО" autocomplete="off">
         </div>
-        <button class="btn btn-primary" type="submit">Найти карты в архиве</button>
+        <button class="btn btn-primary" type="submit">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg>
+            Найти карты
+        </button>
     </form>
-</div>
+</section>
+
 {% if query %}
-<div class="card">
-    <h3>Карты, доступные для запроса</h3>
+<section class="card operation-panel central-request-results-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Результаты поиска</p>
+            <h2>Доступные карты</h2>
+            <p class="page-description">Запрос: <strong>{{ query }}</strong></p>
+        </div>
+        <span class="badge badge-neutral">{{ cards|length }} найдено</span>
+    </div>
     {% if cards %}
-    <form method="post" action="/requests/create">
-        <table class="data">
-            <thead><tr><th>Выбрать</th><th>Номер карты</th><th>ФИО пациента</th><th>Дата рождения</th></tr></thead>
-            <tbody>
-            {% for card in cards %}
-            <tr>
-                <td><input type="checkbox" name="card_ids" value="{{ card.id }}"></td>
-                <td>{{ card.card_number }}</td>
-                <td>{{ card.full_name }}</td>
-                <td>{{ card.date_of_birth }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        <button class="btn btn-primary" type="submit">Создать заявки на выбранные карты</button>
+    <form method="post" action="/requests/create" class="central-request-results-form">
+        <div class="table-wrap">
+            <table class="data central-request-table">
+                <thead><tr><th class="request-select-column">Выбрать</th><th>Номер карты</th><th>ФИО пациента</th><th>Дата рождения</th></tr></thead>
+                <tbody>
+                {% for card in cards %}
+                <tr>
+                    <td><input type="checkbox" name="card_ids" value="{{ card.id }}" aria-label="Выбрать карту {{ card.card_number }}"></td>
+                    <td class="request-card-number">{{ card.card_number }}</td>
+                    <td>{{ card.full_name }}</td>
+                    <td>{{ card.date_of_birth }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="operation-form-footer central-request-footer">
+            <p class="form-help">После создания активной заявки карта перестанет отображаться в результатах нового поиска.</p>
+            <button class="btn btn-primary" type="submit">Создать заявки на выбранные карты</button>
+        </div>
     </form>
     {% else %}
-    <p class="muted">В архиве не найдено доступных карт по этому запросу. Возможно, на карту уже создана активная заявка.</p>
+    <div class="empty-state central-request-empty">
+        <strong>Доступные карты не найдены</strong>
+        <span>По этому запросу нет карт, доступных для новой заявки. Возможно, карта уже запрошена или сейчас находится вне доступного архивного фонда.</span>
+    </div>
     {% endif %}
-</div>
+</section>
 {% endif %}
 {% endblock %}
