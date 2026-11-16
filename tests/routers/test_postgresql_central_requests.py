@@ -148,6 +148,11 @@ async def test_postgresql_central_office_creates_archive_card_request():
             assert "Упаковка и коробки" in central_packing.text
             assert central_transfer.status_code == 200
             assert "Отправка из центрального офиса" in central_transfer.text
+            assert 'action="/central/transfer/confirm"' in central_transfer.text
+            assert 'id="central-transfer-form"' in central_transfer.text
+            assert "central-dispatch-route" in central_transfer.text
+            assert "central-dispatch-card-table" in central_transfer.text
+            assert "Передать отправление курьеру" in central_transfer.text
             assert central_custody.status_code == 200
             assert "Внешнее хранение карт" in central_custody.text
             for page in (central_receive, central_packing, central_transfer, central_custody):
