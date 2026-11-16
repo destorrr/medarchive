@@ -65,6 +65,26 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
                 forbidden = await client.get("/transfer", cookies={
                     "session": get_auth().create_session_token(user)})
                 assert forbidden.status_code == 403
+
+            # Keep the complete role boundary matrix for operational routes.
+            for path in ("/receive", "/placement", "/requests", "/central/receive"):
+                denied = await client.get(path, cookies={"session": token})
+                assert denied.status_code == 403, (path, denied.status_code)
+
+            archive_token = get_auth().create_session_token(archive_actor)
+            for path in ("/transfer", "/branch/receive", "/central/receive"):
+                denied = await client.get(path, cookies={"session": archive_token})
+                assert denied.status_code == 403, (path, denied.status_code)
+
+            central_token = get_auth().create_session_token(central_actor)
+            for path in ("/transfer", "/branch/receive", "/receive", "/placement", "/requests"):
+                denied = await client.get(path, cookies={"session": central_token})
+                assert denied.status_code == 403, (path, denied.status_code)
+
+            viewer_token = get_auth().create_session_token(viewer)
+            for path in ("/transfer", "/branch/receive", "/receive", "/placement", "/requests", "/central/receive"):
+                denied = await client.get(path, cookies={"session": viewer_token})
+                assert denied.status_code == 403, (path, denied.status_code)
     finally:
         async with database.session_factory() as session:
             await session.execute(Location.__table__.delete().where(Location.branch_id == branch_id))
