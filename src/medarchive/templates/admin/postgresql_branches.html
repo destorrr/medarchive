@@ -1,37 +1,81 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>🏢 Филиалы</h1>
-<div class="card">
-    <h2 style="font-size:16px; margin-bottom:12px;">Создать филиал</h2>
-    <form method="post" action="/admin/branches">
-        <input type="text" name="code" placeholder="Код филиала" maxlength="64" required>
-        <input type="text" name="name" placeholder="Название филиала" maxlength="255" required>
-        <button type="submit" class="btn btn-primary">Создать</button>
+<section class="page-header admin-page-header">
+    <div>
+        <div class="eyebrow">Администрирование</div>
+        <h1>Филиалы</h1>
+        <p class="page-description">Управление площадками медицинской организации и их доступностью в системе</p>
+    </div>
+    <a class="btn btn-secondary" href="/admin">К настройкам</a>
+</section>
+
+<section class="panel admin-form-panel branch-create-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Добавить филиал</h2>
+            <p class="page-description">Укажите уникальный код и официальное название площадки</p>
+        </div>
+        <span class="badge badge-info">Новая запись</span>
+    </div>
+    <form method="post" action="/admin/branches" class="branch-create-form">
+        <div class="form-group">
+            <label for="branch-code">Код филиала</label>
+            <input id="branch-code" name="code" maxlength="64" autocomplete="off" placeholder="Например, MSK-01" required>
+            <span class="field-hint">До 64 символов, код должен быть уникальным</span>
+        </div>
+        <div class="form-group">
+            <label for="branch-name">Название филиала</label>
+            <input id="branch-name" name="name" maxlength="255" placeholder="Название медицинского центра" required>
+        </div>
+        <div class="branch-create-submit">
+            <button type="submit" class="btn btn-primary">Создать филиал</button>
+        </div>
     </form>
-</div>
-<div class="card">
-    <table>
-        <thead><tr><th>Код</th><th>Название</th><th>Статус</th><th>Действия</th></tr></thead>
-        <tbody>
-        {% for b in branches %}
-        <tr>
-            <td><input type="text" name="code" value="{{ b.code }}" form="branch-{{ b.id }}" required></td>
-            <td><input type="text" name="name" value="{{ b.name }}" form="branch-{{ b.id }}" required></td>
-            <td>{{ "Активен" if b.is_active else "Отключён" }}</td>
-            <td>
-                <form id="branch-{{ b.id }}" method="post" action="/admin/branches/{{ b.id }}/edit" style="display:inline">
-                    <button type="submit" class="btn btn-primary">Сохранить</button>
-                </form>
-                <form method="post" action="/admin/branches/{{ b.id }}/status" style="display:inline">
-                    <input type="hidden" name="is_active" value="{{ 'false' if b.is_active else 'true' }}">
-                    <button type="submit" class="btn">{{ "Отключить" if b.is_active else "Восстановить" }}</button>
-                </form>
-            </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="4">Филиалов пока нет.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
+</section>
+
+<section class="panel admin-table-panel branch-list-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Список филиалов</h2>
+            <p class="page-description">Изменение реквизитов и включение или отключение площадок</p>
+        </div>
+        <span class="admin-record-count">{{ branches|length }} записей</span>
+    </div>
+    {% if branches %}
+    <div class="table-wrap">
+        <table class="admin-branches-table">
+            <thead><tr><th>Код</th><th>Название</th><th>Состояние</th><th>Действия</th></tr></thead>
+            <tbody>
+            {% for b in branches %}
+            <tr>
+                <td>
+                    <form id="branch-{{ b.id }}" method="post" action="/admin/branches/{{ b.id }}/edit"></form>
+                    <input class="branch-code-input" aria-label="Код филиала {{ b.name }}" type="text" name="code" value="{{ b.code }}" maxlength="64" form="branch-{{ b.id }}" required>
+                </td>
+                <td><input class="branch-name-input" aria-label="Название филиала {{ b.code }}" type="text" name="name" value="{{ b.name }}" maxlength="255" form="branch-{{ b.id }}" required></td>
+                <td>
+                    {% if b.is_active %}<span class="status-pill status-pill-success">Активен</span>
+                    {% else %}<span class="status-pill status-pill-muted">Отключён</span>{% endif %}
+                </td>
+                <td>
+                    <div class="branch-row-actions">
+                        <button type="submit" form="branch-{{ b.id }}" class="btn btn-secondary btn-sm">Сохранить</button>
+                        <form method="post" action="/admin/branches/{{ b.id }}/status">
+                            <input type="hidden" name="is_active" value="{{ 'false' if b.is_active else 'true' }}">
+                            <button type="submit" class="btn btn-quiet btn-sm">{{ "Отключить" if b.is_active else "Восстановить" }}</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state branch-empty-state">
+        <strong>Филиалы ещё не добавлены</strong>
+        <span>Создайте первую площадку с помощью формы выше. После этого её можно будет назначать сотрудникам и использовать в логистических операциях.</span>
+    </div>
+    {% endif %}
+</section>
 {% endblock %}
