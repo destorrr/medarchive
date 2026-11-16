@@ -496,3 +496,28 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
 .history-pagination-info{font-size:13px;color:var(--color-muted)}
 .history-pagination-actions{display:flex;align-items:center;gap:8px}
 @media(max-width:700px){.history-page-header{flex-direction:column}.history-header-meta{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.history-pagination{align-items:flex-start;flex-direction:column}.history-pagination-actions{width:100%;justify-content:flex-start}}
+
+
+/* Printable transport-box QR label */
+.box-label-page-header { align-items:flex-start; margin-bottom:20px; }
+.box-label-screen { max-width:760px; margin:0 auto; padding:24px; }
+.box-label { width:100%; max-width:390px; margin:0 auto; padding:22px; color:#172033; background:#fff; border:1px solid var(--color-border-strong); border-radius:var(--radius-md); text-align:center; }
+.box-label-brand { color:#244d9e; font-size:19px; font-weight:800; letter-spacing:-.35px; }
+.box-label-caption { margin:3px 0 14px; color:var(--color-muted); font-size:11px; font-weight:650; letter-spacing:.07em; text-transform:uppercase; }
+.box-label img { display:block; width:min(240px,100%); height:auto; aspect-ratio:1; margin:0 auto 12px; image-rendering:pixelated; }
+.box-label-number { color:#172033; font-size:25px; font-weight:800; letter-spacing:.02em; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.box-label-location { margin-top:4px; color:#475467; font-size:13px; font-weight:600; }
+.box-label-payload { margin-top:7px; color:var(--color-muted); font:10px ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere; }
+.box-label-hint { margin:12px 0 0; padding-top:10px; color:var(--color-muted); border-top:1px solid var(--color-border); font-size:10px; }
+.box-label-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:9px; margin-top:18px; }
+.box-label-actions .btn { display:inline-flex; align-items:center; gap:7px; }
+@media(max-width:600px) { .box-label-screen { padding:14px; } .box-label { padding:16px; } .box-label-actions { align-items:stretch; flex-direction:column; } .box-label-actions .btn { justify-content:center; } }
+@media print {
+  @page { size:100mm 100mm; margin:5mm; }
+  html,body { min-width:0; min-height:0; background:#fff !important; }
+  .sidebar,.box-label-page-header,.box-label-actions { display:none !important; }
+  .app-shell,.main { display:block !important; min-height:0 !important; margin:0 !important; padding:0 !important; }
+  .box-label-screen { max-width:none !important; margin:0 !important; padding:0 !important; border:0 !important; box-shadow:none !important; }
+  .box-label { width:90mm !important; max-width:none !important; margin:0 !important; padding:5mm !important; border:1px solid #222 !important; border-radius:0 !important; break-inside:avoid; }
+  .box-label img { width:60mm !important; height:60mm !important; }
+}
