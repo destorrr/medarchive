@@ -1,29 +1,48 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>🚨 Инциденты отправлений</h1>
-<div class="card">
-    <p>Отправления с зафиксированным инцидентом. Просмотр не изменяет состав груза и его местонахождение.</p>
+<section class="page-header admin-page-header">
+    <div>
+        <div class="eyebrow">Администрирование · Контроль</div>
+        <h1>Инциденты отправлений</h1>
+        <p class="page-description">Просмотр зафиксированных расхождений и результатов проверки. Изменение состава и местонахождения груза здесь недоступно.</p>
+    </div>
+    <a class="btn btn-secondary" href="/admin">К настройкам</a>
+</section>
+
+<section class="panel admin-table-panel incident-list-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Журнал инцидентов</h2>
+            <p class="page-description">Отправления, требующие внимания администратора</p>
+        </div>
+        <span class="admin-record-count">{{ incidents|length }} записей</span>
+    </div>
     {% if incidents %}
-    <table>
-        <thead>
-            <tr><th>№ отправления</th><th>Статус</th><th>Маршрут</th><th>Курьер</th><th>Причина</th><th>Зафиксирован</th><th></th></tr>
-        </thead>
-        <tbody>
-        {% for item in incidents %}
-            <tr>
-                <td>{{ item.shipment.shipment_number }}</td>
-                <td>{{ item.shipment.status }}</td>
-                <td>{{ item.source_name }} → {{ item.target_name }}</td>
-                <td>{{ item.courier_name }}</td>
-                <td>{{ item.shipment.exception_note }}</td>
-                <td>{{ item.shipment.exception_at }}</td>
-                <td><a href="/admin/incidents/{{ item.shipment.id }}">Открыть</a></td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table class="admin-incidents-table">
+            <thead>
+                <tr><th>Отправление</th><th>Состояние</th><th>Маршрут</th><th>Курьер</th><th>Причина</th><th>Зафиксирован</th><th></th></tr>
+            </thead>
+            <tbody>
+            {% for item in incidents %}
+                <tr>
+                    <td class="incident-number"><strong>№{{ item.shipment.shipment_number }}</strong></td>
+                    <td><span class="status-pill status-pill-warning">{{ item.shipment.status }}</span></td>
+                    <td><div class="incident-route"><span>{{ item.source_name }}</span><span aria-hidden="true">→</span><span>{{ item.target_name }}</span></div></td>
+                    <td>{{ item.courier_name }}</td>
+                    <td class="incident-reason">{{ item.shipment.exception_note }}</td>
+                    <td class="incident-date">{{ item.shipment.exception_at }}</td>
+                    <td><a class="btn btn-secondary btn-sm" href="/admin/incidents/{{ item.shipment.id }}">Открыть</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
-    <p style="color:#888;">Зафиксированных инцидентов нет.</p>
+    <div class="empty-state incident-empty-state">
+        <strong>Зафиксированных инцидентов нет</strong>
+        <span>Если при приёмке обнаружится расхождение, отправление появится здесь вместе с маршрутом и причиной.</span>
+    </div>
     {% endif %}
-</div>
+</section>
 {% endblock %}
