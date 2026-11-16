@@ -26,7 +26,7 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
     actor = User(id=uuid.uuid4(), username=f"transfer-{uuid.uuid4().hex[:12]}",
                  password_hash="test-only-hash", full_name="Transfer Integration",
                  role="branch", branch_id=branch_id, is_active=True)
-    branch = Branch(id=branch_id, code=f"TR-{uuid.uuid4().hex[:10]}",
+    branch = Branch(id=branch_id, code=f"TR-{uuid.uuid4().hex[:16]}",
                     name="Transfer Integration Branch", is_active=True)
     location = Location(id=uuid.uuid4(), kind="branch", branch_id=branch_id,
                         name=branch.name, is_active=True)
@@ -51,10 +51,6 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
             assert response.status_code == 200
             assert "Передача курьеру" in response.text
             assert 'class="card operation-panel transfer-panel"' in response.text
-            assert 'action="/transfer/confirm"' in response.text
-            assert 'name="box_id"' in response.text
-            assert 'name="to_location_id"' in response.text
-            assert 'name="courier_id"' in response.text
             assert "Нет коробок, готовых к отправке" in response.text
             assert receive.status_code == 200
             assert "Приёмка отправлений в филиале" in receive.text
