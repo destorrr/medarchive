@@ -399,3 +399,31 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
  .central-dispatch-footer { align-items:stretch; }
  .central-dispatch-footer .btn { width:100%; }
 }
+
+
+/* Central Office archive requests */
+.central-request-header { margin-bottom:20px; }
+.central-request-search-panel,.central-request-results-panel { max-width:1100px; margin-bottom:18px; }
+.central-request-search-panel > .panel-heading,.central-request-results-panel > .panel-heading { align-items:flex-start; }
+.central-request-search-form { display:flex; align-items:flex-end; gap:12px; }
+.central-request-search-form .form-group { flex:1; margin:0; }
+.central-request-search-form input { width:100%; min-height:42px; }
+.central-request-search-form .btn { min-height:42px; white-space:nowrap; }
+.central-request-search-form .btn svg { vertical-align:middle; margin-right:5px; }
+.central-request-table { min-width:560px; }
+.central-request-table th,.central-request-table td { padding:11px 13px; }
+.central-request-table .request-select-column { width:72px; }
+.central-request-table input[type="checkbox"] { width:16px; height:16px; }
+.request-card-number { color:#26364d; font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.central-request-footer { align-items:flex-end; }
+.central-request-footer .form-help { max-width:450px; }
+.central-request-empty { min-height:170px; gap:8px; }
+.central-request-empty strong { color:#344054; font-size:13px; }
+.central-request-empty span { max-width:560px; font-size:12px; }
+@media (max-width:760px) {
+ .central-request-search-form { align-items:stretch; flex-direction:column; }
+ .central-request-search-form .btn { width:100%; justify-content:center; }
+ .central-request-search-panel > .panel-heading,.central-request-results-panel > .panel-heading { flex-direction:column; }
+ .central-request-footer { align-items:stretch; }
+ .central-request-footer .btn { width:100%; }
+}
