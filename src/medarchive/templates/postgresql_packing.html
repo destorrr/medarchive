@@ -1,83 +1,134 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>📦 Упаковка коробки</h1>
-{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
-{% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+<header class="page-header operation-page-header">
+    <div>
+        <p class="eyebrow">Операции филиала</p>
+        <h1>Упаковка коробки</h1>
+        <p class="page-description">Сканируйте QR-коды медицинской системы, проверяйте состав и готовьте коробки к отправке.</p>
+    </div>
+    {% if box %}
+    <a class="btn btn-secondary" href="/boxes/{{ box.id }}/label" target="_blank" rel="noopener">Печать QR-этикетки</a>
+    {% endif %}
+</header>
+
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success" role="status">{{ success }}</div>{% endif %}
 
 {% if pending_card_data %}
-<div class="card">
-    <h3 style="margin-bottom:10px">Новая карта ещё не зарегистрирована</h3>
-    <p>Проверьте данные из QR-кода. До подтверждения запись в МедАрхиве не создаётся.</p>
-    <table class="data" style="margin:12px 0">
-        <tbody>
-            <tr><th>Номер карты</th><td>{{ pending_card_data.card_number }}</td></tr>
-            <tr><th>ФИО пациента</th><td>{{ pending_card_data.full_name }}</td></tr>
-            <tr><th>Дата рождения</th><td>{{ pending_card_data.birth_date }}</td></tr>
-            {% if pending_card_data.phone %}<tr><th>Телефон</th><td>{{ pending_card_data.phone }}</td></tr>{% endif %}
-        </tbody>
-    </table>
-    <form method="post" action="/packing/confirm-card">
+<section class="card operation-panel review-panel" aria-labelledby="pending-card-title">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Требуется подтверждение</p>
+            <h2 id="pending-card-title">Новая карта ещё не зарегистрирована</h2>
+            <p class="page-description">Сверьте данные QR-кода. До подтверждения запись в МедАрхиве не создаётся.</p>
+        </div>
+        <span class="badge badge-new">Ожидает проверки</span>
+    </div>
+    <div class="table-wrap">
+        <table class="data operation-data-table">
+            <tbody>
+                <tr><th>Номер карты</th><td>{{ pending_card_data.card_number }}</td></tr>
+                <tr><th>ФИО пациента</th><td>{{ pending_card_data.full_name }}</td></tr>
+                <tr><th>Дата рождения</th><td>{{ pending_card_data.birth_date }}</td></tr>
+                {% if pending_card_data.phone %}<tr><th>Телефон</th><td>{{ pending_card_data.phone }}</td></tr>{% endif %}
+            </tbody>
+        </table>
+    </div>
+    <form method="post" action="/packing/confirm-card" class="operation-actions">
         <input type="hidden" name="box_id" value="{{ box.id }}">
         <input type="hidden" name="qr_payload" value="{{ pending_qr_payload }}">
         <button class="btn btn-primary" type="submit">Подтвердить регистрацию и добавить в коробку</button>
     </form>
-</div>
+</section>
 {% endif %}
 
 {% if not box %}
-<div class="card">
-    <p>Создайте новую коробку, чтобы начать упаковку медицинских карт.</p>
+<section class="card empty-operation">
+    <span class="empty-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 7 9-4 9 4v10l-9 4-9-4z"/><path d="m3 7 9 4 9-4M12 11v10M7.5 5l9 4"/></svg>
+    </span>
+    <h2>Начните с новой коробки</h2>
+    <p>Создайте коробку, чтобы зарегистрировать карты и сформировать её состав.</p>
     <form method="post" action="/packing/new-box">
         <button class="btn btn-primary" type="submit">Создать коробку</button>
     </form>
-</div>
+</section>
 {% else %}
-<div class="card">
-    <h2 style="margin-bottom:8px">Коробка {{ box.box_number }}</h2>
-    <p class="muted">Местонахождение: {{ location.name }} · Карт в коробке: {{ cards|length }}</p>
-    <p style="margin-top:12px"><a class="btn btn-primary" href="/boxes/{{ box.id }}/label" target="_blank" rel="noopener">QR-этикетка / повторная печать</a></p>
-</div>
-<div class="card">
-    <h3 style="margin-bottom:12px">Добавить медицинскую карту</h3>
-    <form method="post" action="/packing/scan-card">
-        <input type="hidden" name="box_id" value="{{ box.id }}">
-        <div class="form-group">
-            <label for="qr_payload">Данные QR-кода из медицинской системы (JSON UTF-8)</label>
-            <textarea id="qr_payload" name="qr_payload" rows="4" required
-                style="width:100%;padding:10px;border:1px solid #ccd;border-radius:6px;font:13px monospace"
-                placeholder='{"version":1,"card_number":"...","full_name":"...","birth_date":"ГГГГ-ММ-ДД","phone":"..."}'></textarea>
+<section class="operation-summary">
+    <div class="operation-summary-main">
+        <p class="eyebrow">Текущая коробка</p>
+        <h2>{{ box.box_number }}</h2>
+        <p class="page-description">Местонахождение: {{ location.name }}</p>
+    </div>
+    <div class="operation-metric">
+        <span class="operation-metric-value">{{ cards|length }}</span>
+        <span class="operation-metric-label">карт в коробке</span>
+    </div>
+    <span class="badge badge-packing">Упаковывается</span>
+</section>
+
+<div class="operation-grid">
+    <section class="card operation-panel" aria-labelledby="scan-card-title">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">Добавление</p>
+                <h2 id="scan-card-title">Добавить медицинскую карту</h2>
+                <p class="page-description">Используйте данные QR-кода из внешней медицинской системы.</p>
+            </div>
         </div>
-        <button class="btn btn-primary" type="submit">Проверить QR и добавить карту</button>
-    </form>
-</div>
-<div class="card">
-    <h3 style="margin-bottom:12px">Состав коробки</h3>
-    {% if cards %}
-    <table class="data">
-        <thead><tr><th>Номер карты</th><th>ФИО пациента</th><th class="act">Действие</th></tr></thead>
-        <tbody>
-        {% for card in cards %}
-        <tr>
-            <td>{{ card.card_number }}</td>
-            <td>{{ card.full_name }}</td>
-            <td class="act">
-                <form method="post" action="/packing/remove-card">
-                    <input type="hidden" name="box_id" value="{{ box.id }}">
-                    <input type="hidden" name="card_id" value="{{ card.id }}">
-                    <button class="btn btn-danger-ghost" type="submit">Извлечь</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="muted">Коробка пока пустая. Её можно сохранить или списать.</p>
-    <form method="post" action="/packing/write-off-box" onsubmit="return confirm('Списать пустую коробку? Повторное использование будет запрещено.');">
-        <input type="hidden" name="box_id" value="{{ box.id }}">
-        <button class="btn btn-danger-ghost" type="submit">Списать пустую коробку</button>
-    </form>
-    {% endif %}
+        <form method="post" action="/packing/scan-card" class="operation-form">
+            <input type="hidden" name="box_id" value="{{ box.id }}">
+            <div class="form-group">
+                <label for="qr_payload">Данные QR-кода (JSON UTF-8)</label>
+                <textarea id="qr_payload" name="qr_payload" rows="5" required class="code-input"
+                    placeholder='{"version":1,"card_number":"...","full_name":"...","birth_date":"ГГГГ-ММ-ДД","phone":"..."}'></textarea>
+                <p class="form-help">Проверьте корректность номера карты и персональных данных перед отправкой.</p>
+            </div>
+            <button class="btn btn-primary" type="submit">Проверить QR-код</button>
+        </form>
+    </section>
+
+    <section class="card operation-panel" aria-labelledby="box-content-title">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">Состав</p>
+                <h2 id="box-content-title">Карты в коробке</h2>
+                <p class="page-description">Список карт, включённых в текущий цикл упаковки.</p>
+            </div>
+            <span class="badge badge-neutral">{{ cards|length }} карт</span>
+        </div>
+        {% if cards %}
+        <div class="table-wrap">
+            <table class="data operation-data-table">
+                <thead><tr><th>Номер карты</th><th>ФИО пациента</th><th class="act">Действие</th></tr></thead>
+                <tbody>
+                {% for card in cards %}
+                <tr>
+                    <td class="operation-card-number">{{ card.card_number }}</td>
+                    <td>{{ card.full_name }}</td>
+                    <td class="act">
+                        <form method="post" action="/packing/remove-card">
+                            <input type="hidden" name="box_id" value="{{ box.id }}">
+                            <input type="hidden" name="card_id" value="{{ card.id }}">
+                            <button class="btn btn-danger-ghost" type="submit">Извлечь</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state compact-empty">
+            <strong>Коробка пока пустая</strong>
+            <span>Добавьте карту или спишите коробку, если она больше не нужна.</span>
+        </div>
+        <form method="post" action="/packing/write-off-box" class="operation-actions" onsubmit="return confirm('Списать пустую коробку? Повторное использование будет запрещено.');">
+            <input type="hidden" name="box_id" value="{{ box.id }}">
+            <button class="btn btn-danger-ghost" type="submit">Списать пустую коробку</button>
+        </form>
+        {% endif %}
+    </section>
 </div>
 {% endif %}
 {% endblock %}
