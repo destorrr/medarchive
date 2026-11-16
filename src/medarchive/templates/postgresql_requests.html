@@ -26,8 +26,7 @@
         <span class="badge badge-neutral">{{ requests|length }} позиций</span>
     </div>
 
-    <form id="fulfill-form" method="post" action="/requests/fulfill" class="archive-request-fulfillment-form">
-        <div class="table-wrap archive-request-table-wrap">
+    <div class="table-wrap archive-request-table-wrap">
             <table class="data archive-request-table">
                 <thead>
                     <tr>
@@ -95,6 +94,7 @@
             </table>
         </div>
 
+    <form id="fulfill-form" method="post" action="/requests/fulfill" class="archive-request-fulfillment-form">
         <div class="archive-request-dispatch">
             <div class="form-group">
                 <label for="courier_id">Курьер для отправления в ЦО</label>
