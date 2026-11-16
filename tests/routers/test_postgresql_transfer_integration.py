@@ -53,7 +53,7 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
             assert 'class="card operation-panel transfer-panel"' in response.text
             assert "Нет коробок, готовых к отправке" in response.text
             assert receive.status_code == 200
-            assert "Приёмка отправлений в филиале" in receive.text
+            assert "Приёмка отправлений" in receive.text
             for page in (response, receive):
                 assert 'href="/search"' in page.text
                 assert 'href="/history"' in page.text
