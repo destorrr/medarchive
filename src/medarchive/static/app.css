@@ -360,3 +360,8 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
  .custody-action-form { grid-template-columns:1fr; min-width:240px; }
  .custody-action-form button { grid-column:auto; width:100%; }
 }
+
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.badge-success { color:#176b45; background:#e8f5ee; }
+.badge-warning { color:#8a5b0a; background:#fff4d6; }
+.badge-info { color:#2457a6; background:#eaf1ff; }
