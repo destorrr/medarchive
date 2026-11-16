@@ -65,6 +65,7 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
     username = f"it-{uuid.uuid4().hex[:16]}"
     branch_id = None
     user_id = None
+    courier_id = None
 
     try:
         transport = httpx.ASGITransport(app=app)
@@ -88,6 +89,50 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
             assert "Список филиалов" in branches_page.text
             assert 'id="branch-code"' in branches_page.text
             assert "Филиалы ещё не добавлены" in branches_page.text
+
+            # Verify courier workspace empty state, creation, and status changes.
+            couriers_page = await client.get("/admin/couriers")
+            assert couriers_page.status_code == 200, couriers_page.text
+            assert "Добавить курьера" in couriers_page.text
+            assert "Список курьеров" in couriers_page.text
+            assert 'id="courier-full-name"' in couriers_page.text
+            assert "Курьеры ещё не добавлены" in couriers_page.text
+            courier_name = f"Тестовый Курьер {uuid.uuid4().hex[:8]}"
+            response = await client.post(
+                "/admin/couriers",
+                data={"full_name": courier_name, "phone": "+7 900 000-00-00"},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                courier = await session.scalar(
+                    select(Courier).where(Courier.full_name == courier_name)
+                )
+                assert courier is not None
+                courier_id = courier.id
+                assert courier.phone == "+7 900 000-00-00"
+                assert courier.is_active is True
+            couriers_page = await client.get("/admin/couriers")
+            assert couriers_page.status_code == 200, couriers_page.text
+            assert courier_name in couriers_page.text
+            assert "Отключить" in couriers_page.text
+            response = await client.post(
+                f"/admin/couriers/{courier_id}/status",
+                data={"is_active": "false"},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                courier = await session.get(Courier, courier_id)
+                assert courier is not None and courier.is_active is False
+            couriers_page = await client.get("/admin/couriers")
+            assert "Отключён" in couriers_page.text
+            response = await client.post(
+                f"/admin/couriers/{courier_id}/status",
+                data={"is_active": "true"},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                courier = await session.get(Courier, courier_id)
+                assert courier is not None and courier.is_active is True
 
             # Create a branch through the same HTML form used by an administrator.
             response = await client.post(
@@ -237,6 +282,11 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
                 employee = await session.get(User, user_id)
                 if employee is not None:
                     await session.delete(employee)
+                    await session.flush()
+            if courier_id is not None:
+                courier = await session.get(Courier, courier_id)
+                if courier is not None:
+                    await session.delete(courier)
                     await session.flush()
             if branch_id is not None:
                 location = await session.scalar(
