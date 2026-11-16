@@ -3174,11 +3174,16 @@ async def test_admin_audit_page_filters_and_renders_append_only_events_on_postgr
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             listing = await client.get("/admin/audit")
             assert listing.status_code == 200, listing.text
+            assert "Журнал административных действий" in listing.text
+            assert 'class="audit-filter-form"' in listing.text
+            assert 'class="admin-audit-table"' in listing.text
+            assert 'class="audit-payload-details"' in listing.text
+            assert "Сбросить" in listing.text
+            assert "Найдено:" in listing.text
             assert "visible-audit-marker" in listing.text
             assert "other-audit-marker" in listing.text
             assert "clinical-event-must-not-appear" not in listing.text
             assert "Audit Journal Admin" in listing.text
-            assert "Найдено событий:" in listing.text
 
             filtered = await client.get(
                 "/admin/audit",
