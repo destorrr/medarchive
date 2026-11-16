@@ -3315,3 +3315,130 @@ async def test_admin_service_audits_all_administrative_mutations_with_actor_and_
         await outer_transaction.rollback()
         await connection.close()
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_admin_ui_archive_shelf_create_edit_and_status_on_postgresql():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    app = create_app(
+        Config(
+            database_url=DATABASE_URL,
+            postgres_enabled=True,
+            auth_backend="postgresql",
+            secret_key="integration-test-secret",
+        )
+    )
+    database = await get_pg_database()
+    actor = User(
+        id=uuid.uuid4(),
+        username=f"admin-shelf-{uuid.uuid4().hex[:12]}",
+        password_hash="test-only-hash",
+        full_name="Integration Admin",
+        role="admin",
+        is_active=True,
+    )
+
+    async def admin_override():
+        return actor
+
+    async def session_override():
+        async with database.session_factory() as session:
+            yield session
+
+    app.dependency_overrides[admin_only] = admin_override
+    from medarchive.dependencies import get_pg_session
+    app.dependency_overrides[get_pg_session] = session_override
+
+    shelf_id = None
+    section_name = f"IT-Секция-{uuid.uuid4().hex[:8]}"
+    shelf_name = f"IT-Полка-{uuid.uuid4().hex[:8]}"
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            page = await client.get("/admin/sections")
+            assert page.status_code == 200, page.text
+            assert "Секции и полки архива" in page.text
+            assert "Добавить полку" in page.text
+            assert 'id="shelf-section-name"' in page.text
+            assert 'id="shelf-name"' in page.text
+
+            response = await client.post(
+                "/admin/sections",
+                data={"section_name": section_name, "shelf_name": shelf_name},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                shelf = await session.scalar(
+                    select(ArchiveShelf).where(
+                        ArchiveShelf.section_name == section_name,
+                        ArchiveShelf.shelf_name == shelf_name,
+                    )
+                )
+                assert shelf is not None
+                shelf_id = shelf.id
+                assert shelf.is_active is True
+                created_event = await session.scalar(
+                    select(DomainEvent).where(
+                        DomainEvent.aggregate_type == "archive_shelf",
+                        DomainEvent.aggregate_id == shelf.id,
+                        DomainEvent.event_type == "admin.shelf_created",
+                    )
+                )
+                assert created_event is not None
+
+            page = await client.get("/admin/sections")
+            assert page.status_code == 200, page.text
+            assert section_name in page.text and shelf_name in page.text
+            assert "Активна" in page.text
+
+            updated_section = f"{section_name}-обновлена"
+            updated_shelf = f"{shelf_name}-02"
+            response = await client.post(
+                f"/admin/sections/{shelf_id}/edit",
+                data={"section_name": updated_section, "shelf_name": updated_shelf},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                shelf = await session.get(ArchiveShelf, shelf_id)
+                assert shelf is not None
+                assert shelf.section_name == updated_section
+                assert shelf.shelf_name == updated_shelf
+                updated_event = await session.scalar(
+                    select(DomainEvent).where(
+                        DomainEvent.aggregate_type == "archive_shelf",
+                        DomainEvent.aggregate_id == shelf_id,
+                        DomainEvent.event_type == "admin.shelf_updated",
+                    )
+                )
+                assert updated_event is not None
+
+            response = await client.post(
+                f"/admin/sections/{shelf_id}/status",
+                data={"is_active": "false"},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                shelf = await session.get(ArchiveShelf, shelf_id)
+                assert shelf is not None and shelf.is_active is False
+            page = await client.get("/admin/sections")
+            assert "Отключена" in page.text
+
+            response = await client.post(
+                f"/admin/sections/{shelf_id}/status",
+                data={"is_active": "true"},
+            )
+            assert response.status_code == 303
+            async with database.session_factory() as session:
+                shelf = await session.get(ArchiveShelf, shelf_id)
+                assert shelf is not None and shelf.is_active is True
+    finally:
+        async with database.session_factory() as session:
+            if shelf_id is not None:
+                shelf = await session.get(ArchiveShelf, shelf_id)
+                if shelf is not None:
+                    await session.delete(shelf)
+            await session.commit()
+        app.dependency_overrides.clear()
+        await database.close()
