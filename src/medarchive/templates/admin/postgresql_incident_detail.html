@@ -15,7 +15,7 @@
             <h2>Сведения об отправлении</h2>
             <p class="page-description">Карточка инцидента доступна только для просмотра</p>
         </div>
-        <span class="status-pill status-pill-warning">{{ shipment.status }}</span>
+        {% if resolution %}<span class="status-pill status-pill-success">{{ shipment.status }}</span>{% else %}<span class="status-pill status-pill-warning">{{ shipment.status }}</span>{% endif %}
     </div>
     <div class="incident-detail-grid">
         <div class="incident-detail-item"><span>Маршрут</span><strong>{{ source_name }} → {{ target_name }}</strong></div>
