@@ -69,6 +69,19 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
     try:
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            # Verify the redesigned administrator landing page and user workspace.
+            landing = await client.get("/admin")
+            assert landing.status_code == 200, landing.text
+            assert "Системные настройки" in landing.text
+            assert "Пользователи и роли" in landing.text
+            assert "Инциденты отправлений" in landing.text
+            users_page = await client.get("/admin/users")
+            assert users_page.status_code == 200, users_page.text
+            assert "Новая учётная запись" in users_page.text
+            assert "Список пользователей" in users_page.text
+            assert 'name="username"' in users_page.text
+            assert 'name="is_active"' in users_page.text
+
             # Create a branch through the same HTML form used by an administrator.
             response = await client.post(
                 "/admin/branches",
