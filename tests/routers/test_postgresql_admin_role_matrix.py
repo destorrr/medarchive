@@ -93,6 +93,9 @@ async def test_non_admin_roles_cannot_open_postgresql_admin_pages_or_api():
                     ("/admin/sections", {
                         "section_name": "Forbidden", "shelf_name": uuid.uuid4().hex[:8],
                     }),
+                    (f"/admin/sections/{uuid.uuid4()}/edit", {
+                        "section_name": "Forbidden", "shelf_name": "Forbidden-Edit",
+                    }),
                     (f"/admin/sections/{uuid.uuid4()}/status", {"is_active": "false"}),
                 )
                 for path, data in html_mutations:
