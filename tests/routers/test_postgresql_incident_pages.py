@@ -153,12 +153,21 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 client.cookies.set("session", admin_token)
                 listing = await client.get("/admin/incidents")
                 assert listing.status_code == 200
+                assert "Инциденты отправлений" in listing.text
+                assert "Журнал инцидентов" in listing.text
+                assert 'class="panel admin-table-panel incident-list-panel"' in listing.text
+                assert 'class="admin-incidents-table"' in listing.text
                 assert str(shipment.shipment_number) in listing.text
                 assert "Интеграционная проверка инцидента" in listing.text
                 assert "Incident test branch" in listing.text
+                assert "Открыть" in listing.text
 
                 detail = await client.get(f"/admin/incidents/{shipment_id}")
                 assert detail.status_code == 200
+                assert "Инцидент №" in detail.text
+                assert 'class="incident-detail-grid"' in detail.text
+                assert 'class="admin-incident-cargo-table"' in detail.text
+                assert "Карты по манифесту" in detail.text
                 assert "Incident Reporter" in detail.text
                 assert "Incident Test Patient" in detail.text
                 assert "Second Incident Test Patient" in detail.text
