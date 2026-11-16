@@ -75,6 +75,10 @@ async def test_postgresql_history_is_available_and_paginated():
 
         assert first_page.status_code == 200
         assert "Журнал движений" in first_page.text
+        assert "history-page-header" in first_page.text
+        assert "history-table" in first_page.text
+        assert 'aria-label="Страницы журнала"' in first_page.text
+        assert "📜" not in first_page.text
         assert "Коробка списана" in first_page.text
         assert "BX-HISTORY-50" in first_page.text
         assert "BX-HISTORY-0" not in first_page.text
