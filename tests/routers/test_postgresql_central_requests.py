@@ -137,6 +137,11 @@ async def test_postgresql_central_office_creates_archive_card_request():
             archive_queue = await client.get("/requests")
             assert archive_queue.status_code == 200
             assert card.card_number in archive_queue.text
+            assert "archive-request-page-header" in archive_queue.text
+            assert "archive-request-table" in archive_queue.text
+            assert "archive-request-fulfillment-form" in archive_queue.text
+            assert "archive-request-not-found-form" in archive_queue.text
+            assert "Ожидает выдачи" in archive_queue.text
             assert "Передать выбранные карты в ЦО без коробки" in archive_queue.text
 
             client.cookies.set("session", token)
