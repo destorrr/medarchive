@@ -477,3 +477,22 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
  .archive-request-header-meta { width:100%; justify-content:space-between; }
  .archive-request-panel > .panel-heading,.archive-request-not-found-panel > .panel-heading { flex-direction:column; }
 }
+
+
+/* Movement history */
+.history-page-header{align-items:flex-start}
+.history-header-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;white-space:nowrap}
+.history-total{font-size:13px;color:var(--color-muted);font-weight:600}
+.history-panel{overflow:hidden}
+.history-table-wrap{width:100%;overflow-x:auto}
+.history-table{min-width:900px}
+.history-table th{white-space:nowrap}
+.history-table td{vertical-align:middle}
+.history-date{white-space:nowrap;color:var(--color-muted);font-variant-numeric:tabular-nums;font-size:13px}
+.history-subject{font-weight:600;color:var(--color-text)}
+.history-action{display:inline-block;max-width:320px;font-weight:500}
+.history-empty{padding:42px 20px}
+.history-pagination{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px;border-top:1px solid var(--color-border)}
+.history-pagination-info{font-size:13px;color:var(--color-muted)}
+.history-pagination-actions{display:flex;align-items:center;gap:8px}
+@media(max-width:700px){.history-page-header{flex-direction:column}.history-header-meta{align-items:flex-start;flex-direction:row;flex-wrap:wrap}.history-pagination{align-items:flex-start;flex-direction:column}.history-pagination-actions{width:100%;justify-content:flex-start}}
