@@ -78,7 +78,8 @@ async def test_postgresql_archive_pages_render_with_archive_role():
         assert placement.status_code == 200
         assert "Размещение на полках" in placement.text
         assert requests.status_code == 200
-        assert "Заявки центрального офиса" in requests.text
+        assert "Очередь заявок" in requests.text
+        assert "archive-request-header" in requests.text
         assert "Archive UI Integration" in receive.text
         for page in (receive, placement, requests):
             assert 'href="/search"' in page.text
