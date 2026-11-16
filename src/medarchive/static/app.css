@@ -521,3 +521,50 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
   .box-label { width:90mm !important; max-width:none !important; margin:0 !important; padding:5mm !important; border:1px solid #222 !important; border-radius:0 !important; break-inside:avoid; }
   .box-label img { width:60mm !important; height:60mm !important; }
 }
+
+/* Administrative workspace */
+.admin-page-header { align-items: center; }
+.admin-page-header .badge { flex-shrink: 0; }
+.admin-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.admin-module-card { display: flex; align-items: center; min-width: 0; gap: 15px; padding: 19px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-card); text-decoration: none; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.admin-module-card:hover { color: var(--color-text); border-color: #c5d3eb; box-shadow: 0 5px 18px rgb(16 24 40 / 7%); transform: translateY(-1px); }
+.admin-module-icon { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 11px; }
+.admin-module-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.admin-module-icon-warning { color: var(--color-warning); background: var(--color-warning-soft); }
+.admin-module-copy { display: grid; min-width: 0; gap: 4px; }
+.admin-module-copy strong { color: #26364d; font-size: 14px; font-weight: 680; }
+.admin-module-copy span { color: var(--color-muted); font-size: 12px; line-height: 1.45; }
+.admin-module-arrow { margin-left: auto; color: #98a2b3; font-size: 19px; }
+.admin-form-panel, .admin-table-panel { padding: 22px; }
+.admin-form-panel .panel-heading, .admin-table-panel .panel-heading { margin-bottom: 17px; }
+.admin-form-panel .panel-heading h2, .admin-table-panel .panel-heading h2 { margin: 0 0 4px; }
+.admin-form-panel .panel-heading .page-description, .admin-table-panel .panel-heading .page-description { margin: 0; font-size: 12px; }
+.admin-create-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 14px; align-items: end; }
+.admin-create-grid .form-group { display: grid; min-width: 0; gap: 6px; margin-bottom: 12px; }
+.admin-create-grid .form-group label { margin: 0; font-size: 12px; }
+.admin-create-grid input, .admin-create-grid select { width: 100%; min-width: 0; }
+.field-hint { color: var(--color-muted); font-size: 11px; }
+.admin-form-submit { display: flex; align-items: center; min-height: 64px; padding-bottom: 12px; }
+.admin-users-table { min-width: 860px; }
+.admin-users-table th { white-space: nowrap; }
+.admin-user-identity { display: grid; gap: 2px; min-width: 150px; }
+.admin-user-identity strong { color: #26364d; font-weight: 650; }
+.admin-user-identity span, .admin-user-identity small { color: var(--color-muted); font-size: 11px; }
+.admin-users-table select { width: 100%; min-width: 135px; }
+.admin-user-edit-form { display: grid; gap: 8px; min-width: 190px; }
+.admin-user-edit-form input[type=password] { width: 100%; }
+.admin-user-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.admin-active-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--color-muted); font-size: 12px; font-weight: 550; }
+.admin-active-toggle input { width: 15px; height: 15px; }
+.btn-sm { min-height: 30px; padding: 5px 10px; font-size: 11px; }
+@media (max-width: 1050px) {
+  .admin-create-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .admin-overview-grid { grid-template-columns: 1fr; }
+  .admin-module-card { padding: 15px; }
+  .admin-create-grid { grid-template-columns: 1fr; }
+  .admin-form-submit { min-height: 0; padding: 0 0 4px; }
+  .admin-form-submit .btn { width: 100%; }
+  .admin-form-panel, .admin-table-panel { padding: 16px; }
+}
