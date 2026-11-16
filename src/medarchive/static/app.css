@@ -264,3 +264,6 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
   .operation-form-footer { align-items:stretch; flex-direction:column; }
   .operation-form-footer .btn { width:100%; }
 }
+
+
+.badge-neutral { color: #475467; background: #f0f2f5; }
