@@ -154,6 +154,8 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             assert card.card_number in initial_page.text
             assert "Custody Test Patient" in initial_page.text
             assert "Отметить передачу" in initial_page.text
+            assert "Контроль внешнего хранения" in initial_page.text
+            assert "custody-action-form" in initial_page.text
 
             marked = await client.post(
                 "/central/custody/mark",
@@ -217,6 +219,8 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
             transfer_page = await client.get("/central/transfer")
             assert packing_page.status_code == 200
             assert transfer_page.status_code == 200
+            assert "Упаковка и коробки" in packing_page.text
+            assert "packing-box-item" in packing_page.text
             assert card.card_number not in packing_page.text
             assert card.card_number not in transfer_page.text
 
@@ -400,6 +404,10 @@ async def test_central_external_custody_round_trip_preserves_balance_and_history
                 data={"shipment_id": str(shipment.id), "confirmed": "true"},
             )
             assert receipt.status_code == 303
+            placement_page = await client.get("/placement")
+            assert placement_page.status_code == 200
+            assert "Размещение на полках" in placement_page.text
+            assert "placement-box-item" in placement_page.text
             placed = await client.post(
                 "/placement/box",
                 data={"box_id": str(empty_box_id), "shelf_id": str(shelf_id)},
