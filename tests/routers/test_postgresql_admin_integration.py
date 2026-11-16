@@ -80,7 +80,6 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
             assert "Новая учётная запись" in users_page.text
             assert "Список пользователей" in users_page.text
             assert 'name="username"' in users_page.text
-            assert 'name="is_active"' in users_page.text
 
             # Create a branch through the same HTML form used by an administrator.
             response = await client.post(
@@ -137,6 +136,11 @@ async def test_admin_ui_branch_employee_block_and_restore_on_postgresql():
                 assert employee.is_active is True
                 assert employee.password_hash != "Integration-Password-2026"
                 assert employee.password_hash
+
+            users_page = await client.get("/admin/users")
+            assert users_page.status_code == 200, users_page.text
+            assert f'form="user-{user_id}"' in users_page.text
+            assert 'name="is_active"' in users_page.text
 
             # A branch employee can use the dashboard but cannot call admin APIs.
             from medarchive.dependencies import get_auth
