@@ -176,6 +176,12 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 assert forbidden_detail.status_code == 403
 
                 client.cookies.set("session", branch_token)
+                branch_page = await client.get("/branch/receive")
+                assert branch_page.status_code == 200
+                assert "Логистика филиала" in branch_page.text
+                assert "Нет отправлений, ожидающих приёмки" in branch_page.text
+                assert 'class="card operation-panel receipt-panel"' in branch_page.text
+
                 wrong_recipient = await client.post(
                     "/receive/resolve",
                     data={"shipment_id": str(shipment_id), "confirmed": "true",
@@ -186,8 +192,12 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 client.cookies.set("session", archive_token)
                 receive_page = await client.get("/receive")
                 assert receive_page.status_code == 200
-                assert "Инциденты, ожидающие проверки" in receive_page.text
+                assert "Инциденты при доставке" in receive_page.text
                 assert "Интеграционная проверка инцидента" in receive_page.text
+                assert 'class="card operation-panel receipt-panel"' in receive_page.text
+                assert "Проверить полный манифест" in receive_page.text
+                assert 'action="/receive/resolve"' in receive_page.text
+                assert 'name="resolution_note"' in receive_page.text
                 assert f"INC-CARD-{suffix}" in receive_page.text
                 assert f"INC-CARD-SECOND-{suffix}" in receive_page.text
 
@@ -350,8 +360,12 @@ async def test_admin_incident_pages_show_manifest_and_enforce_admin_role():
                 client.cookies.set("session", central_token)
                 central_page = await client.get("/central/receive")
                 assert central_page.status_code == 200
+                assert "Логистика центрального офиса" in central_page.text
                 assert "Инцидент отправления в центральный офис" in central_page.text
                 assert f"INC-CENTRAL-{suffix}" in central_page.text
+                assert 'class="card operation-panel receipt-panel"' in central_page.text
+                assert 'action="/central/receive/resolve"' in central_page.text
+                assert 'name="resolution_note"' in central_page.text
 
                 wrong_recipient = await client.post(
                     "/receive/resolve",
