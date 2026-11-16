@@ -1,49 +1,89 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>🚨 Инцидент отправления №{{ shipment.shipment_number }}</h1>
-<div class="card">
-    <p><strong>Статус:</strong> {{ shipment.status }}</p>
-    <p><strong>Маршрут:</strong> {{ source_name }} → {{ target_name }}</p>
-    <p><strong>Курьер:</strong> {{ courier_name }}</p>
-    <p><strong>Причина:</strong> {{ shipment.exception_note }}</p>
-    <p><strong>Зарегистрировал:</strong> {{ reporter_name or "—" }}</p>
-    <p><strong>Время регистрации:</strong> {{ shipment.exception_at }}</p>
-    <p><strong>Передано курьеру:</strong> {{ shipment.handed_over_at }}</p>
-</div>
+<section class="page-header admin-page-header">
+    <div>
+        <div class="eyebrow">Администрирование · Контроль отправлений</div>
+        <h1>Инцидент №{{ shipment.shipment_number }}</h1>
+        <p class="page-description">Сведения о доставке, зафиксированном расхождении и фактическом манифесте</p>
+    </div>
+    <a class="btn btn-secondary" href="/admin/incidents">К списку инцидентов</a>
+</section>
+
+<section class="panel incident-summary-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Сведения об отправлении</h2>
+            <p class="page-description">Карточка инцидента доступна только для просмотра</p>
+        </div>
+        <span class="status-pill status-pill-warning">{{ shipment.status }}</span>
+    </div>
+    <div class="incident-detail-grid">
+        <div class="incident-detail-item"><span>Маршрут</span><strong>{{ source_name }} → {{ target_name }}</strong></div>
+        <div class="incident-detail-item"><span>Курьер</span><strong>{{ courier_name }}</strong></div>
+        <div class="incident-detail-item"><span>Причина инцидента</span><strong>{{ shipment.exception_note }}</strong></div>
+        <div class="incident-detail-item"><span>Зарегистрировал</span><strong>{{ reporter_name or "—" }}</strong></div>
+        <div class="incident-detail-item"><span>Время регистрации</span><strong>{{ shipment.exception_at }}</strong></div>
+        <div class="incident-detail-item"><span>Передано курьеру</span><strong>{{ shipment.handed_over_at or "—" }}</strong></div>
+    </div>
+</section>
+
 {% if resolution %}
-<div class="card">
-    <h2 style="font-size:16px;">Разрешение инцидента</h2>
-    <p><strong>Результат проверки:</strong> {{ resolution.note or "—" }}</p>
-    <p><strong>Принял:</strong> {{ resolution.actor_name or "—" }}</p>
-    <p><strong>Время разрешения:</strong> {{ resolution.occurred_at }}</p>
-</div>
+<section class="panel incident-resolution-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Результат разрешения</h2>
+            <p class="page-description">Сведения из неизменяемого журнала событий</p>
+        </div>
+        <span class="status-pill status-pill-success">Разрешён</span>
+    </div>
+    <div class="incident-detail-grid">
+        <div class="incident-detail-item"><span>Результат проверки</span><strong>{{ resolution.note or "—" }}</strong></div>
+        <div class="incident-detail-item"><span>Принял</span><strong>{{ resolution.actor_name or "—" }}</strong></div>
+        <div class="incident-detail-item"><span>Время разрешения</span><strong>{{ resolution.occurred_at }}</strong></div>
+    </div>
+</section>
 {% endif %}
-<div class="card">
-    <h2 style="font-size:16px;">Коробки в отправлении</h2>
+
+<section class="panel incident-cargo-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Коробки в отправлении</h2>
+            <p class="page-description">Состав коробок по манифесту отправления</p>
+        </div>
+        <span class="admin-record-count">{{ boxes|length }} коробок</span>
+    </div>
     {% if boxes %}
-    <ul>{% for box in boxes %}<li>{{ box.box_number }}</li>{% endfor %}</ul>
+    <ul class="incident-box-list">{% for box in boxes %}<li>{{ box.box_number }}</li>{% endfor %}</ul>
     {% else %}
-    <p style="color:#888;">Коробок в отправлении нет.</p>
+    <div class="empty-state incident-sub-empty"><strong>Коробок в отправлении нет</strong></div>
     {% endif %}
-</div>
-<div class="card">
-    <h2 style="font-size:16px;">Карты по манифесту</h2>
+</section>
+
+<section class="panel incident-cargo-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Карты по манифесту</h2>
+            <p class="page-description">Перечень карт, включённых в отправление при передаче курьеру</p>
+        </div>
+        <span class="admin-record-count">{{ cargo|length }} карт</span>
+    </div>
     {% if cargo %}
-    <table>
-        <thead><tr><th>Номер карты</th><th>Пациент</th><th>Коробка</th></tr></thead>
-        <tbody>
-        {% for card in cargo %}
-        <tr>
-            <td>{{ card.card_number }}</td>
-            <td>{{ card.full_name }}</td>
-            <td>{{ card.box_number or "Отдельно" }}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-wrap">
+        <table class="admin-incident-cargo-table">
+            <thead><tr><th>Номер карты</th><th>Пациент</th><th>Коробка</th></tr></thead>
+            <tbody>
+            {% for card in cargo %}
+            <tr>
+                <td class="incident-number"><strong>{{ card.card_number }}</strong></td>
+                <td>{{ card.full_name }}</td>
+                <td>{{ card.box_number or "Отдельно" }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
     {% else %}
-    <p style="color:#888;">В манифесте нет карт.</p>
+    <div class="empty-state incident-sub-empty"><strong>В манифесте нет карт</strong></div>
     {% endif %}
-</div>
-<p><a href="/admin/incidents">← К списку инцидентов</a></p>
+</section>
 {% endblock %}
