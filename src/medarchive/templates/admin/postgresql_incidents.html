@@ -27,7 +27,7 @@
             {% for item in incidents %}
                 <tr>
                     <td class="incident-number"><strong>№{{ item.shipment.shipment_number }}</strong></td>
-                    <td><span class="status-pill status-pill-warning">{{ item.shipment.status }}</span></td>
+                    <td>{% if item.shipment.status == "received" %}<span class="status-pill status-pill-success">{{ item.shipment.status }}</span>{% else %}<span class="status-pill status-pill-warning">{{ item.shipment.status }}</span>{% endif %}</td>
                     <td><div class="incident-route"><span>{{ item.source_name }}</span><span aria-hidden="true">→</span><span>{{ item.target_name }}</span></div></td>
                     <td>{{ item.courier_name }}</td>
                     <td class="incident-reason">{{ item.shipment.exception_note }}</td>
