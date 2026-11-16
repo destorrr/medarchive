@@ -365,3 +365,37 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
 .badge-success { color:#176b45; background:#e8f5ee; }
 .badge-warning { color:#8a5b0a; background:#fff4d6; }
 .badge-info { color:#2457a6; background:#eaf1ff; }
+
+
+/* Central Office dispatch */
+.central-dispatch-header { margin-bottom:20px; }
+.central-dispatch-panel { max-width:1100px; }
+.central-dispatch-panel > .panel-heading { align-items:flex-start; }
+.central-dispatch-panel > .panel-heading .badge { flex:0 0 auto; }
+.central-dispatch-form { display:grid; gap:20px; }
+.central-dispatch-route { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:16px; background:var(--color-surface-muted); border:1px solid var(--color-border); border-radius:var(--radius-sm); }
+.central-dispatch-route .form-group { margin:0; }
+.central-dispatch-route select,.central-dispatch-box select { width:100%; min-height:42px; }
+.central-dispatch-content { display:grid; grid-template-columns:minmax(240px,.8fr) minmax(0,1.5fr); gap:14px; }
+.central-dispatch-box,.central-dispatch-cards { min-width:0; padding:15px; border:1px solid var(--color-border); border-radius:var(--radius-sm); }
+.central-dispatch-section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:13px; }
+.central-dispatch-section-heading h3 { margin:0; color:#26364d; font-size:13px; }
+.central-dispatch-section-heading p { margin:4px 0 0; color:var(--color-muted); font-size:11px; }
+.central-dispatch-card-table { min-width:420px; }
+.central-dispatch-card-table th,.central-dispatch-card-table td { padding:10px 11px; }
+.central-dispatch-card-table .dispatch-select-column { width:65px; }
+.central-dispatch-card-table input[type="checkbox"] { width:16px; height:16px; }
+.dispatch-card-number { color:#26364d; font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.central-dispatch-footer { align-items:flex-end; }
+.central-dispatch-footer .form-help { max-width:480px; }
+.central-dispatch-empty { min-height:230px; gap:9px; }
+.central-dispatch-empty strong { color:#344054; font-size:13px; }
+.central-dispatch-empty > span:last-of-type { max-width:500px; font-size:12px; }
+.central-dispatch-empty .btn { margin-top:6px; }
+@media (max-width:760px) {
+ .central-dispatch-content { grid-template-columns:1fr; }
+ .central-dispatch-route { grid-template-columns:1fr; }
+ .central-dispatch-panel > .panel-heading { flex-direction:column; }
+ .central-dispatch-footer { align-items:stretch; }
+ .central-dispatch-footer .btn { width:100%; }
+}
