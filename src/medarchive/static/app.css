@@ -319,3 +319,44 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
   .receipt-resolve-footer .btn { width:100%; }
   .receipt-confirm-form .btn { width:100%; }
 }
+
+
+/* Archive placement, Central Office packing and external custody */
+.archive-page-header { align-items:center; }
+.archive-page-header > form { flex:0 0 auto; }
+.placement-panel { margin-bottom:16px; }
+.placement-box-list,.packing-box-list { display:grid; gap:12px; }
+.placement-box-item,.packing-box-item { min-width:0; padding:15px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface); }
+.placement-box-heading,.packing-box-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--color-border); }
+.placement-box-heading > div,.packing-box-heading > div { display:grid; gap:3px; min-width:0; }
+.placement-box-heading strong,.packing-box-heading strong { color:#26364d; font-size:14px; font-variant-numeric:tabular-nums; }
+.placement-members,.packing-members { display:grid; }
+.placement-member,.packing-member { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--color-border); }
+.placement-member > div,.packing-member > div { display:grid; gap:2px; min-width:0; }
+.placement-member strong,.packing-member strong { color:#344054; font-size:12px; font-variant-numeric:tabular-nums; }
+.placement-member span,.packing-member span { color:var(--color-muted); font-size:11px; }
+.placement-member form,.packing-member form { margin:0; }
+.placement-inline-form,.packing-add-form { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.placement-inline-form select,.packing-add-form select { flex:1 1 240px; min-width:0; }
+.placement-empty-box,.packing-empty-box { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; color:var(--color-muted); font-size:12px; }
+.placement-empty-box form,.packing-empty-box form { margin:0; }
+.placement-selection-form { display:grid; gap:12px; }
+.placement-selection-form .operation-form-footer form { margin:0; }
+.placement-table { min-width:700px; }
+.placement-table td form { margin:0; }
+.custody-panel { min-width:0; }
+.custody-table { min-width:950px; }
+.custody-table td { vertical-align:middle; }
+.custody-action-form { display:grid; grid-template-columns:minmax(110px,.75fr) minmax(150px,1fr); gap:7px; min-width:280px; }
+.custody-action-form input,.custody-action-form select { min-width:0; width:100%; }
+.custody-action-form button { grid-column:1 / -1; justify-self:start; }
+.custody-table .badge { white-space:nowrap; }
+@media (max-width:700px) {
+ .archive-page-header { align-items:flex-start; flex-direction:column; }
+ .archive-page-header > form,.archive-page-header > form .btn { width:100%; }
+ .placement-box-heading,.packing-box-heading { align-items:flex-start; }
+ .placement-empty-box,.packing-empty-box { align-items:flex-start; flex-direction:column; }
+ .placement-empty-box .btn,.packing-empty-box .btn { width:100%; }
+ .custody-action-form { grid-template-columns:1fr; min-width:240px; }
+ .custody-action-form button { grid-column:auto; width:100%; }
+}
