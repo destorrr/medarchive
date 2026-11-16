@@ -568,3 +568,29 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
   .admin-form-submit .btn { width: 100%; }
   .admin-form-panel, .admin-table-panel { padding: 16px; }
 }
+
+/* Branch administration */
+.branch-create-panel,.branch-list-panel { margin-bottom:18px; }
+.branch-create-form { display:grid; grid-template-columns:minmax(180px,.8fr) minmax(240px,1.2fr) auto; align-items:end; gap:14px; }
+.branch-create-form .form-group { display:grid; gap:6px; margin:0; min-width:0; }
+.branch-create-form .form-group label { margin:0; font-size:12px; }
+.branch-create-form input { width:100%; min-width:0; }
+.branch-create-submit { padding-bottom:1px; }
+.branch-create-submit .btn { white-space:nowrap; }
+.admin-record-count { color:var(--color-muted); font-size:12px; font-weight:600; white-space:nowrap; }
+.admin-branches-table { min-width:760px; }
+.admin-branches-table th { white-space:nowrap; }
+.admin-branches-table td { vertical-align:middle; }
+.branch-code-input { width:125px; min-width:0; }
+.branch-name-input { width:100%; min-width:180px; }
+.branch-row-actions { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+.branch-row-actions form { margin:0; }
+.status-pill { display:inline-flex; align-items:center; min-height:25px; padding:4px 9px; border-radius:999px; font-size:11px; font-weight:650; white-space:nowrap; }
+.status-pill-success { color:#067647; background:#ecfdf3; }
+.status-pill-muted { color:#475467; background:#f2f4f7; }
+.btn-quiet { color:#475467; background:#fff; border:1px solid var(--color-border); }
+.branch-empty-state { min-height:170px; }
+.branch-empty-state strong { color:#344054; font-size:13px; }
+.branch-empty-state span { max-width:560px; color:var(--color-muted); font-size:12px; line-height:1.55; }
+@media(max-width:850px) { .branch-create-form { grid-template-columns:1fr 1fr; } .branch-create-submit { grid-column:1/-1; } }
+@media(max-width:600px) { .branch-create-form { grid-template-columns:1fr; } .branch-create-submit { grid-column:auto; } .branch-create-submit .btn { width:100%; } .branch-list-panel>.panel-heading { align-items:flex-start; flex-direction:column; } }
