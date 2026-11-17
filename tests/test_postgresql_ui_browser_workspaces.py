@@ -172,6 +172,36 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
         return !hasLabel && !hasAriaName;
     }).map((el) => ({tag: el.tagName, type: el.type || '', name: el.name || '', id: el.id || ''}))""")
     assert not unlabeled_controls, (path, "form controls without accessible names", unlabeled_controls)
+
+    unnamed_actions = page.evaluate("""() => {
+      const visible = (el) => {
+        const style = getComputedStyle(el);
+        return style.display !== "none" && style.visibility !== "hidden"
+          && el.getClientRects().length > 0;
+      };
+      const accessibleName = (el) => {
+        const labelledBy = el.getAttribute("aria-labelledby");
+        const referenced = labelledBy
+          ? labelledBy.split(/\\s+/).map((id) => document.getElementById(id))
+              .filter(Boolean).map((node) => node.innerText || node.textContent).join(" ")
+          : "";
+        const imageAlt = Array.from(el.querySelectorAll("img[alt]"))
+          .map((image) => image.getAttribute("alt")).join(" ");
+        return (el.getAttribute("aria-label") || referenced || el.innerText
+          || el.getAttribute("title") || imageAlt || "").trim();
+      };
+      return Array.from(document.querySelectorAll(
+        "a[href], button, [role=button], [role=link]"
+      )).filter((el) => visible(el) && !accessibleName(el))
+        .map((el) => ({tag: el.tagName, role: el.getAttribute("role"),
+          href: el.getAttribute("href"), className: el.className}));
+    }""")
+    assert not unnamed_actions, (path, "interactive elements without accessible names", unnamed_actions)
+
+    images_without_alt = page.evaluate("""() => Array.from(document.querySelectorAll("img"))
+      .filter((image) => image.getClientRects().length > 0 && !image.hasAttribute("alt"))
+      .map((image) => image.getAttribute("src") || "inline image")""")
+    assert not images_without_alt, (path, "images without alt attributes", images_without_alt)
     # Start keyboard navigation from the document, not from an autofocus
     # search field. Otherwise Tab advances from a page-specific initial focus
     # and makes this shared accessibility check depend on the previous route.
