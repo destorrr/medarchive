@@ -55,14 +55,14 @@ def _context(request: Request, user: User, **extra) -> dict:
         "user_role_pill": "Центральный офис",
         "role_label": "Центральный офис",
         "menu_items": [
-            {"url": "/dashboard", "label": "📊 Панель управления"},
-            {"url": "/search", "label": "🔍 Поиск"},
-            {"url": "/history", "label": "📜 Журнал движений"},
-            {"url": "/requests/new", "label": "📋 Запросить карты из архива"},
-            {"url": "/central/receive", "label": "📥 Приёмка"},
-            {"url": "/central/packing", "label": "📦 Упаковка"},
-            {"url": "/central/transfer", "label": "🚚 Отправка"},
-            {"url": "/central/custody", "label": "⚖️ Внешнее хранение"},
+            {"url": "/dashboard", "label": "Панель управления"},
+            {"url": "/search", "label": "Поиск"},
+            {"url": "/history", "label": "Журнал движений"},
+            {"url": "/requests/new", "label": "Запросить карты из архива"},
+            {"url": "/central/receive", "label": "Приёмка"},
+            {"url": "/central/packing", "label": "Упаковка"},
+            {"url": "/central/transfer", "label": "Отправка"},
+            {"url": "/central/custody", "label": "Внешнее хранение"},
         ],
     }
     context.update(extra)

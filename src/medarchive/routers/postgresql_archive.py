@@ -61,12 +61,12 @@ def _archive_context(request: Request, user: User, **extra) -> dict:
         "user_role_pill": "Архив",
         "role_label": "Архив",
         "menu_items": [
-            {"url": "/dashboard", "label": "📊 Панель управления"},
-            {"url": "/search", "label": "🔍 Поиск"},
-            {"url": "/history", "label": "📜 Журнал движений"},
-            {"url": "/receive", "label": "📥 Приёмка"},
-            {"url": "/placement", "label": "🗂 Размещение"},
-            {"url": "/requests", "label": "📋 Заявки ЦО"},
+            {"url": "/dashboard", "label": "Панель управления"},
+            {"url": "/search", "label": "Поиск"},
+            {"url": "/history", "label": "Журнал движений"},
+            {"url": "/receive", "label": "Приёмка"},
+            {"url": "/placement", "label": "Размещение"},
+            {"url": "/requests", "label": "Заявки ЦО"},
         ],
     }
     context.update(extra)
@@ -699,10 +699,10 @@ def _central_requests_context(request: Request, user: User, **extra) -> dict:
         "user_role_pill": "Центральный офис",
         "role_label": "Центральный офис",
         "menu_items": [
-            {"url": "/dashboard", "label": "📊 Панель управления"},
-            {"url": "/search", "label": "🔍 Поиск"},
-            {"url": "/history", "label": "📜 Журнал движений"},
-            {"url": "/requests/new", "label": "📋 Запросить карты из архива"},
+            {"url": "/dashboard", "label": "Панель управления"},
+            {"url": "/search", "label": "Поиск"},
+            {"url": "/history", "label": "Журнал движений"},
+            {"url": "/requests/new", "label": "Запросить карты из архива"},
         ],
     }
     context.update(extra)
