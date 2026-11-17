@@ -64,6 +64,7 @@ def _archive_context(request: Request, user: User, **extra) -> dict:
             {"url": "/dashboard", "label": "Панель управления"},
             {"url": "/search", "label": "Поиск"},
             {"url": "/history", "label": "Журнал движений"},
+            {"url": "/shipments", "label": "Отправления"},
             {"url": "/receive", "label": "Приёмка"},
             {"url": "/placement", "label": "Размещение"},
             {"url": "/requests", "label": "Заявки ЦО"},
@@ -702,6 +703,7 @@ def _central_requests_context(request: Request, user: User, **extra) -> dict:
             {"url": "/dashboard", "label": "Панель управления"},
             {"url": "/search", "label": "Поиск"},
             {"url": "/history", "label": "Журнал движений"},
+            {"url": "/shipments", "label": "Отправления"},
             {"url": "/requests/new", "label": "Запросить карты из архива"},
         ],
     }
