@@ -153,11 +153,16 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
                     to_location_id=archive_location.id, courier_id=courier.id,
                     issued_by=central_user.id, status="draft",
                 )
-                session.add_all([branch, branch_location, branch_user, archive_user, central_user, viewer, courier, shipment, central_shipment])
+                session.add(branch)
+                await session.flush()
+                session.add_all([branch_location, branch_user, archive_user, central_user, viewer, courier])
                 if created_archive:
                     session.add(archive_location)
                 if created_central:
                     session.add(central_location)
+                await session.flush()
+                session.add_all([shipment, central_shipment])
+                await session.flush()
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
             async def get_as(user, page):
                 return await client.get(page, cookies={"session": get_auth().create_session_token(user)})
