@@ -112,6 +112,7 @@ async def _transfer_context(
             {"url": "/dashboard", "label": "Панель управления"},
             {"url": "/search", "label": "Поиск"},
             {"url": "/history", "label": "Журнал движений"},
+            {"url": "/branch/receive", "label": "Приёмка"},
             {"url": "/shipments", "label": "Отправления"},
             {"url": "/packing", "label": "Упаковка коробки"},
             {"url": "/transfer", "label": "Передача курьеру"},
