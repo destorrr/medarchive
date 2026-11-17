@@ -249,6 +249,35 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
       .filter((image) => image.getClientRects().length > 0 && !image.hasAttribute("alt"))
       .map((image) => image.getAttribute("src") || "inline image")""")
     assert not images_without_alt, (path, "images without alt attributes", images_without_alt)
+
+    accessibility_references = page.evaluate("""() => {
+      const ids = Array.from(document.querySelectorAll("[id]")).map((el) => el.id);
+      const counts = ids.reduce((result, id) => {
+        result[id] = (result[id] || 0) + 1;
+        return result;
+      }, {});
+      const duplicateIds = Object.entries(counts)
+        .filter(([, count]) => count > 1)
+        .map(([id, count]) => ({id, count}));
+      const brokenReferences = [];
+      for (const attribute of ["aria-labelledby", "aria-describedby"]) {
+        for (const element of document.querySelectorAll("[" + attribute + "]")) {
+          for (const id of element.getAttribute(attribute).trim().split(/\\s+/).filter(Boolean)) {
+            if (!document.getElementById(id)) {
+              brokenReferences.push({attribute, id, tag: element.tagName});
+            }
+          }
+        }
+      }
+      return {duplicateIds, brokenReferences};
+    }""")
+    assert not accessibility_references["duplicateIds"], (
+        path, "document contains duplicate element IDs", accessibility_references
+    )
+    assert not accessibility_references["brokenReferences"], (
+        path, "ARIA label/description references a missing element", accessibility_references
+    )
+
     # Start keyboard navigation from the document, not from an autofocus
     # search field. Otherwise Tab advances from a page-specific initial focus
     # and makes this shared accessibility check depend on the previous route.
