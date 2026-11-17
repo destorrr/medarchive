@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header operation-page-header central-dispatch-header">
+    <div>
+        <p class="eyebrow">Логистика центрального офиса</p>
+        <h1>Отправка из центрального офиса</h1>
+        <p class="page-description">Сформируйте одно отправление для филиала или архива. Можно передать одну коробку, отдельные карты или их сочетание.</p>
+    </div>
+</header>
+
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success" role="status">{{ success }}</div>{% endif %}
+
+<section class="card operation-panel central-dispatch-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Новое отправление</p>
+            <h2>Маршрут и передача</h2>
+            <p class="page-description">У отправления может быть только один получатель. После передачи курьеру состав и маршрут фиксируются.</p>
+        </div>
+        <span class="badge badge-info">ЦО → филиал / архив</span>
+    </div>
+
+    {% if ready_boxes or cards %}
+    <form id="central-transfer-form" method="post" action="/central/transfer/confirm" class="operation-form central-dispatch-form">
+        <div class="central-dispatch-route">
+            <div class="form-group">
+                <label for="to_location_id">Получатель</label>
+                <select id="to_location_id" name="to_location_id" required>
+                    <option value="">— Выберите филиал или архив —</option>
+                    {% for location in destinations %}<option value="{{ location.id }}">{{ location.name }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="courier_id">Курьер</label>
+                <select id="courier_id" name="courier_id" required>
+                    <option value="">— Выберите курьера —</option>
+                    {% for courier in couriers %}<option value="{{ courier.id }}">{{ courier.full_name }}{% if courier.phone %} · {{ courier.phone }}{% endif %}</option>{% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="central-dispatch-content">
+            <div class="central-dispatch-box">
+                <div class="central-dispatch-section-heading">
+                    <div><h3>Коробка</h3><p>Выберите не более одной коробки целиком</p></div>
+                    <span class="badge badge-neutral">{{ ready_boxes|length }} доступно</span>
+                </div>
+                <label class="sr-only" for="box_id">Коробка для отправления</label>
+                <select id="box_id" name="box_id">
+                    <option value="">— Без коробки —</option>
+                    {% for box in ready_boxes %}<option value="{{ box.id }}">{{ box.box_number }} · {{ box.card_count }} карт</option>{% endfor %}
+                </select>
+                {% if not ready_boxes %}<p class="form-help">Нет коробок, готовых к отправке.</p>{% endif %}
+            </div>
+
+            <div class="central-dispatch-cards">
+                <div class="central-dispatch-section-heading">
+                    <div><h3>Отдельные карты</h3><p>Можно выбрать несколько карт без упаковки</p></div>
+                    <span class="badge badge-neutral">{{ cards|length }} доступно</span>
+                </div>
+                {% if cards %}
+                <div class="table-wrap">
+                    <table class="data central-dispatch-card-table">
+                        <thead><tr><th class="dispatch-select-column">Выбрать</th><th>Номер карты</th><th>ФИО пациента</th></tr></thead>
+                        <tbody>
+                        {% for card in cards %}
+                        <tr>
+                            <td><input type="checkbox" name="card_ids" value="{{ card.id }}" form="central-transfer-form" aria-label="Выбрать карту {{ card.card_number }}"></td>
+                            <td class="dispatch-card-number">{{ card.card_number }}</td>
+                            <td>{{ card.full_name }}</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state compact-empty"><strong>Отдельных карт для отправки нет</strong><span>Карты, уже упакованные или находящиеся во внешнем хранении, здесь не отображаются.</span></div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="operation-form-footer central-dispatch-footer">
+            <p class="form-help">Выберите коробку, отдельные карты или оба типа состава. Отправление без состава создать нельзя.</p>
+            <button class="btn btn-primary" type="submit">Передать отправление курьеру</button>
+        </div>
+    </form>
+    {% else %}
+    <div class="empty-state central-dispatch-empty">
+        <span class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg>
+        </span>
+        <strong>Нет состава, готового к отправке</strong>
+        <span>На балансе ЦО пока нет свободных коробок или отдельных карт. Внешне переданные карты не включаются в отправления до возврата.</span>
+        <a class="btn btn-secondary" href="/central/packing">Перейти к упаковке</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

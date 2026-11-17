@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header operation-page-header">
+    <div><p class="eyebrow">Логистика центрального офиса</p><h1>Упаковка и коробки</h1><p class="page-description">Формируйте транспортные коробки из карт на балансе ЦО. Карты во внешнем ответственном хранении недоступны для упаковки.</p></div>
+</header>
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success" role="status">{{ success }}</div>{% endif %}
+<section class="operation-summary"><div class="operation-summary-main"><p class="eyebrow">Центральный офис</p><h2>Подготовка отправлений</h2><p class="page-description">Можно создать пустую коробку или сразу включить выбранные карты.</p></div><div class="operation-metric"><span class="operation-metric-value">{{ cards|length }}</span><span class="operation-metric-label">Карт без коробки</span></div><div class="operation-metric"><span class="operation-metric-value">{{ boxes|length }}</span><span class="operation-metric-label">Коробок на балансе</span></div></section>
+<section class="card operation-panel">
+    <div class="panel-heading"><div><p class="eyebrow">Новая транспортная единица</p><h2>Создать коробку</h2><p class="page-description">Отметьте карты ниже или оставьте выбор пустым, чтобы создать пустую коробку.</p></div></div>
+    <form id="new-box-form" method="post" action="/central/packing/new-box" class="operation-form"><div class="operation-form-footer"><p class="form-help">Новая коробка будет зарегистрирована на балансе центрального офиса.</p><button class="btn btn-primary" type="submit">Создать коробку</button></div></form>
+</section>
+<section class="card operation-panel">
+    <div class="panel-heading"><div><p class="eyebrow">Доступны для упаковки</p><h2>Карты ЦО без коробки</h2></div><span class="badge badge-neutral">{{ cards|length }} карт</span></div>
+    {% if cards %}<div class="table-wrap"><table class="data operation-data-table"><thead><tr><th>В новую коробку</th><th>Номер</th><th>Пациент</th><th>Дата рождения</th></tr></thead><tbody>{% for card in cards %}<tr><td><input type="checkbox" name="card_ids" value="{{ card.id }}" form="new-box-form" aria-label="Выбрать карту {{ card.card_number }}"></td><td class="operation-card-number">{{ card.card_number }}</td><td>{{ card.full_name }}</td><td>{{ card.date_of_birth }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state compact-empty"><strong>Нет отдельных карт, доступных для упаковки</strong><span>Карты появятся после приёмки в центральном офисе или возврата из внешней организации.</span></div>{% endif %}
+</section>
+<section class="card operation-panel">
+    <div class="panel-heading"><div><p class="eyebrow">Состав и повторное использование</p><h2>Коробки на балансе ЦО</h2></div><span class="badge badge-neutral">{{ boxes|length }} коробок</span></div>
+    {% if boxes %}<div class="packing-box-list">{% for item in box_items %}<article class="packing-box-item"><div class="packing-box-heading"><div><span class="eyebrow">Транспортная коробка</span><strong>{{ item.box.box_number }}</strong><span class="receipt-secondary">{{ item.cards|length }} карт</span></div><a class="btn btn-secondary" href="/boxes/{{ item.box.id }}/label" target="_blank" rel="noopener">QR-этикетка</a></div>
+    {% if item.cards %}<div class="packing-members">{% for card in item.cards %}<div class="packing-member"><div><strong>{{ card.card_number }}</strong><span>{{ card.full_name }}</span></div><form method="post" action="/central/packing/remove-card"><input type="hidden" name="box_id" value="{{ item.box.id }}"><input type="hidden" name="card_id" value="{{ card.id }}"><button class="btn btn-ghost" type="submit">Извлечь</button></form></div>{% endfor %}</div>{% else %}<div class="packing-empty-box"><span>Коробка пуста</span><form method="post" action="/central/packing/write-off-box" onsubmit="return confirm('Списать пустую коробку? Повторное использование будет запрещено.');"><input type="hidden" name="box_id" value="{{ item.box.id }}"><button class="btn btn-danger-ghost" type="submit">Списать пустую коробку</button></form></div>{% endif %}
+    {% if cards %}<form method="post" action="/central/packing/add-card" class="packing-add-form"><input type="hidden" name="box_id" value="{{ item.box.id }}"><label class="sr-only" for="central-add-{{ item.box.id }}">Добавить карту</label><select id="central-add-{{ item.box.id }}" name="card_id" required><option value="">— Добавить отдельную карту —</option>{% for card in cards %}<option value="{{ card.id }}">{{ card.card_number }} · {{ card.full_name }}</option>{% endfor %}</select><button class="btn btn-secondary" type="submit">Добавить</button></form>{% endif %}
+    </article>{% endfor %}</div>{% else %}<div class="empty-state compact-empty"><strong>Коробок на балансе ЦО пока нет</strong></div>{% endif %}
+</section>
+{% endblock %}

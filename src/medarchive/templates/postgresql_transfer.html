@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header operation-page-header">
+    <div>
+        <p class="eyebrow">Логистика филиала</p>
+        <h1>Передача курьеру</h1>
+        <p class="page-description">Сформируйте отправление из одной коробки и укажите единственного получателя и курьера.</p>
+    </div>
+</header>
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success" role="status">{{ success }}</div>{% endif %}
+
+<section class="card operation-panel transfer-panel">
+    {% if ready_boxes %}
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Новое отправление</p>
+            <h2>Параметры передачи</h2>
+            <p class="page-description">Перед передачей проверьте коробку и маршрут. После передачи состав отправления фиксируется.</p>
+        </div>
+        <span class="badge badge-ready">{{ ready_boxes|length }} готово</span>
+    </div>
+    <form method="post" action="/transfer/confirm" class="operation-form transfer-form">
+        <div class="form-group">
+            <label for="box_id">Коробка</label>
+            <select id="box_id" name="box_id" class="dd-select" required>
+                <option value="">— Выберите коробку —</option>
+                {% for box in ready_boxes %}
+                <option value="{{ box.id }}"{% if selected_box_id is defined and selected_box_id|string == box.id|string %} selected{% endif %}>{{ box.box_number }} · {{ box.card_count }} карт</option>
+                {% endfor %}
+            </select>
+            <p class="form-help">В отправление включается полный текущий состав выбранной коробки.</p>
+        </div>
+        <div class="form-group">
+            <label for="to_location_id">Получатель</label>
+            <select id="to_location_id" name="to_location_id" class="dd-select" required>
+                <option value="">— Выберите место доставки —</option>
+                {% for location in destinations %}
+                <option value="{{ location.id }}">{{ location.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="courier_id">Курьер</label>
+            <select id="courier_id" name="courier_id" class="dd-select" required>
+                <option value="">— Выберите курьера —</option>
+                {% for courier in couriers %}
+                <option value="{{ courier.id }}">{{ courier.full_name }}{% if courier.phone %} · {{ courier.phone }}{% endif %}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="operation-form-footer">
+            <p class="form-help">Отправление будет адресовано только одному получателю.</p>
+            <button type="submit" class="btn btn-primary">Передать коробку курьеру</button>
+        </div>
+    </form>
+    {% else %}
+    <div class="empty-state">
+        <span class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg>
+        </span>
+        <strong>Нет коробок, готовых к отправке</strong>
+        <span>Сначала создайте коробку, добавьте в неё карты и завершите упаковку.</span>
+        <a class="btn btn-secondary" href="/packing">Перейти к упаковке</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

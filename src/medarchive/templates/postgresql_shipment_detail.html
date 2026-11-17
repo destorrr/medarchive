@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header shipment-page-header">
+  <div><p class="eyebrow"><a href="/shipments">Отправления</a> · карточка отправления</p>
+    <h1>Отправление № {{ shipment.number }}</h1>
+    <p class="page-description">Сведения о маршруте, курьере, составе и последовательности событий.</p></div>
+  <a class="btn btn-secondary" href="/shipments">К списку</a>
+</header>
+<section class="shipment-detail-grid">
+  <article class="card shipment-summary">
+    <div class="shipment-detail-title"><h2>Основные сведения</h2><span class="badge badge-{{ shipment.status }}">{{ shipment.status_label }}</span></div>
+    <dl class="shipment-facts">
+      <div><dt>Откуда</dt><dd>{{ shipment.source }}</dd></div>
+      <div><dt>Куда</dt><dd>{{ shipment.destination }}</dd></div>
+      <div><dt>Курьер</dt><dd>{{ shipment.courier }}{% if shipment.courier_phone %}<span class="shipment-muted">{{ shipment.courier_phone }}</span>{% endif %}</dd></div>
+      <div><dt>Создано</dt><dd>{{ shipment.created_at.strftime("%d.%m.%Y %H:%M") if shipment.created_at else "—" }}</dd></div>
+      <div><dt>Передано курьеру</dt><dd>{{ shipment.handed_over_at.strftime("%d.%m.%Y %H:%M") if shipment.handed_over_at else "—" }}</dd></div>
+      <div><dt>Принято</dt><dd>{{ shipment.received_at.strftime("%d.%m.%Y %H:%M") if shipment.received_at else "—" }}</dd></div>
+      <div><dt>Состав</dt><dd>{{ shipment.box_count }} коробок · {{ shipment.card_count }} карт</dd></div>
+    </dl>
+    {% if shipment.exception_note %}<div class="shipment-exception"><strong>Инцидент</strong><p>{{ shipment.exception_note }}</p></div>{% endif %}
+  </article>
+  <article class="card shipment-manifest">
+    <div class="panel-heading"><div><p class="eyebrow">Состав отправления</p><h2>Манифест</h2></div></div>
+    {% for box in boxes %}
+    <section class="shipment-manifest-group"><h3>Коробка {{ box.box_number }}</h3>
+      {% if box.cards %}<ul>{% for card in box.cards %}<li><strong>{{ card.card_number }}</strong><span>{{ card.full_name }}</span></li>{% endfor %}</ul>
+      {% else %}<p class="shipment-muted">Пустая коробка</p>{% endif %}
+    </section>
+    {% endfor %}
+    {% if standalone_cards %}<section class="shipment-manifest-group"><h3>Отдельные карты</h3>
+      <ul>{% for card in standalone_cards %}<li><strong>{{ card.card_number }}</strong><span>{{ card.full_name }}</span></li>{% endfor %}</ul>
+    </section>{% endif %}
+    {% if not boxes and not standalone_cards %}<p class="shipment-muted">Манифест пуст.</p>{% endif %}
+  </article>
+  <article class="card shipment-timeline-card">
+    <div class="panel-heading"><div><p class="eyebrow">Аудит</p><h2>История статусов</h2></div></div>
+    {% if timeline %}<ol class="shipment-timeline">
+      {% for event in timeline %}<li><span class="shipment-timeline-dot"></span><div>
+        <strong>{{ event.event_label }}</strong><p>{{ event.occurred_at.strftime("%d.%m.%Y %H:%M:%S") if event.occurred_at else "—" }} · {{ event.actor }}</p>
+        {% if event.payload and event.payload.get("note") %}<p>{{ event.payload.get("note") }}</p>{% endif %}
+        {% if event.payload and event.payload.get("resolution_note") %}<p>{{ event.payload.get("resolution_note") }}</p>{% endif %}
+      </div></li>{% endfor %}
+    </ol>{% else %}<p class="shipment-muted">События по отправлению не зарегистрированы.</p>{% endif %}
+  </article>
+</section>
+{% endblock %}

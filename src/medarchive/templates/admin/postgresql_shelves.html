@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header admin-page-header">
+    <div>
+        <div class="eyebrow">Администрирование</div>
+        <h1>Секции и полки архива</h1>
+        <p class="page-description">Настройка адресов хранения медицинских карт и коробок в архиве</p>
+    </div>
+    <a class="btn btn-secondary" href="/admin">К настройкам</a>
+</section>
+
+<section class="panel admin-form-panel shelf-create-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Добавить полку</h2>
+            <p class="page-description">Укажите секцию и обозначение новой полки. Существующую секцию можно выбрать, повторив её название.</p>
+        </div>
+        <span class="badge badge-info">Новая запись</span>
+    </div>
+    <form method="post" action="/admin/sections" class="shelf-create-form">
+        <div class="form-group">
+            <label for="shelf-section-name">Секция</label>
+            <input id="shelf-section-name" name="section_name" maxlength="120" placeholder="Например, Секция А" required>
+        </div>
+        <div class="form-group">
+            <label for="shelf-name">Полка</label>
+            <input id="shelf-name" name="shelf_name" maxlength="120" placeholder="Например, А-01" required>
+        </div>
+        <div class="shelf-create-submit">
+            <button class="btn btn-primary" type="submit">Добавить полку</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel admin-table-panel shelf-list-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Список полок</h2>
+            <p class="page-description">Редактирование обозначений и управление доступностью мест хранения</p>
+        </div>
+        <span class="admin-record-count">{{ shelves|length }} записей</span>
+    </div>
+    {% if shelves %}
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Таблица архивных полок; прокручивается по горизонтали">
+        <table class="admin-shelves-table">
+            <thead><tr><th>Секция</th><th>Полка</th><th>Состояние</th><th>Действия</th></tr></thead>
+            <tbody>
+            {% for shelf in shelves %}
+            <tr>
+                <td>
+                    <form id="shelf-{{ shelf.id }}" method="post" action="/admin/sections/{{ shelf.id }}/edit"></form>
+                    <input class="shelf-section-input" aria-label="Секция полки {{ shelf.shelf_name }}" name="section_name" value="{{ shelf.section_name }}" maxlength="120" form="shelf-{{ shelf.id }}" required>
+                </td>
+                <td><input class="shelf-name-input" aria-label="Обозначение полки в секции {{ shelf.section_name }}" name="shelf_name" value="{{ shelf.shelf_name }}" maxlength="120" form="shelf-{{ shelf.id }}" required></td>
+                <td>
+                    {% if shelf.is_active %}<span class="status-pill status-pill-success">Активна</span>
+                    {% else %}<span class="status-pill status-pill-muted">Отключена</span>{% endif %}
+                </td>
+                <td>
+                    <div class="shelf-row-actions">
+                        <button class="btn btn-secondary btn-sm" type="submit" form="shelf-{{ shelf.id }}">Сохранить</button>
+                        <form method="post" action="/admin/sections/{{ shelf.id }}/status">
+                            <input type="hidden" name="is_active" value="{{ 'false' if shelf.is_active else 'true' }}">
+                            <button class="btn btn-quiet btn-sm" type="submit">{{ "Отключить" if shelf.is_active else "Восстановить" }}</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="shelf-list-note">Полку с размещёнными картами или коробками нельзя отключить. Сначала освободите её в разделе размещения архива.</p>
+    {% else %}
+    <div class="empty-state shelf-empty-state">
+        <strong>Полки ещё не настроены</strong>
+        <span>Добавьте первую полку. Укажите секцию и обозначение, чтобы использовать её как адрес хранения в архиве.</span>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

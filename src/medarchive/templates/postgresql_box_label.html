@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Этикетка коробки · МедАрхив{% endblock %}
+{% block content %}
+<header class="page-header operation-page-header box-label-page-header">
+    <div>
+        <p class="eyebrow">Идентификация и маркировка</p>
+        <h1>Этикетка транспортной коробки</h1>
+        <p class="page-description">QR-код содержит только технический идентификатор коробки и не включает сведения о пациентах.</p>
+    </div>
+    <span class="badge badge-info">Печать QR-этикетки</span>
+</header>
+
+<section class="card box-label-screen" aria-label="Предпросмотр этикетки">
+    <div class="box-label">
+        <div class="box-label-brand">МедАрхив</div>
+        <div class="box-label-caption">Транспортная коробка</div>
+        <img src="{{ qr_data_uri }}" alt="QR-код коробки {{ box.box_number }}" width="240" height="240">
+        <div class="box-label-number">{{ box.box_number }}</div>
+        <div class="box-label-location">{{ location.name }}</div>
+        <div class="box-label-payload">{{ qr_payload }}</div>
+        <p class="box-label-hint">При сканировании используйте штатный интерфейс МедАрхива</p>
+    </div>
+    <div class="box-label-actions">
+        <button class="btn btn-primary" type="button" onclick="window.print()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
+            Печать этикетки
+        </button>
+        <button class="btn btn-secondary" type="button" onclick="history.back()">Назад</button>
+    </div>
+</section>
+{% endblock %}

@@ -1,77 +1,34 @@
 {% extends "base.html" %}
+{% block title %}Поиск карт и коробок — МедАрхив{% endblock %}
 {% block content %}
-<h1>🔍 Поиск по архиву</h1>
-<style>
-    /* Страница /search — итоговый макет (вариант C + остатки B-1).
-       Бейджи карточных статусов (.badge-*) — уже в base.html; здесь только
-       недостающие коробочные (.badge-packing/ready/received/lost), mark,
-       списки .ci/.bi и пустые состояния. */
-    .search-box { display: flex; gap: 8px; align-items: center; }
-    .search-box input {
-        flex: 1; padding: 12px 14px; border: 2px solid #ddd; border-radius: 8px;
-        font: inherit; font-size: 16px; outline: none; background: #fff; color: #1a1a2e;
-    }
-    .search-box input:focus { border-color: #e94560; }
-    .search-box input::placeholder { color: #aaa; }
-    .btn-clear {
-        background: #eef1f6; border: none; border-radius: 8px; width: 42px; height: 42px;
-        font-size: 18px; cursor: pointer; color: #666; flex-shrink: 0;
-    }
-    .btn-clear:hover { background: #e2e6ee; }
-    .search-hint { margin-top: 8px; font-size: 12px; color: #888; }
-    .kbd {
-        display: inline-block; border: 1px solid #ccc; border-bottom-width: 2px;
-        border-radius: 4px; padding: 0 5px; font-size: 11px;
-        background: #fafafa; color: #555;
-    }
-    mark { background: #ffe9a8; border-radius: 3px; padding: 0 1px; }
-
-    /* Статусы коробок, которых нет в base.html */
-    .badge-packing { background: #f3e5f5; color: #6a1b9a; }
-    .badge-ready { background: #eef1f6; color: #1a1a2e; }
-    .badge-received { background: #e3f2fd; color: #1565c0; }
-    .badge-lost { background: #fdecea; color: #c0392b; }
-
-    /* Заголовки секций результатов */
-    .card h3 { font-size: 15px; margin-bottom: 6px; color: #1a1a2e; }
-    .card h3 .cnt { color: #888; font-weight: 400; }
-
-    /* Карточка результата — карта (.ci) */
-    .ci { padding: 10px 2px; border-bottom: 1px solid #f0f0f0; }
-    .ci:last-child { border-bottom: none; }
-    .ci-top { display: flex; align-items: center; gap: 10px; }
-    .ci-fio { font-weight: 600; color: #1a1a2e; flex: 1; min-width: 0; }
-    .ci-detail { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 4px 0 0 16px; }
-    .ci-place { font-size: 15px; font-weight: 700; color: #2e7d32; }
-    .ci-ctx { font-size: 13px; color: #555; }
-    .ci-stale { margin: 3px 0 0 16px; font-size: 12.5px; color: #999; }
-    .ci-nobox { margin: 4px 0 0 16px; font-size: 13px; color: #bbb; }
-
-    /* Коробка (.bi) */
-    .bi { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
-    .bi:last-child { border-bottom: none; }
-    .bi-num { font-weight: 600; color: #1a1a2e; min-width: 76px; }
-    .bi-meta { margin-left: auto; color: #888; font-size: 13px; }
-
-    /* Пустые состояния (idle / ничего не найдено) */
-    .empty-state { text-align: center; padding: 24px 16px; }
-    .empty-state .icon { font-size: 30px; margin-bottom: 8px; }
-    .empty-state p { color: #666; }
-    .empty-state .hint { margin-top: 6px; font-size: 12px; color: #999; }
-</style>
-<div class="card">
+<header class="page-header search-page-heading">
+    <div>
+        <p class="eyebrow">Архив и учёт</p>
+        <h1>Поиск карт и коробок</h1>
+        <p class="page-description">Найдите медицинскую карту по ФИО или коробку по номеру и проверьте текущее местонахождение.</p>
+    </div>
+</header>
+<section class="card search-card" aria-label="Поиск">
     <form class="search-box" method="get" action="/search" role="search">
-        <input type="text" id="search-q" name="query" value="{{ query }}"
-               placeholder="ФИО пациента или номер коробки…" autocomplete="off" autofocus
-               hx-get="/search/results"
-               hx-trigger="input changed delay:350ms, search"
-               hx-target="#search-results" hx-swap="innerHTML">
-        <button type="button" class="btn-clear" id="search-clear"
-                title="Очистить" aria-label="Очистить" {% if not query %}hidden{% endif %}>✕</button>
+        <label class="search-field-label" for="search-q">ФИО пациента или номер коробки</label>
+        <div class="search-input-row">
+            <span class="search-field-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg>
+            </span>
+            <input type="search" id="search-q" name="query" value="{{ query }}"
+                   placeholder="Например, Иванов или B-0010" autocomplete="off" autofocus
+                   hx-get="/search/results"
+                   hx-trigger="input changed delay:350ms, search"
+                   hx-target="#search-results" hx-swap="innerHTML">
+            <button type="button" class="btn-clear" id="search-clear"
+                    title="Очистить поиск" aria-label="Очистить поиск" {% if not query %}hidden{% endif %}>
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+            </button>
+        </div>
     </form>
-    <div class="search-hint">Результаты обновляются по мере ввода · <span class="kbd">Esc</span> очистить · поиск без учёта регистра</div>
-</div>
-<div id="search-results">
+    <div class="search-hint">Результаты обновляются по мере ввода · <kbd class="kbd">Esc</kbd> очистить · поиск без учёта регистра</div>
+</section>
+<div id="search-results" aria-live="polite" aria-busy="false">
     {% include "search_fragment.html" %}
 </div>
 {% endblock %}

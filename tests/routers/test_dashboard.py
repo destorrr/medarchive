@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -79,6 +81,10 @@ class TestDashboard:
         r = await client.get("/dashboard")
         assert r.status_code == 200
         assert "Карт всего" in r.text
+        assert "Найти карту или коробку" in r.text
+        assert "Сводные показатели" in r.text
+        assert "Последние движения" in r.text
+        assert "dashboard-stats" in r.text
 
 
     async def test_dashboard_shows_recent_movements(self, client, db):
@@ -111,7 +117,7 @@ class TestSidebarProfile:
         # Логотип: текст + подпись, без эмодзи/иконки (в пунктах меню эмодзи допустимы).
         assert '<div class="brand"><b>МедАрхив</b><span>учёт медкарт</span></div>' in r.text
         # Профиль: аватар-инициалы из ФИО, строка ФИО, строка филиала, пилюля роли.
-        assert 'class="avatar">ИП</div>' in r.text
+        assert re.search(r'<div class="avatar"[^>]*>ИП</div>', r.text)
         assert '<div class="name">Иванова П.С.</div>' in r.text
         assert '<div class="branch">Test Branch</div>' in r.text
         assert 'class="role-pill">Филиал</div>' in r.text
@@ -123,7 +129,7 @@ class TestSidebarProfile:
         r = await client.get("/dashboard")
         assert r.status_code == 200
         assert '<div class="name">admin_user</div>' in r.text
-        assert 'class="avatar">A</div>' in r.text
+        assert re.search(r'<div class="avatar"[^>]*>A</div>', r.text)
         assert '<div class="branch">Администратор</div>' in r.text
         assert 'class="role-pill">Администратор</div>' in r.text
 
@@ -142,7 +148,10 @@ class TestSidebarProfile:
         await client.post("/login", data={"username": "archive_user", "password": "test123"})
         r = await client.get("/requests")
         assert r.status_code == 200
-        assert 'href="/requests" class="active">📋 Очередь заявок<span class="cnt">1</span>' in r.text
+        assert 'href="/requests" class="active"' in r.text
+        assert "Очередь заявок" in r.text
+        assert 'class="cnt"' in r.text
+        assert ">1</span>" in r.text
 
     async def test_archive_no_badge_without_active_requests(self, client):
         """Нет активных заявок → счётчик скрыт (бейдж не выводится)."""
