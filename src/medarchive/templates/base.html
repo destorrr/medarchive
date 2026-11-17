@@ -17,7 +17,7 @@
         <div class="brand"><b>МедАрхив</b><span>учёт медкарт</span></div>
         {% if menu_items %}
         <div class="group-label">{{ role_label }}</div>
-        <nav>
+        <nav aria-label="Разделы системы">
             {% for item in menu_items %}
             <a href="{{ item.url }}" class="{% if request.url.path == item.url or (item.url == '/shipments' and request.url.path.startswith('/shipments/')) or (item.url == '/requests/new' and request.url.path.startswith('/requests/')) %}active{% endif %}" {% if request.url.path == item.url %}aria-current="page"{% endif %}>
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
