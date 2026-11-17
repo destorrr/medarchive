@@ -183,7 +183,7 @@
 | `postgresql_admin` (JSON API) | GET/POST `/branches`; PUT `/branches/{branch_id}`; POST `/branches/{branch_id}/deactivate`; POST `/branches/{branch_id}/activate`; GET/POST `/users`; PUT `/users/{user_id}` |
 | `postgresql_admin_pages` (HTML) | GET `/admin`; GET/POST `/admin/branches`; POST `/admin/branches/{branch_id}/edit`; POST `/admin/branches/{branch_id}/status`; GET/POST `/admin/users`; POST `/admin/users/{user_id}/edit`; GET/POST `/admin/couriers`; POST `/admin/couriers/{courier_id}/status`; GET/POST `/admin/sections`; POST `/admin/sections/{shelf_id}/edit`; POST `/admin/sections/{shelf_id}/status`; GET `/admin/audit`; GET `/admin/incidents`; GET `/admin/incidents/{shipment_id}` |
 
-**Подсчёт:** 78 router endpoints (включая общий auth router) плюс корневой redirect `/`. Счёт включает каждый HTTP method/path отдельно; GET/POST на одном пути считаются двумя endpoints.
+**Подсчёт:** 79 router endpoints (включая общий auth router) плюс корневой redirect `/`. Счёт включает каждый HTTP method/path отдельно; GET/POST на одном пути считаются двумя endpoints.
 
 ### Выводы по полноте
 
