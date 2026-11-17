@@ -705,6 +705,10 @@ def _central_requests_context(request: Request, user: User, **extra) -> dict:
             {"url": "/history", "label": "Журнал движений"},
             {"url": "/shipments", "label": "Отправления"},
             {"url": "/requests/new", "label": "Запросить карты из архива"},
+            {"url": "/central/receive", "label": "Приёмка"},
+            {"url": "/central/packing", "label": "Упаковка"},
+            {"url": "/central/transfer", "label": "Отправка"},
+            {"url": "/central/custody", "label": "Внешнее хранение"},
         ],
     }
     context.update(extra)
