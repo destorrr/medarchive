@@ -63,6 +63,7 @@ async def postgres_browser_server():
         ("browser-branch", "branch", branch_id),
         ("browser-archive", "archive", None),
         ("browser-central", "central_office", None),
+        ("browser-viewer", "viewer", None),
     ]
     users = [
         User(
@@ -163,6 +164,14 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
         "document.getElementById(label.htmlFor) !== null)"
     )
     assert labels_are_associated, path
+    unlabeled_controls = page.evaluate("""() => Array.from(document.querySelectorAll(
+        'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=reset]), select, textarea'
+    )).filter((el) => {
+        const hasLabel = el.labels && el.labels.length > 0;
+        const hasAriaName = Boolean(el.getAttribute('aria-label') || el.getAttribute('aria-labelledby'));
+        return !hasLabel && !hasAriaName;
+    }).map((el) => ({tag: el.tagName, type: el.type || '', name: el.name || '', id: el.id || ''}))""")
+    assert not unlabeled_controls, (path, "form controls without accessible names", unlabeled_controls)
     page.keyboard.press("Tab")
     keyboard_focus_is_visible = page.evaluate(
         "() => { const el = document.activeElement; if (!el) return false; "
@@ -276,19 +285,23 @@ def test_postgresql_role_workspaces_render_responsively_in_chromium(
 ):
     workspaces = {
         "browser-branch": (
-            "/dashboard", "/packing", "/transfer", "/branch/receive",
+            "/dashboard", "/search", "/history", "/shipments",
+            "/packing", "/transfer", "/branch/receive",
         ),
         "browser-archive": (
-            "/dashboard", "/receive", "/placement", "/requests",
+            "/dashboard", "/search", "/history", "/shipments",
+            "/receive", "/placement", "/requests",
         ),
         "browser-central": (
-            "/dashboard", "/central/packing", "/central/transfer",
+            "/dashboard", "/search", "/history", "/shipments",
+            "/central/packing", "/central/transfer",
             "/requests/new", "/central/custody",
         ),
         "browser-admin": (
-            "/admin", "/admin/users", "/admin/branches", "/admin/couriers",
+            "/dashboard", "/search", "/history", "/admin", "/admin/users", "/admin/branches", "/admin/couriers",
             "/admin/sections", "/admin/incidents", "/admin/audit",
         ),
+        "browser-viewer": ("/dashboard", "/search", "/history"),
     }
     for username, paths in workspaces.items():
         context = postgres_chromium.new_context(viewport={"width": 1280, "height": 900})
