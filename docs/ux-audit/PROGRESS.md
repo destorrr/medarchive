@@ -270,3 +270,22 @@ Backend допускает несколько коробок в отправле
 2. Просмотреть оставшиеся общие auth/dependency модули и все legacy routers, чтобы построить граф импортов.
 3. Завершить полную API route inventory и объектные guards.
 4. После этого уточнить статус UX-01 и подготовить перечень конкретных решений для UX-02; код приложения не менять.
+
+
+## 2026-11-17 — связность legacy SQLite admin и backup
+
+Дополнены `SQLITE-INVENTORY.md` и `UX-01-route-inventory.md` после проверки legacy admin router, PostgreSQL admin router, общего auth/dependency wiring и backup scripts.
+
+### Подтверждено
+
+- Legacy `/admin/backup*` endpoints используют SQLite BackupService и находятся только в `routers/admin.py`.
+- `main.py` подключает этот router только при SQLite backend; в PostgreSQL admin pages backup/restore UI отсутствует.
+- PostgreSQL backup — отдельный системный процесс `pg_dump` → проверка `pg_restore --list` → шифрование age → retention через systemd timer.
+- Общий `auth.py` и `dependencies.py` всё ещё импортируют SQLite Database/AuthService; dependency initialization создаёт SQLiteDatabase независимо от backend, а PG login идёт отдельной веткой PostgreSQLAuthService.
+- Это подтверждает, что отказ от SQLite требует отделить legacy admin/auth/dependency wiring, а не только удалить адаптер и пакет `aiosqlite`.
+
+### Следующий блок
+
+1. Проверить полный набор legacy routers и services, импортируемых в main.py и dependencies, для оценки объёма удаления.
+2. Проверить оставшиеся API endpoints и объектные проверки по отправлениям, коробкам, заявкам и справочникам.
+3. Сверить документацию UX-01, закрыть пробелы и подготовить список решений для владельца продукта перед UX-02.
