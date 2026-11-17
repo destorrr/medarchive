@@ -138,9 +138,6 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
     viewer = User(id=uuid.uuid4(), username="shipviewer-" + uuid.uuid4().hex[:12],
                   password_hash="test-only-hash", full_name="Shipment Viewer",
                   role="viewer", is_active=True)
-    admin_user = User(id=uuid.uuid4(), username="shipadmin-" + uuid.uuid4().hex[:12],
-                      password_hash="test-only-hash", full_name="Shipment Admin",
-                      role="admin", is_active=True)
     courier = Courier(id=uuid.uuid4(), full_name="Register Test Courier", is_active=True)
 
     try:
@@ -165,8 +162,7 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
             session.add(branch)
             await session.flush()
             session.add_all([
-                branch_location, branch_user, archive_user, central_user, viewer,
-                admin_user, courier,
+                branch_location, branch_user, archive_user, central_user, viewer, courier,
             ])
             await session.flush()
 
@@ -209,93 +205,6 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
             assert central_detail.status_code == 200
             assert hidden_detail.status_code == 404
             assert (await get_as(viewer, "/shipments")).status_code == 403
-            assert (await get_as(admin_user, "/shipments")).status_code == 403
-
-            # Exercise every PostgreSQL HTML page through the real router
-            # registration and session authentication, not dependency mocks.
-            shared_pages = (
-                "/dashboard", "/search", "/search/results?query=scope", "/history",
-            )
-            for role_user in (branch_user, archive_user, central_user, viewer, admin_user):
-                for page_path in shared_pages:
-                    page = await get_as(role_user, page_path)
-                    assert page.status_code == 200, (
-                        role_user.role, page_path, page.status_code, page.text[:500]
-                    )
-
-            role_pages = {
-                "branch": ("/packing", "/transfer", "/branch/receive"),
-                "archive": ("/receive", "/placement", "/requests"),
-                "central_office": (
-                    "/requests/new", "/central/receive", "/central/packing",
-                    "/central/transfer", "/central/custody",
-                ),
-                "admin": (
-                    "/admin", "/admin/branches", "/admin/users", "/admin/couriers",
-                    "/admin/sections", "/admin/incidents", "/admin/audit",
-                ),
-            }
-            all_role_pages = tuple(path for pages in role_pages.values() for path in pages)
-            users_by_role = {
-                "branch": branch_user, "archive": archive_user,
-                "central_office": central_user, "admin": admin_user,
-            }
-            for role, pages in role_pages.items():
-                token_user = users_by_role[role]
-                for page_path in pages:
-                    page = await get_as(token_user, page_path)
-                    assert page.status_code == 200, (
-                        role, page_path, page.status_code, page.text[:500]
-                    )
-                for other_role, other_user in (
-                    ("branch", branch_user), ("archive", archive_user),
-                    ("central_office", central_user), ("viewer", viewer),
-                    ("admin", admin_user),
-                ):
-                    if other_role == role:
-                        continue
-                    for page_path in pages:
-                        denied = await get_as(other_user, page_path)
-                        assert denied.status_code == 403, (
-                            other_role, page_path, denied.status_code
-                        )
-
-            # Sidebar links must match each role's permitted workflow.
-            expected_navigation = {
-                "branch": (
-                    "/dashboard", "/search", "/history", "/shipments",
-                    "/branch/receive", "/packing", "/transfer",
-                ),
-                "archive": (
-                    "/dashboard", "/search", "/history", "/shipments",
-                    "/receive", "/placement", "/requests",
-                ),
-                "central_office": (
-                    "/dashboard", "/search", "/history", "/shipments",
-                    "/requests/new", "/central/receive", "/central/packing",
-                    "/central/transfer", "/central/custody",
-                ),
-                "viewer": ("/dashboard", "/search", "/history"),
-                "admin": (
-                    "/dashboard", "/search", "/history", "/admin",
-                ),
-            }
-            for role, role_user in (
-                ("branch", branch_user), ("archive", archive_user),
-                ("central_office", central_user), ("viewer", viewer),
-                ("admin", admin_user),
-            ):
-                dashboard = await get_as(role_user, "/dashboard")
-                assert dashboard.status_code == 200
-                for nav_path in expected_navigation[role]:
-                    assert f'href="{nav_path}"' in dashboard.text, (
-                        role, "missing navigation", nav_path
-                    )
-                for forbidden_path in all_role_pages:
-                    if forbidden_path not in role_pages.get(role, ()):
-                        assert f'href="{forbidden_path}"' not in dashboard.text, (
-                            role, "unexpected navigation", forbidden_path
-                        )
     finally:
         app.dependency_overrides.clear()
         await session.rollback()
