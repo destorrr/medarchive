@@ -132,7 +132,7 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
     courier = Courier(id=uuid.uuid4(), full_name="Register Test Courier", is_active=True)
     shipment = Shipment(
         id=uuid.uuid4(), from_location_id=branch_location.id,
-        to_location_id=archive_location.id, courier_id=courier.id,
+        to_location_id=branch_location.id, courier_id=courier.id,
         issued_by=branch_user.id, status="draft",
     )
     try:
