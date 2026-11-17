@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header shipment-page-header">
+  <div><p class="eyebrow">Логистика · реестр</p><h1>Отправления</h1>
+    <p class="page-description">Отправления, связанные с вашей локацией: исходящие, входящие и завершённые.</p></div>
+</header>
+<section class="card shipment-register">
+  <form method="get" action="/shipments" class="shipment-filter">
+    <label for="shipment-status">Статус</label>
+    <select id="shipment-status" name="status">
+      <option value="">Все статусы</option>
+      {% for value, label in [("draft","Черновик"),("in_transit","В пути"),("received","Принято"),("exception","Инцидент"),("cancelled","Отменено")] %}
+      <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-secondary" type="submit">Применить</button>
+    {% if selected_status %}<a class="btn btn-ghost" href="/shipments">Сбросить</a>{% endif %}
+  </form>
+  {% if shipments %}
+  <div class="table-wrap"><table class="data shipment-table">
+    <thead><tr><th>Отправление</th><th>Маршрут</th><th>Курьер</th><th>Состав</th><th>Статус</th><th>Создано</th></tr></thead>
+    <tbody>{% for item in shipments %}
+      <tr>
+        <td><a class="shipment-number-link" href="/shipments/{{ item.id }}">№ {{ item.number }}</a></td>
+        <td><span>{{ item.source }}</span><span class="shipment-route-arrow">→</span><span>{{ item.destination }}</span></td>
+        <td>{{ item.courier }}</td>
+        <td>{{ item.box_count }} кор. · {{ item.card_count }} карт</td>
+        <td><span class="badge badge-{{ item.status }}">{{ item.status_label }}</span></td>
+        <td>{{ item.created_at.strftime("%d.%m.%Y %H:%M") if item.created_at else "—" }}</td>
+      </tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <p class="shipment-list-note">Показаны последние {{ shipments|length }} отправлений, доступных вашей локации.</p>
+  {% else %}
+  <div class="empty-state shipment-empty"><span class="empty-icon" aria-hidden="true">↔</span>
+    <strong>Отправлений пока нет</strong><span>Здесь появятся отправления, в которых ваша локация является отправителем или получателем.</span>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
