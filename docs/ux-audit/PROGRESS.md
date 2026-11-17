@@ -905,3 +905,26 @@ SQLite removal пока не готово к выполнению: есть runt
 Открыть handler `POST /search`, завершить классификацию маршрутов и проверить каждый endpoint, отмеченный как имеющий только service-level опору. Затем сформировать точечный backlog недостающих HTTP-тестов. Новые тесты и продуктовый код не добавлять до согласования.
 
 **Статус:** inventory основных изменяющих PostgreSQL routes подготовлен; сверка тестов endpoint-by-endpoint продолжается.
+
+
+## 2026-11-17 — UX-02: уточнение POST /search и CI-триггеров
+
+Продолжена проверка на HEAD `31012befc6b8a1b8f17a701155955638017c513c`.
+
+### Результаты
+
+- Открыт handler `postgresql_search_submit`: он только формирует redirect на GET `/search?query=...` с кодом 303; DB/service mutation отсутствует.
+- Уточнён подсчёт предыдущего inventory: 48 POST/PUT routes в просмотренных десяти модулях, из них 47 доменных mutation endpoints и один POST для поисковой формы.
+- Повторно прочитан `.github/workflows/postgresql.yml`: push triggers включают `master` и `docs/target-architecture-spec`, pull_request target — `master`; рабочая ветка `docs/ux-audit-project` не включена в push filter.
+- Workflow конфигурирует PostgreSQL 16, Alembic upgrade/current, проверку таблиц, `pytest -q -rs` и encrypted backup/restore.
+- Для проверенного HEAD GitHub combined status вернул пустой список; PR-triggered workflow runs для commit не обнаружены. Доступный запрос workflow runs по branch не дал подтверждённого результата. Поэтому факт выполнения CI для текущей рабочей ветки не заявляется.
+
+### Ограничения и решения
+
+Workflow не изменялся: изменение CI вне текущего согласованного scope. Код, тесты, миграции и конфигурация приложения не менялись. Это статический аудит и чтение GitHub metadata, не запуск тестов.
+
+### Следующий шаг
+
+Продолжить endpoint-level сверку: проверить прямые HTTP-тесты для действий с только service-level опорой; затем подготовить минимальный backlog тестов. Отдельно решить с владельцем продукта/репозитория, нужно ли включить рабочую ветку/PR target в PostgreSQL CI, прежде чем менять workflow.
+
+**Статус:** классификация POST /search завершена; CI trigger gap зафиксирован.
