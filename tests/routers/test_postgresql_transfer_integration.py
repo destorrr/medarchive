@@ -6,7 +6,7 @@ import uuid
 import httpx
 import pytest
 
-from medarchive.adapters.postgresql.models import Branch, Location, User
+from medarchive.adapters.postgresql.models import Branch, Courier, Location, Shipment, User
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_database
 from medarchive.main import create_app
@@ -52,6 +52,9 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
             assert "Передача курьеру" in response.text
             assert 'class="card operation-panel transfer-panel"' in response.text
             assert "Нет коробок, готовых к отправке" in response.text
+            shipments_page = await client.get("/shipments", cookies={"session": token})
+            assert shipments_page.status_code == 200
+            assert "Отправления" in shipments_page.text
             assert receive.status_code == 200
             assert "Приёмка отправлений" in receive.text
             for page in (response, receive):
@@ -89,6 +92,84 @@ async def test_postgresql_branch_transfer_page_is_scoped_to_branch():
                 if persisted is not None:
                     await session.delete(persisted)
             await session.flush()
+            persisted_branch = await session.get(Branch, branch_id)
+            if persisted_branch is not None:
+                await session.delete(persisted_branch)
+            await session.commit()
+        await database.close()
+
+
+@pytest.mark.asyncio
+async def test_postgresql_shipment_register_and_detail_are_location_scoped():
+    if not DATABASE_URL:
+        pytest.skip("MEDARCHIVE_DATABASE_URL is not configured")
+
+    app = create_app(Config(database_url=DATABASE_URL, postgres_enabled=True,
+                            auth_backend="postgresql", secret_key="postgres-shipment-register-secret"))
+    database = await get_pg_database()
+    branch_id = uuid.uuid4()
+    branch = Branch(id=branch_id, code="SR-" + uuid.uuid4().hex[:16], name="Shipment Register Branch", is_active=True)
+    branch_location = Location(id=uuid.uuid4(), kind="branch", branch_id=branch_id,
+                               name=branch.name, is_active=True)
+    archive_location = Location(id=uuid.uuid4(), kind="archive", name="Shipment Register Archive", is_active=True)
+    central_location = Location(id=uuid.uuid4(), kind="central_office", name="Shipment Register Central", is_active=True)
+    branch_user = User(id=uuid.uuid4(), username="shipbranch-" + uuid.uuid4().hex[:12],
+                       password_hash="test-only-hash", full_name="Branch Shipment User",
+                       role="branch", branch_id=branch_id, is_active=True)
+    archive_user = User(id=uuid.uuid4(), username="shiparchive-" + uuid.uuid4().hex[:12],
+                        password_hash="test-only-hash", full_name="Archive Shipment User",
+                        role="archive", is_active=True)
+    central_user = User(id=uuid.uuid4(), username="shipcentral-" + uuid.uuid4().hex[:12],
+                        password_hash="test-only-hash", full_name="Central Shipment User",
+                        role="central_office", is_active=True)
+    viewer = User(id=uuid.uuid4(), username="shipviewer-" + uuid.uuid4().hex[:12],
+                  password_hash="test-only-hash", full_name="Shipment Viewer",
+                  role="viewer", is_active=True)
+    courier = Courier(id=uuid.uuid4(), full_name="Register Test Courier", is_active=True)
+    shipment = Shipment(
+        id=uuid.uuid4(), from_location_id=branch_location.id,
+        to_location_id=archive_location.id, courier_id=courier.id,
+        issued_by=branch_user.id, status="draft",
+    )
+    try:
+        async with database.session_factory() as session:
+            async with session.begin():
+                session.add_all([branch, branch_location, archive_location, central_location,
+                                 branch_user, archive_user, central_user, viewer, courier, shipment])
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            async def get_as(user, page):
+                return await client.get(page, cookies={"session": get_auth().create_session_token(user)})
+            for user in (branch_user, archive_user):
+                listing = await get_as(user, "/shipments")
+                detail = await get_as(user, "/shipments/" + str(shipment.id))
+                assert listing.status_code == 200
+                assert "№ " + str(shipment.shipment_number) in listing.text
+                assert detail.status_code == 200
+                assert "Shipment Register Branch" in detail.text
+                assert "Shipment Register Archive" in detail.text
+            hidden_list = await get_as(central_user, "/shipments")
+            hidden_detail = await get_as(central_user, "/shipments/" + str(shipment.id))
+            assert hidden_list.status_code == 200
+            assert "№ " + str(shipment.shipment_number) not in hidden_list.text
+            assert hidden_detail.status_code == 404
+            assert (await get_as(viewer, "/shipments")).status_code == 403
+    finally:
+        async with database.session_factory() as session:
+            persisted = await session.get(Shipment, shipment.id)
+            if persisted is not None:
+                await session.delete(persisted)
+            for user in (branch_user, archive_user, central_user, viewer):
+                persisted_user = await session.get(User, user.id)
+                if persisted_user is not None:
+                    await session.delete(persisted_user)
+            persisted_courier = await session.get(Courier, courier.id)
+            if persisted_courier is not None:
+                await session.delete(persisted_courier)
+            await session.flush()
+            for location_id in (branch_location.id, archive_location.id, central_location.id):
+                persisted_location = await session.get(Location, location_id)
+                if persisted_location is not None:
+                    await session.delete(persisted_location)
             persisted_branch = await session.get(Branch, branch_id)
             if persisted_branch is not None:
                 await session.delete(persisted_branch)
