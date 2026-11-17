@@ -604,3 +604,30 @@ SQLite removal пока не готово к выполнению: есть runt
 4. После технической сверки подготовить критерии закрытия UX-01; переход к UX-02 — только после подтверждения владельца продукта.
 
 Код приложения, тесты, модели и миграции не менялись.
+
+
+## 2026-11-17 — сверка полного состава подключённых HTTP-маршрутов
+
+Проверены актуальный `src/medarchive/main.py` и декораторы всех подключённых auth/PostgreSQL router modules.
+
+### Подтверждено
+
+- Общий auth router подключается при любом backend: GET `/login`, POST `/login`, POST `/logout`.
+- В PostgreSQL-режиме подключаются 10 routers: dashboard, packing, box labels, branch, transfer, shipments, archive, central office, admin JSON API и admin HTML pages.
+- Инвентаризация декораторов выявила 78 HTTP endpoints, включая auth, плюс корневой GET `/` redirect, объявленный непосредственно в `main.py`.
+- В SQLite-ветке подключаются пять legacy routers: packing, archive, dashboard, admin и transfer.
+- В `main.py` есть общий middleware, блокирующий cross-site state-changing запросы по Fetch Metadata и проверке Origin/Referer.
+- Ранее route inventory описывал ключевые операции, но не сводил в единую таблицу auth/root и полный набор административных JSON/HTML handlers. Раздел 10 документа `UX-01-route-inventory.md` дополнен.
+
+### Ограничения и остаток
+
+- Сверка подтверждает регистрацию маршрутов и backend branching, но не является повторным полным аудитом каждого dependency, service guard и object-level check.
+- Полная SQLite-инвентаризация всё ещё требует проверки оставшихся package/docs/install/CI references и всех прямых импортов/SQL употреблений по дереву. Наличие списка файлов в git tree не доказывает отсутствие скрытых runtime-зависимостей.
+- Не запускались приложение, PostgreSQL, миграции или тесты в рамках этой сверки.
+- Код приложения, тесты и миграции не менялись; выполнялась только документация.
+
+### Следующий блок
+
+1. Завершить выборочную проверку оставшихся файлов дерева, связанных с SQLite: package metadata, config/dependencies, auth abstraction, tests, cleanup script и документация установки/эксплуатации.
+2. Отдельно зафиксировать, какие зависимости SQLite являются legacy-only, а какие ещё импортируются общим PostgreSQL runtime.
+3. Перепроверить документы после записи и compare commits; затем сформировать критерии закрытия технической части UX-01.
