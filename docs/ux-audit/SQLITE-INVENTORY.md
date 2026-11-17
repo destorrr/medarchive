@@ -53,3 +53,20 @@
 ## 5. Ограничение
 
 До отдельного согласования не удалять SQLite адаптер, зависимости, legacy routers, тесты или конфигурационные переключатели. Текущая задача — только установить полный граф зависимостей и сформировать безопасную последовательность отказа.
+
+
+## 6. Проверка legacy backup UI и связи с PostgreSQL
+
+Дополнительная проверка `routers/admin.py`, `routers/postgresql_admin_pages.py`, `auth.py`, `dependencies.py`, `main.py` и шаблона `admin/backup.html` уточнила картину:
+
+- `routers/admin.py` импортирует SQLite Database, SQLite repositories, legacy AuthService и BackupService. Все маршруты `/admin/backup`, `/admin/backup/create`, `/admin/backup/restore` находятся в этом legacy admin router.
+- `main.py` подключает legacy `admin_router` только в ветке SQLite. В PostgreSQL-режиме подключается `postgresql_admin_pages_router`, где маршрутов backup/restore нет.
+- Следовательно, Python BackupService и HTML backup/restore UI — часть legacy SQLite поверхности, а не PostgreSQL admin UI. Их нельзя переносить как есть в PostgreSQL-only архитектуру.
+- PostgreSQL backup выполняется внешним эксплуатационным механизмом: `scripts/backup.sh` запускает `pg_dump --format=custom`, проверяет архив через `pg_restore --list`, шифрует через `age`, применяет retention; `install.sh` настраивает systemd service/timer.
+- Legacy SQLite restore создаёт копию текущего файла перед восстановлением и сбрасывает WAL; эти действия относятся к SQLite и не являются планом восстановления PostgreSQL.
+- `auth.py` сохраняет общий login/logout router: в нём есть SQLite-типы/legacy AuthService, а при PostgreSQL backend выполняется отдельная ветка через PostgreSQLAuthService и UserRepository. Это остаточная import-time связность, даже если PG login использует PostgreSQL.
+- `dependencies.py` безусловно создаёт SQLiteDatabase и AuthService; PG Database создаётся отдельно, если включён PostgreSQL.
+
+### Вывод
+
+SQLite dependency graph остаётся активным в legacy режиме и частично импортируется в общем PG runtime. Для отказа от SQLite необходимо отдельно решить судьбу legacy admin router, auth abstractions, dependency wiring, SQLite adapters/repositories, legacy templates и тестов. PostgreSQL backup/restore должен оставаться отдельным эксплуатационным runbook/процессом; отсутствие backup UI в PostgreSQL admin UI — зафиксированное текущее состояние, а не автоматически дефект.
