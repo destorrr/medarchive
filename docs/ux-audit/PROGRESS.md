@@ -614,7 +614,7 @@ SQLite removal пока не готово к выполнению: есть runt
 
 - Общий auth router подключается при любом backend: GET `/login`, POST `/login`, POST `/logout`.
 - В PostgreSQL-режиме подключаются 10 routers: dashboard, packing, box labels, branch, transfer, shipments, archive, central office, admin JSON API и admin HTML pages.
-- Инвентаризация декораторов выявила 78 HTTP endpoints, включая auth, плюс корневой GET `/` redirect, объявленный непосредственно в `main.py`.
+- Инвентаризация декораторов выявила 79 HTTP endpoints, включая auth, плюс корневой GET `/` redirect, объявленный непосредственно в `main.py`.
 - В SQLite-ветке подключаются пять legacy routers: packing, archive, dashboard, admin и transfer.
 - В `main.py` есть общий middleware, блокирующий cross-site state-changing запросы по Fetch Metadata и проверке Origin/Referer.
 - Ранее route inventory описывал ключевые операции, но не сводил в единую таблицу auth/root и полный набор административных JSON/HTML handlers. Раздел 10 документа `UX-01-route-inventory.md` дополнен.
@@ -685,3 +685,29 @@ SQLite removal пока не готово к выполнению: есть runt
 2. Проверить PostgreSQL workflow triggers и соответствие целевой веточной стратегии, не меняя workflow без отдельного решения.
 3. Сформировать критерии закрытия UX-01: полнота процессов/маршрутов, технические аудиты, решения владельца и обязательные проверки перед UX-02.
 4. Не менять приложение и не удалять SQLite без согласования.
+
+## 2026-11-17 — заключительная перекрёстная сверка UX-01 и критерии перехода
+
+Повторно проверены актуальная вершина ветки, compare с базовой веткой, список документов, заключительные разделы `PROGRESS.md` и `SQLITE-INVENTORY.md`, реестр решений, route inventory и PostgreSQL workflow.
+
+### Состояние ветки
+
+- Рабочая ветка: `docs/ux-audit-project`.
+- HEAD на момент проверки: `e59d6a0754f53b67dcf4d6f16528aa4777ff34e`.
+- База: `docs/target-architecture-spec`, SHA `767e0f10239d4404a60b82e8b827da581350cae3`.
+- Compare: 65 commits ahead, 0 behind; 14 файлов, все добавлены в `docs/ux-audit/`.
+- Изменения исходников приложения, тестов, миграций и workflow в compare отсутствуют.
+
+### Заключительные уточнения
+
+- Подсчёт endpoint исправлен и унифицирован: 79 router endpoints плюс корневой GET `/`.
+- Основные SQLite runtime/deployment/CI/test entry points сверены вручную; полный AST/import graph, content-wide scan и runtime validation остаются вне выполненного объёма.
+- Workflow `postgresql.yml` не запускается на push в `docs/ux-audit-project`; PR target `master` соответствует pull_request trigger. Workflow не менялся.
+- Реестр D-01…D-20 остаётся открытым: ни одно продуктовое или техническое решение не считается согласованным без явного подтверждения.
+- Уточнены критерии закрытия аудита и входа в UX-02 в `UX-01-cross-review-and-decision-register.md`.
+
+### Статус
+
+**Аудиторская документация UX-01 сформирована в существенной части; формальное закрытие UX-01 не объявляется.** Требуется подтверждение владельца продукта о достаточности текущего аудита и решение, какие открытые D-01…D-20 переходят в UX-02. Ручная UX-валидация и перечисленные технические проверки остаются ограничениями/отдельными задачами.
+
+Код приложения, тесты, миграции, workflow и базовая ветка не менялись. SQLite не удалялся. CI и тесты в рамках этого прохода не запускались.
