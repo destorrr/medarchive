@@ -631,3 +631,18 @@ SQLite removal пока не готово к выполнению: есть runt
 1. Завершить выборочную проверку оставшихся файлов дерева, связанных с SQLite: package metadata, config/dependencies, auth abstraction, tests, cleanup script и документация установки/эксплуатации.
 2. Отдельно зафиксировать, какие зависимости SQLite являются legacy-only, а какие ещё импортируются общим PostgreSQL runtime.
 3. Перепроверить документы после записи и compare commits; затем сформировать критерии закрытия технической части UX-01.
+
+
+## 2026-11-17 — повторная проверка общих SQLite/PostgreSQL зависимостей
+
+Повторно проверены config, dependency wiring, общий AuthService, auth router, PostgreSQL CLI bootstrap, package metadata, pytest base fixture, cleanup script и утверждённое решение об отсутствии переноса данных.
+
+- Подтверждён SQLite default в `config.py` и обязательный флаг `MEDARCHIVE_POSTGRES_ENABLED=true` для PG.
+- Подтверждены безусловный импорт и создание SQLite Database в общем `dependencies.py`, а также SQLite imports на уровне общего auth router.
+- Уточнено, что AuthService нужен PostgreSQL login/dependencies и CLI для password hashing/session credentials; удалять его целиком нельзя, сначала нужно выделить общие credential helpers.
+- `aiosqlite` остаётся обязательной runtime dependency; базовый pytest conftest остаётся SQLite-first.
+- `cleanup_stale_box_cards.py` подтверждён как самостоятельный stdlib sqlite3 maintenance script, не применимый к PostgreSQL.
+- Повторно подтверждено решение: перенос данных SQLite не требуется; отказ от SQLite — отдельная задача удаления legacy runtime и зависимостей.
+- Раздел 8 `SQLITE-INVENTORY.md` дополнен свежей проверкой и явными границами достоверности.
+
+**Статус:** инвентаризация ключевых общих зависимостей уточнена, но полный content-wide scan всех файлов и runtime validation не выполнялись. SQLite не удалять; приложение, тесты и миграции не менялись.
