@@ -141,3 +141,15 @@
 Подробный аудит внешнего хранения, административного сервиса и ограничений моделей — `UX-01-custody-admin-database-audit.md`.
 
 **Открытый вопрос:** текущая модель не фиксирует акт, ожидаемую дату возврата, ответственное лицо у внешней организации и подтверждающий документ. Это учётный статус, а не полноценный реестр юридически подтверждённых передач.
+
+
+## 10. Административные HTML-маршруты
+
+- HTML-разделы `/admin/branches`, `/admin/users`, `/admin/couriers`, `/admin/sections` и их POST actions используют `admin_only`.
+- `/admin/audit` — read-only административный журнал, фильтрованный по `admin.%`, с пагинацией и фильтрами.
+- `/admin/incidents` и `/admin/incidents/{shipment_id}` — глобальный административный просмотр инцидентов; карточка доступна только admin.
+- HTML handlers используют общий `PostgreSQLAdminService`; отдельный JSON API `/api/admin/*` защищён тем же `admin_only`.
+- В форме редактирования пользователя checkbox статуса при снятии отправляет отсутствие значения, что handler интерпретирует как false; для текущего admin шаблон передаёт hidden true, а handler запрещает снять с себя admin.
+- Изученный admin service test file не даёт полной матрицы всех HTML POST действий × чужие IDs/состояния.
+
+Подробности — `UX-01-custody-admin-database-audit.md` и `UX-01-alembic-migration-audit.md`.
