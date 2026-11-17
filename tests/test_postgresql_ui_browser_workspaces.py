@@ -173,6 +173,59 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
     assert keyboard_focus_is_visible, path
 
 
+def _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path):
+    page.set_viewport_size({"width": 320, "height": 900})
+    tables = page.locator("table")
+    for index in range(tables.count()):
+        table = tables.nth(index)
+        wrapper = table.locator("xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' table-wrap ')][1]")
+        assert wrapper.count() == 1, (path, "table has no dedicated scroll region")
+        assert wrapper.get_attribute("role") == "region", path
+        assert wrapper.get_attribute("tabindex") == "0", path
+        overflow = wrapper.evaluate("(el) => getComputedStyle(el).overflowX")
+        assert overflow in ("auto", "scroll"), (path, overflow)
+        if path == "/admin/users":
+            dimensions = wrapper.evaluate("(el) => ({client: el.clientWidth, scroll: el.scrollWidth})")
+            assert dimensions["scroll"] > dimensions["client"], (path, dimensions)
+
+
+def _assert_status_contrast(page, path):
+    classes = [
+        "badge-in_branch", "badge-in_box", "badge-ready",
+        "badge-in_transit", "badge-in_progress",
+        "badge-in_archive", "badge-placed", "badge-completed",
+        "badge-pending_return", "badge-lost", "badge-new", "badge-received",
+        "badge-cancelled", "badge-not_found", "badge-packing", "badge-neutral",
+        "badge-success", "badge-warning", "badge-info",
+        "status-pill-success", "status-pill-muted", "status-pill-warning",
+    ]
+    results = page.evaluate("""(classes) => {
+      const luminance = (value) => {
+        const channels = value.match(/[\\d.]+/g).slice(0, 3).map(Number).map((v) => {
+          v /= 255;
+          return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+      };
+      return classes.map((name) => {
+        const node = document.createElement("span");
+        node.className = name;
+        node.textContent = "Статус";
+        node.style.cssText = "position:fixed;left:-10000px;top:0";
+        document.body.appendChild(node);
+        const style = getComputedStyle(node);
+        const foreground = style.color;
+        const background = style.backgroundColor;
+        const values = [luminance(foreground), luminance(background)].sort((a,b) => b-a);
+        const ratio = (values[0] + 0.05) / (values[1] + 0.05);
+        node.remove();
+        return {name, foreground, background, ratio};
+      });
+    }""", classes)
+    failures = [item for item in results if item["ratio"] < 4.5]
+    assert not failures, (path, failures)
+
+
 def test_postgresql_role_workspaces_render_responsively_in_chromium(
     postgres_browser_server, postgres_chromium
 ):
@@ -200,5 +253,8 @@ def test_postgresql_role_workspaces_render_responsively_in_chromium(
         _login(page, postgres_browser_server, username)
         for path in paths:
             _assert_page_responsive_and_labeled(page, postgres_browser_server, path)
+            if path.startswith("/admin/") and path != "/admin/audit":
+                _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path)
+            _assert_status_contrast(page, path)
         assert not page_errors, page_errors
         context.close()
