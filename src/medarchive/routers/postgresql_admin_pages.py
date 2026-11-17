@@ -46,13 +46,13 @@ def _context(request: Request, user: User, **extra):
         "user_initials": initials,
         "user_branch": ROLE_LABELS.get(user.role, user.role),
         "menu_items": [
-            {"url": "/admin", "label": "⚙️ Справочники"},
-            {"url": "/admin/branches", "label": "🏢 Филиалы"},
-            {"url": "/admin/users", "label": "👤 Пользователи"},
-            {"url": "/admin/couriers", "label": "🚚 Курьеры"},
-            {"url": "/admin/sections", "label": "🗂 Секции / Полки"},
-            {"url": "/admin/incidents", "label": "🚨 Инциденты"},
-            {"url": "/admin/audit", "label": "📋 Журнал действий"},
+            {"url": "/admin", "label": "Справочники"},
+            {"url": "/admin/branches", "label": "Филиалы"},
+            {"url": "/admin/users", "label": "Пользователи"},
+            {"url": "/admin/couriers", "label": "Курьеры"},
+            {"url": "/admin/sections", "label": "Секции / Полки"},
+            {"url": "/admin/incidents", "label": "Инциденты"},
+            {"url": "/admin/audit", "label": "Журнал действий"},
         ],
     }
     ctx.update(extra)
