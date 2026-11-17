@@ -651,3 +651,37 @@ SQLite removal пока не готово к выполнению: есть runt
 ### Уточнение подсчёта endpoints
 
 При повторном пересчёте каждого HTTP method/path отдельно уточнено итоговое количество: **79 router endpoints** плюс корневой GET `/`. Исправлен счётчик в `UX-01-route-inventory.md`; список маршрутов не менялся.
+
+
+## 2026-11-17 — завершена основная сверка SQLite runtime, deployment и CI
+
+Проверены production install/service, PostgreSQL backup, CI workflow, pyproject, main.py, dependencies.py, общий auth router, legacy routers, SQLite adapter, backup service, pytest fixtures и профильные тесты.
+
+### Подтверждено
+
+- Production install template и systemd service явно выставляют PostgreSQL backend и MEDARCHIVE_POSTGRES_ENABLED=true; backup реализован через pg_dump/pg_restore и age.
+- Config по умолчанию всё ещё выбирает SQLite, а тест test_auth_config.py фиксирует это как ожидаемое поведение.
+- main.py импортирует общий dependencies.py; тот безусловно импортирует и создаёт объект SQLiteDatabase даже в PG режиме. В PG lifespan SQLite connection/init не открывается, но import-time dependency и aiosqlite остаются.
+- Общий auth router сохраняет ненужный для PG ветки import SQLite Database. AuthService остаётся общим password/session helper и нужен PostgreSQL.
+- Legacy routers напрямую используют SQLite repositories; legacy admin содержит SQLite backup UI/service.
+- PostgreSQL CI поднимает PostgreSQL 16, применяет Alembic, проверяет таблицы, запускает полный pytest suite и выполняет encrypted backup/restore. Тестовый suite включает SQLite-specific tests и SQLite-first base fixtures.
+- Workflow triggers не включают push в docs/ux-audit-project; pull_request trigger настроен только для PR в master. Это статическая проверка конфигурации, не отчёт о конкретном CI запуске.
+- Документ SQLITE-INVENTORY.md дополнен разделами 9.1–9.5 с классификацией runtime/test/deployment зависимостей и границами проверки.
+
+### Архитектурный вывод
+
+Производственная эксплуатационная конфигурация уже PostgreSQL-only, но приложение и тестовый пакет пока двухрежимные. Для удаления SQLite потребуется отдельная согласованная последовательность: развязать dependencies/auth imports, выделить общие credential helpers, убрать legacy routers/adapter/backup UI и SQLite tests/fixtures, затем удалить aiosqlite и SQLite config. Ничего из этого не реализовывалось.
+
+### Ограничения
+
+- Выполнена ручная проверка основных runtime/deployment/test entry points, но не AST-based import graph всех файлов.
+- Не запускались pytest, приложение, pip install или CI.
+- Фактическая конфигурация production экземпляра не проверялась.
+- Старые планы и статические текстовые материалы не были полностью перечитаны для поиска исторических SQLite references.
+
+### Следующий блок
+
+1. Провести заключительную проверку SQLite inventory на пропущенные entry points и противоречия между документацией, конфигурацией и CI.
+2. Проверить PostgreSQL workflow triggers и соответствие целевой веточной стратегии, не меняя workflow без отдельного решения.
+3. Сформировать критерии закрытия UX-01: полнота процессов/маршрутов, технические аудиты, решения владельца и обязательные проверки перед UX-02.
+4. Не менять приложение и не удалять SQLite без согласования.
