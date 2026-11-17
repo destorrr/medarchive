@@ -195,3 +195,35 @@ docs/migration/sqlite-to-postgresql.md содержит зафиксирован
 - Никакие файлы приложения, тесты, зависимости или workflow не менялись.
 
 **Вывод:** production deployment и CI уже используют PostgreSQL, но кодовая база и тестовый пакет остаются двухрежимными. Для безопасного PostgreSQL-only перехода нужен отдельный согласованный этап: разорвать общий import/dependency coupling, вынести AuthService credential helpers, удалить legacy routers/adapter/backup и SQLite tests/fixtures, затем убрать aiosqlite и SQLite config. До согласования ничего не удалять.
+
+## 10. Заключительная сверка области инвентаризации и CI triggers (2026-11-17)
+
+Повторно сопоставлены выводы разделов 8–9 с актуальным деревом ветки, `pyproject.toml`, конфигурацией, общим dependency/auth wiring, production install/service, backup scripts, PostgreSQL workflow и pytest entry points.
+
+### Итог по охвату
+
+- Основные runtime entry points проверены: backend selection в config/main, общий `dependencies.py`, общий auth router/AuthService, legacy routers, SQLite adapter/repositories и legacy backup service.
+- Основные production entry points проверены: install template, systemd service, PostgreSQL backup/restore scripts.
+- Основные CI/test entry points проверены: PostgreSQL workflow, package dependencies, base pytest fixture, SQLite-specific suites и PostgreSQL integration suites.
+- Отдельный cleanup script с прямым stdlib `sqlite3` использованием классифицирован как legacy maintenance utility.
+- Это завершённая ручная инвентаризация ключевых entry points, но не доказательство полного отсутствия SQLite references в каждом файле репозитория.
+
+### CI trigger — зафиксированное наблюдение
+
+Файл `.github/workflows/postgresql.yml` задаёт:
+- `push.branches: master, docs/target-architecture-spec`;
+- `pull_request.branches: master`.
+
+Следовательно, обычный push в `docs/ux-audit-project` не запускает этот workflow. PR в `master` подпадает под pull_request trigger. Это статический вывод из YAML; запуск CI на этой ветке не выполнялся. Workflow не изменялся, поскольку изменение CI scope не входит в согласованный текущий этап.
+
+### Классификация статуса
+
+- **Подтверждено:** production deployment настроен на PostgreSQL; SQLite остаётся в приложении как legacy backend, в общем import/dependency wiring и в тестовом наборе.
+- **Подтверждено:** перенос данных SQLite не требуется по принятому проектному ограничению.
+- **Не подтверждено:** полное отсутствие SQLite imports/references вне проверенных ключевых entry points; для этого нужен AST/import graph и content-wide scan.
+- **Не выполнялось:** runtime import tracing, установка пакета, запуск приложения, pytest, миграции и schema drift check.
+- **Не разрешено:** удаление SQLite, изменение backend default, удаление legacy routers/tests или изменение CI triggers.
+
+### Вывод
+
+Для UX-01 инвентаризация основных SQLite runtime/deployment/CI/test зависимостей достаточна, чтобы описать объём будущего PostgreSQL-only cleanup и его блокеры. Она не является разрешением на удаление SQLite и не заменяет отдельную техническую задачу с автоматизированным поиском и runtime validation.
