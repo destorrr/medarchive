@@ -1,6 +1,14 @@
 /* Keyboard support for horizontally scrollable data regions. */
 document.addEventListener("keydown", (event) => {
-  const region = event.target.closest(
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (
+    target.isContentEditable ||
+    target.closest("input, textarea, select, button, [contenteditable='true']")
+  ) return;
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+  const region = target.closest(
     '.table-wrap[role="region"][tabindex="0"], .receipt-table-wrap[role="region"][tabindex="0"], .dashboard-table-wrap[role="region"][tabindex="0"]'
   );
   if (!region || region.scrollWidth <= region.clientWidth) return;
