@@ -41,7 +41,7 @@ class TestSmoke:
         assert response.status_code == 200
         assert "/static/app.css" in response.text
         assert "/static/htmx.min.js" in response.text
-        assert "Перейти к содержимому" in response.text
+        assert "К основному содержимому" in response.text
         assert "class=\"nav-icon\"" in response.text
         assert "unpkg.com" not in response.text
 
