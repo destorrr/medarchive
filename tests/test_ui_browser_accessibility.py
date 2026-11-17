@@ -14,20 +14,18 @@ from medarchive.services.auth_service import AuthService
 
 
 @pytest.fixture
-def browser_server(test_config, db):
+async def browser_server(test_config, db):
     """Start the real ASGI app against the isolated SQLite test database."""
     auth = AuthService(secret_key=test_config.effective_secret_key)
-    awaitable = db.execute(
+    await db.execute(
         "INSERT OR REPLACE INTO branches (id, name, code) VALUES (1, 'Тестовый филиал', 'B1')"
     )
-    import asyncio
-    asyncio.run(awaitable)
-    asyncio.run(db.execute(
+    await db.execute(
         "INSERT OR REPLACE INTO users (id, username, full_name, password_hash, role, branch_id) "
         "VALUES (1, 'admin', 'Администратор Тест', ?, 'admin', NULL)",
         (auth.hash_password("admin123"),),
-    ))
-    asyncio.run(db.conn.commit())
+    )
+    await db.conn.commit()
 
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
