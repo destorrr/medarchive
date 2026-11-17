@@ -253,7 +253,7 @@ def test_postgresql_role_workspaces_render_responsively_in_chromium(
         _login(page, postgres_browser_server, username)
         for path in paths:
             _assert_page_responsive_and_labeled(page, postgres_browser_server, path)
-            if path.startswith("/admin/") and path != "/admin/audit":
+            if path.startswith("/admin/"):
                 _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path)
             _assert_status_contrast(page, path)
         assert not page_errors, page_errors
