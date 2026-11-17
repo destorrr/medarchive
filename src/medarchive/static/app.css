@@ -776,3 +776,9 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
 }
 
 .badge-exception { background:var(--color-danger-soft); color:var(--color-danger); }
+
+/* Keep keyboard focus clearly visible on form controls. */
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgb(49 95 189 / 32%);
+  outline-offset: 2px;
+}
