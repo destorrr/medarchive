@@ -54,3 +54,4 @@
 - `UX-02-postgresql-mutation-endpoint-inventory.md` — перечень изменяющих PostgreSQL routes по router modules с привязкой к найденным тестовым опорам и прямым HTTP-покрытием.
 - `UX-02-http-test-gap-backlog.md` — endpoint-level backlog недостающих прямых HTTP-тестов, с отделением существующих проверок от service-only опоры и непроверенных role/ownership/state комбинаций.
 - `UX-02-cross-review-and-exit-criteria.md` — cross-review комплекта UX-02, согласованность фактов, оставшиеся решения и критерии готовности к переходу к UX-03.
+- `PRODUCT-DECISIONS-D-01-D-18.md` — пакет решений владельца продукта: текущее поведение, вопрос, варианты, предварительная рекомендация и влияние на UX-03/UX-04; все пункты ожидают явного согласования.
