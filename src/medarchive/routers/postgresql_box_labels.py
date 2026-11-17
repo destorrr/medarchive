@@ -16,6 +16,44 @@ from medarchive.dependencies import get_pg_current_user, get_pg_session
 
 router = APIRouter()
 
+# Keep the label page's shared shell navigation consistent with the
+# corresponding PostgreSQL role dashboard. The base template adds the
+# shipment-register link for the three operational roles.
+role_menus = {
+    "branch": (
+        ("/dashboard", "Панель управления"),
+        ("/search", "Поиск"),
+        ("/history", "Журнал движений"),
+        ("/branch/receive", "Приёмка"),
+        ("/packing", "Упаковка коробки"),
+        ("/transfer", "Передача курьеру"),
+    ),
+    "central_office": (
+        ("/dashboard", "Панель управления"),
+        ("/search", "Поиск"),
+        ("/history", "Журнал движений"),
+        ("/requests/new", "Запросить карты из архива"),
+        ("/central/receive", "Приёмка"),
+        ("/central/packing", "Упаковка"),
+        ("/central/transfer", "Отправка"),
+        ("/central/custody", "Внешнее хранение"),
+    ),
+    "archive": (
+        ("/dashboard", "Панель управления"),
+        ("/search", "Поиск"),
+        ("/history", "Журнал движений"),
+        ("/receive", "Приёмка"),
+        ("/placement", "Размещение"),
+        ("/requests", "Заявки ЦО"),
+    ),
+    "admin": (
+        ("/dashboard", "Панель управления"),
+        ("/search", "Поиск"),
+        ("/history", "Журнал движений"),
+        ("/admin", "Администрирование"),
+    ),
+}
+
 
 def _box_qr_data(box_id: uuid.UUID) -> str:
     """Stable, non-PII QR payload; reprinting always produces the same value."""
