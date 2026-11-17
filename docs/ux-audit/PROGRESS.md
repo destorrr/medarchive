@@ -693,9 +693,9 @@ SQLite removal пока не готово к выполнению: есть runt
 ### Состояние ветки
 
 - Рабочая ветка: `docs/ux-audit-project`.
-- HEAD на момент проверки: `e59d6a0754f53b67dcf4d6f16528aa4777ff34e`.
+- HEAD после фиксации заключительного прохода: `37403283ccaf5ea6020c2beb15fe8394c5bea5cc`.
 - База: `docs/target-architecture-spec`, SHA `767e0f10239d4404a60b82e8b827da581350cae3`.
-- Compare: 65 commits ahead, 0 behind; 14 файлов, все добавлены в `docs/ux-audit/`.
+- Compare после фиксации заключительного прохода: 68 commits ahead, 0 behind; 14 файлов, все добавлены в `docs/ux-audit/`.
 - Изменения исходников приложения, тестов, миграций и workflow в compare отсутствуют.
 
 ### Заключительные уточнения
@@ -705,6 +705,7 @@ SQLite removal пока не готово к выполнению: есть runt
 - Workflow `postgresql.yml` не запускается на push в `docs/ux-audit-project`; PR target `master` соответствует pull_request trigger. Workflow не менялся.
 - Реестр D-01…D-20 остаётся открытым: ни одно продуктовое или техническое решение не считается согласованным без явного подтверждения.
 - Уточнены критерии закрытия аудита и входа в UX-02 в `UX-01-cross-review-and-decision-register.md`.
+- Итоговые commits документации: `fe4223ce7cfde9ab31341006cf73d44223d1987c` (cross-review), `425ff938b1d6cca2c83bf3d43145d1d98c19ff80` (SQLite inventory), `37403283ccaf5ea6020c2beb15fe8394c5bea5cc` (PROGRESS).
 
 ### Статус
 
