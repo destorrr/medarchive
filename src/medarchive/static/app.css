@@ -700,7 +700,7 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
 
 /* Accessible application navigation */
 .skip-link { position: fixed; z-index: 1000; top: 10px; left: 10px; padding: 10px 14px; color: #fff; background: var(--color-primary); border-radius: var(--radius-sm); transform: translateY(-160%); }
-.skip-link:focus { color: #fff; transform: translateY(0); }
+.skip-link:focus-visible { color: #fff; transform: translateY(0); outline: 3px solid #fff; outline-offset: 3px; box-shadow: 0 0 0 5px var(--color-primary); }
 
 /* Sign-in page */
 .login-page { display: grid; min-height: 100vh; place-items: center; padding: 32px 18px; }
