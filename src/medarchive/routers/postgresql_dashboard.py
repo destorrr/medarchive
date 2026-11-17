@@ -88,7 +88,7 @@ def _dashboard_context(request: Request, user: User, branch_name: str | None) ->
             {"url": "/requests/new", "label": "Запросить карты из архива"},
             {"url": "/central/receive", "label": "Приёмка"},
             {"url": "/central/packing", "label": "Упаковка"},
-            {"url": "/central/transfer", "label": "🚚 Отправка"},
+            {"url": "/central/transfer", "label": "Отправка"},
             {"url": "/central/custody", "label": "Внешнее хранение"},
         ])
     if user.role == "archive":
