@@ -190,7 +190,13 @@ def _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path):
             wrapper.evaluate("(el) => { el.scrollLeft = 0; el.focus(); }")
             assert wrapper.evaluate("(el) => document.activeElement === el"), path
             page.keyboard.press("End")
-            assert wrapper.evaluate("(el) => el.scrollLeft > 0"), (path, "keyboard did not scroll table")
+            assert wrapper.evaluate("(el) => el.scrollLeft > 0"), (path, "End did not scroll table to the right")
+            page.keyboard.press("Home")
+            assert wrapper.evaluate("(el) => el.scrollLeft === 0"), (path, "Home did not return table to the left")
+            page.keyboard.press("ArrowRight")
+            assert wrapper.evaluate("(el) => el.scrollLeft > 0"), (path, "ArrowRight did not scroll table")
+            page.keyboard.press("ArrowLeft")
+            assert wrapper.evaluate("(el) => el.scrollLeft === 0"), (path, "ArrowLeft did not scroll table back")
 
 
 def _assert_admin_filters_and_forms(page, path):
