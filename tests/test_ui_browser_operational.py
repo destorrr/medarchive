@@ -50,14 +50,6 @@ async def test_postgresql_operational_pages_are_responsive_and_keyboard_accessib
         id=uuid.uuid4(), kind="branch", branch_id=branch.id,
         name=f"UI Browser Branch Location {suffix}", is_active=True,
     )
-    archive_location = Location(
-        id=uuid.uuid4(), kind="archive", branch_id=None,
-        name=f"UI Browser Archive {suffix}", is_active=True,
-    )
-    central_location = Location(
-        id=uuid.uuid4(), kind="central_office", branch_id=None,
-        name=f"UI Browser Central {suffix}", is_active=True,
-    )
     shelf = ArchiveShelf(
         id=uuid.uuid4(), section_name=f"UI-{suffix}", shelf_name="Shelf 01",
         qr_code=f"UI-SHELF-{suffix}", is_active=True,
@@ -78,8 +70,7 @@ async def test_postgresql_operational_pages_are_responsive_and_keyboard_accessib
     try:
         async with database.session_factory() as session:
             session.add_all([
-                branch, branch_location, archive_location, central_location,
-                shelf, courier, *actors,
+                branch, branch_location, shelf, courier, *actors,
             ])
             await session.commit()
 
@@ -185,7 +176,7 @@ async def test_postgresql_operational_pages_are_responsive_and_keyboard_accessib
             await session.execute(delete(Courier).where(Courier.id == courier.id))
             await session.execute(delete(ArchiveShelf).where(ArchiveShelf.id == shelf.id))
             await session.execute(delete(Location).where(
-                Location.id.in_([branch_location.id, archive_location.id, central_location.id])
+                Location.id == branch_location.id
             ))
             await session.execute(delete(Branch).where(Branch.id == branch.id))
             await session.commit()
