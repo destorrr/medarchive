@@ -177,8 +177,10 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
     # and makes this shared accessibility check depend on the previous route.
     page.bring_to_front()
     page.evaluate(
-        "() => { window.focus(); const active = document.activeElement; "
-        "if (active && active !== document.body) active.blur(); }"
+        "() => { document.body.setAttribute('tabindex', '-1'); document.body.focus(); }"
+    )
+    assert page.evaluate("() => document.activeElement === document.body"), (
+        path, "could not establish document-level keyboard focus"
     )
     page.keyboard.press("Tab")
     keyboard_focus_diagnostics = page.evaluate(
