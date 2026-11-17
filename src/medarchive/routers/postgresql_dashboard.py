@@ -69,36 +69,36 @@ EVENT_LABELS = {
 
 def _dashboard_context(request: Request, user: User, branch_name: str | None) -> dict:
     role_label = ROLE_LABELS.get(user.role, "Пользователь")
-    menu_items = [{"url": "/dashboard", "label": "📊 Панель управления"}]
+    menu_items = [{"url": "/dashboard", "label": "Панель управления"}]
     if user.role == "branch":
         menu_items.extend([
-            {"url": "/search", "label": "🔍 Поиск"},
-            {"url": "/history", "label": "📜 Журнал движений"},
-            {"url": "/branch/receive", "label": "📥 Приёмка"},
-            {"url": "/packing", "label": "📦 Упаковка коробки"},
+            {"url": "/search", "label": "Поиск"},
+            {"url": "/history", "label": "Журнал движений"},
+            {"url": "/branch/receive", "label": "Приёмка"},
+            {"url": "/packing", "label": "Упаковка коробки"},
         ])
-        menu_items.append({"url": "/transfer", "label": "🚚 Передача курьеру"})
+        menu_items.append({"url": "/transfer", "label": "Передача курьеру"})
     if user.role in {"archive", "viewer", "admin", "central_office"}:
         menu_items.extend([
-            {"url": "/search", "label": "🔍 Поиск"},
-            {"url": "/history", "label": "📜 Журнал движений"},
+            {"url": "/search", "label": "Поиск"},
+            {"url": "/history", "label": "Журнал движений"},
         ])
     if user.role == "central_office":
         menu_items.extend([
-            {"url": "/requests/new", "label": "📋 Запросить карты из архива"},
-            {"url": "/central/receive", "label": "📥 Приёмка"},
-            {"url": "/central/packing", "label": "📦 Упаковка"},
+            {"url": "/requests/new", "label": "Запросить карты из архива"},
+            {"url": "/central/receive", "label": "Приёмка"},
+            {"url": "/central/packing", "label": "Упаковка"},
             {"url": "/central/transfer", "label": "🚚 Отправка"},
-            {"url": "/central/custody", "label": "⚖️ Внешнее хранение"},
+            {"url": "/central/custody", "label": "Внешнее хранение"},
         ])
     if user.role == "archive":
         menu_items.extend([
-            {"url": "/receive", "label": "📥 Приёмка"},
-            {"url": "/placement", "label": "🗂 Размещение"},
-            {"url": "/requests", "label": "📋 Заявки ЦО"},
+            {"url": "/receive", "label": "Приёмка"},
+            {"url": "/placement", "label": "Размещение"},
+            {"url": "/requests", "label": "Заявки ЦО"},
         ])
     if user.role == "admin":
-        menu_items.append({"url": "/admin", "label": "⚙️ Администрирование"})
+        menu_items.append({"url": "/admin", "label": "Администрирование"})
     return {
         "request": request,
         "username": user.username,
