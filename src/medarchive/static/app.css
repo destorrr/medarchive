@@ -774,3 +774,5 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
   .shipment-register, .shipment-summary, .shipment-manifest, .shipment-timeline-card { padding:17px; }
   .shipment-facts { grid-template-columns:minmax(0,1fr); }
 }
+
+.badge-exception { background:var(--color-danger-soft); color:var(--color-danger); }
