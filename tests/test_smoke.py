@@ -32,6 +32,8 @@ class TestSmoke:
         assert app_js.status_code == 200
         assert "ArrowRight" in app_js.text
         assert "scrollTo" in app_js.text
+        assert 'target.closest("input, textarea, select, button' in app_js.text
+        assert "event.ctrlKey" in app_js.text
         assert "htmx" in htmx.text[:500].lower()
 
     async def test_shared_template_uses_local_assets(self, app_client):
