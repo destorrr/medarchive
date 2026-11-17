@@ -153,3 +153,44 @@
 - Изученный admin service test file не даёт полной матрицы всех HTML POST действий × чужие IDs/состояния.
 
 Подробности — `UX-01-custody-admin-database-audit.md` и `UX-01-alembic-migration-audit.md`.
+
+
+## 10. Полная сверка подключённых PostgreSQL routers с main.py
+
+Проверены актуальные `src/medarchive/main.py` и все 11 файлов PostgreSQL/auth routers на ветке аудита. `create_app()` всегда подключает общий auth router; при `auth_backend == "postgresql"` подключает ровно десять PostgreSQL routers, перечисленных ниже. Ветка `else` подключает пять legacy SQLite routers (`packing`, `archive`, `dashboard`, `admin`, `transfer`). Отдельных дополнительных PostgreSQL routers в точке подключения не обнаружено.
+
+### Общие маршруты
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| GET | `/` | Redirect на `/login`; маршрут определён непосредственно в `main.py`, исключён из OpenAPI |
+| GET | `/login` | Форма входа |
+| POST | `/login` | Аутентификация |
+| POST | `/logout` | Выход |
+
+### PostgreSQL routers
+
+| Router | Подключённые endpoints |
+|---|---|
+| `postgresql_dashboard` | GET `/dashboard`; GET `/search`; GET `/search/results`; POST `/search`; GET `/history` |
+| `postgresql_packing` | GET `/packing`; POST `/packing/new-box`; POST `/packing/scan-card`; POST `/packing/confirm-card`; POST `/packing/remove-card`; POST `/packing/write-off-box` |
+| `postgresql_box_labels` | GET `/boxes/{box_id}/label` |
+| `postgresql_branch` | GET `/branch/receive`; POST `/branch/receive/confirm`; POST `/branch/receive/resolve` |
+| `postgresql_transfer` | GET `/transfer`; POST `/transfer/confirm` |
+| `postgresql_shipments` | GET `/shipments`; GET `/shipments/{shipment_id}` |
+| `postgresql_archive` | GET `/receive`; POST `/receive/confirm`; POST `/receive/resolve`; GET `/placement`; POST `/placement/add-card`; POST `/placement/remove-card-from-box`; POST `/placement/new-internal-box`; POST `/placement/box`; POST `/placement/card`; POST `/placement/remove-box`; POST `/placement/write-off-box`; POST `/placement/remove-card`; GET `/requests`; POST `/requests/not-found`; POST `/requests/unpack-card`; POST `/requests/fulfill`; GET `/requests/new`; POST `/requests/create` |
+| `postgresql_central_office` | GET `/central/receive`; POST `/central/receive/confirm`; POST `/central/receive/resolve`; GET `/central/packing`; POST `/central/packing/new-box`; POST `/central/packing/add-card`; POST `/central/packing/remove-card`; POST `/central/packing/write-off-box`; GET `/central/transfer`; POST `/central/transfer/confirm`; GET `/central/custody`; POST `/central/custody/mark`; POST `/central/custody/return` |
+| `postgresql_admin` (JSON API) | GET/POST `/branches`; PUT `/branches/{branch_id}`; POST `/branches/{branch_id}/deactivate`; POST `/branches/{branch_id}/activate`; GET/POST `/users`; PUT `/users/{user_id}` |
+| `postgresql_admin_pages` (HTML) | GET `/admin`; GET/POST `/admin/branches`; POST `/admin/branches/{branch_id}/edit`; POST `/admin/branches/{branch_id}/status`; GET/POST `/admin/users`; POST `/admin/users/{user_id}/edit`; GET/POST `/admin/couriers`; POST `/admin/couriers/{courier_id}/status`; GET/POST `/admin/sections`; POST `/admin/sections/{shelf_id}/edit`; POST `/admin/sections/{shelf_id}/status`; GET `/admin/audit`; GET `/admin/incidents`; GET `/admin/incidents/{shipment_id}` |
+
+**Подсчёт:** 78 router endpoints (включая общий auth router) плюс корневой redirect `/`. Счёт включает каждый HTTP method/path отдельно; GET/POST на одном пути считаются двумя endpoints.
+
+### Выводы по полноте
+
+- Ранее приведённые списки бизнес-маршрутов были неполными: они не объединяли общий auth/root слой и полный набор административных JSON/HTML endpoints в одной точке.
+- Все перечисленные PostgreSQL routers явно подключены в `main.py`; legacy SQLite routers подключаются только в альтернативной ветке backend.
+- Это inventory регистрации маршрутов, а не повторная полная проверка каждого guard/service/test. Для прав доступа и object-level ограничений остаются ссылки на профильные аудиты выше.
+- В `main.py` middleware дополнительно защищает POST/PUT/PATCH/DELETE от cross-site запросов по Fetch Metadata и Origin/Referer. Это общая защита CSRF-поверхности, не замена ролевой авторизации.
+- Список не включает автоматически монтируемые static assets и не предполагает, что внутренние функции сервисов являются HTTP endpoints.
+
+Исходники и ревизии, использованные для сверки: `src/medarchive/main.py` (blob `47ab977217a15568238c1a3fcb94f7c2af268c8d`), auth и десять PostgreSQL router modules. Код приложения не менялся.
