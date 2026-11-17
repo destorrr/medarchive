@@ -52,3 +52,4 @@
 Эти документы описывают фактический код и не утверждают бизнес-процессы как согласованные.
 
 - `UX-02-postgresql-mutation-endpoint-inventory.md` — перечень изменяющих PostgreSQL routes по router modules с привязкой к найденным тестовым опорам и прямым HTTP-покрытием.
+- `UX-02-http-test-gap-backlog.md` — endpoint-level backlog недостающих прямых HTTP-тестов, с отделением существующих проверок от service-only опоры и непроверенных role/ownership/state комбинаций.
