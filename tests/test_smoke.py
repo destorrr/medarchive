@@ -25,9 +25,13 @@ class TestSmoke:
     async def test_local_frontend_assets_are_served_without_cdn(self, app_client):
         css = await app_client.get("/static/app.css")
         htmx = await app_client.get("/static/htmx.min.js")
+        app_js = await app_client.get("/static/app.js")
         assert css.status_code == 200
         assert "var(--color-primary)" in css.text
         assert htmx.status_code == 200
+        assert app_js.status_code == 200
+        assert "ArrowRight" in app_js.text
+        assert "scrollTo" in app_js.text
         assert "htmx" in htmx.text[:500].lower()
 
     async def test_shared_template_uses_local_assets(self, app_client):
@@ -41,6 +45,7 @@ class TestSmoke:
         assert response.status_code == 200
         assert "/static/app.css" in response.text
         assert "/static/htmx.min.js" in response.text
+        assert "/static/app.js" in response.text
         assert "К основному содержимому" in response.text
         assert "class=\"nav-icon\"" in response.text
         assert "unpkg.com" not in response.text
@@ -61,11 +66,14 @@ class TestSmoke:
         login_page = await app_client.get("/login")
         css = await app_client.get("/static/app.css")
         htmx = await app_client.get("/static/htmx.min.js")
+        app_js = await app_client.get("/static/app.js")
 
         assert dashboard.status_code == 200
         assert login_page.status_code == 200
         assert css.status_code == 200
         assert htmx.status_code == 200
+        assert app_js.status_code == 200
+        assert "ArrowLeft" in app_js.text
         assert "login-card" in login_page.text
         assert 'rel="stylesheet" href="/static/app.css"' in login_page.text
         assert "<style" not in login_page.text
