@@ -928,3 +928,29 @@ Workflow не изменялся: изменение CI вне текущего 
 Продолжить endpoint-level сверку: проверить прямые HTTP-тесты для действий с только service-level опорой; затем подготовить минимальный backlog тестов. Отдельно решить с владельцем продукта/репозитория, нужно ли включить рабочую ветку/PR target в PostgreSQL CI, прежде чем менять workflow.
 
 **Статус:** классификация POST /search завершена; CI trigger gap зафиксирован.
+
+
+## 2026-11-17 — UX-02: backlog недостающих HTTP-тестов
+
+Создан документ `UX-02-http-test-gap-backlog.md` на HEAD `b985bc6fc897b701bc95902d1d19b43978f6abd8`.
+
+### Выполнено
+
+- Повторно проверены branch HEAD и compare: до записи `b985bc6fc897b701bc95902d1d19b43978f6abd8`, 93 commits ahead, 0 behind относительно `docs/target-architecture-spec`.
+- Прочитаны handlers central packing, archive placement/requests/receive, branch transfer и central receive.
+- Повторно сопоставлены прямые HTTP-вызовы в тестах packing, archive integration/fulfillment, full logistics cycle, incident pages, transfer integration и central requests.
+- Разделены прямые HTTP-тесты и service-only проверки: в частности, not-found проверяется через workflow, но прямой вызов `POST /requests/not-found` в просмотренных тестах не найден.
+- Уточнено, что shelf placement `POST /placement/card` не является тестом `POST /placement/add-card` (добавление карты во внутреннюю коробку).
+- Подтверждены существующие HTTP сценарии: branch transfer happy path; archive и central receive; archive fulfillment; archive/central incident resolve; viewer denial для отдельных archive POST с использованием случайных UUID.
+- Сформирован backlog HTTP-01…HTTP-22: отсутствующие happy paths, ownership/state checks, role-denial tests, receive/resolve edge cases и concurrency.
+- Зафиксированы точные ограничения доказательности: тесты не запускались; «не найдено» ограничено просмотренной выборкой; случайный UUID не доказывает отказ на существующем чужом объекте.
+
+### Вывод
+
+Backlog показывает, что ряд ранее отмеченных «service-only» пробелов подтвердился, но часть маршрутов уже имеет прямую HTTP-опору. Особенно важно не дублировать существующие позитивные сценарии полного логистического цикла и incident resolve, а закрыть конкретные недостающие проверки.
+
+### Ограничения и следующий шаг
+
+Проверка статическая; pytest, PostgreSQL и GitHub Actions не запускались. Новые тесты и продуктовый код не создавались. Следующий шаг — завершить UX-02 кратким cross-review: сверить backlog с endpoint inventory и process matrix, обозначить оставшиеся неопределённости и критерии выхода из UX-02. Затем перейти к проектированию UX-03 (целевая матрица полномочий пяти существующих ролей) после согласования необходимых бизнес-решений.
+
+**Изменения:** только документация в `docs/ux-audit/`; исходники приложения, тесты, миграции, workflow, SQLite-конфигурация и `master` не менялись.
