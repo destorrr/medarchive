@@ -175,8 +175,9 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
     # Start keyboard navigation from the document, not from an autofocus
     # search field. Otherwise Tab advances from a page-specific initial focus
     # and makes this shared accessibility check depend on the previous route.
+    page.bring_to_front()
     page.evaluate(
-        "() => { const active = document.activeElement; "
+        "() => { window.focus(); const active = document.activeElement; "
         "if (active && active !== document.body) active.blur(); }"
     )
     page.keyboard.press("Tab")
