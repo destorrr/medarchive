@@ -782,3 +782,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 3px solid rgb(49 95 189 / 32%);
   outline-offset: 2px;
 }
+
+/* Accessible horizontal scrolling for dense operational and admin tables */
+.table-wrap, .receipt-table-wrap, .dashboard-table-wrap {
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+.table-wrap[role="region"]:focus-visible {
+  outline: 3px solid rgb(49 95 189 / 32%);
+  outline-offset: 2px;
+}
+@media (max-width: 680px) {
+  .table-wrap, .receipt-table-wrap, .dashboard-table-wrap {
+    border-radius: var(--radius-sm);
+    scrollbar-width: thin;
+  }
+}
