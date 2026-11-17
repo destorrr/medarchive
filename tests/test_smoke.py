@@ -72,6 +72,8 @@ class TestSmoke:
         assert 'autocomplete="username"' in login_page.text
         assert 'autocomplete="current-password"' in login_page.text
         assert ":focus-visible" in css.text
+        assert "input:focus-visible, select:focus-visible, textarea:focus-visible" in css.text
+        assert "outline: 3px solid rgb(49 95 189 / 32%)" in css.text
         assert "@media (max-width: 680px)" in css.text
         assert "prefers-reduced-motion: reduce" in css.text
         assert "--color-subtle: #667085" in css.text
