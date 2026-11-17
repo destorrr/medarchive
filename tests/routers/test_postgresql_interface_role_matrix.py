@@ -61,7 +61,7 @@ async def test_postgresql_html_pages_and_navigation_follow_role_matrix():
                 )
             )
             locations["archive"] = await session.scalar(
-                __import__("sqlalchemy").select(Location).where(
+                select(Location).where(
                     Location.kind == "archive", Location.is_active.is_(True)
                 )
             )
