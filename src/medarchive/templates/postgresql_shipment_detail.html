@@ -39,6 +39,7 @@
       {% for event in timeline %}<li><span class="shipment-timeline-dot"></span><div>
         <strong>{{ event.event_label }}</strong><p>{{ event.occurred_at.strftime("%d.%m.%Y %H:%M:%S") if event.occurred_at else "—" }} · {{ event.actor }}</p>
         {% if event.payload and event.payload.get("note") %}<p>{{ event.payload.get("note") }}</p>{% endif %}
+        {% if event.payload and event.payload.get("resolution_note") %}<p>{{ event.payload.get("resolution_note") }}</p>{% endif %}
       </div></li>{% endfor %}
     </ol>{% else %}<p class="shipment-muted">События по отправлению не зарегистрированы.</p>{% endif %}
   </article>
