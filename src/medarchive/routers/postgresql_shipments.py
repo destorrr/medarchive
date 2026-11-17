@@ -7,6 +7,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from medarchive.adapters.postgresql.models import (
     Box, Card, Courier, DomainEvent, Location, Shipment, ShipmentBox,
@@ -16,6 +17,14 @@ from medarchive.dependencies import get_pg_session, require_pg_role
 
 router = APIRouter()
 shipment_reader = require_pg_role("branch", "central_office", "archive")
+
+EVENT_LABELS = {
+    "shipment.created": "Отправление создано",
+    "shipment.handed_over": "Передано курьеру",
+    "shipment.exception_registered": "Зарегистрировано расхождение",
+    "shipment.received": "Отправление принято",
+    "shipment.exception_resolved": "Инцидент разрешён",
+}
 
 STATUS_LABELS = {
     "draft": "Черновик", "in_transit": "В пути", "received": "Принято",
@@ -107,11 +116,16 @@ async def shipment_list(
     location = await _user_location(session, user)
     if location is None:
         raise HTTPException(status_code=403, detail="Для пользователя не настроена активная локация")
-    from sqlalchemy.orm import aliased
     source = aliased(Location)
     destination = aliased(Location)
+    box_count_query = select(func.count()).select_from(ShipmentBox).where(
+        ShipmentBox.shipment_id == Shipment.id
+    ).scalar_subquery()
+    card_count_query = select(func.count()).select_from(ShipmentCard).where(
+        ShipmentCard.shipment_id == Shipment.id
+    ).scalar_subquery()
     query = (
-        select(Shipment, source, destination, Courier)
+        select(Shipment, source, destination, Courier, box_count_query, card_count_query)
         .join(source, source.id == Shipment.from_location_id)
         .join(destination, destination.id == Shipment.to_location_id)
         .join(Courier, Courier.id == Shipment.courier_id)
@@ -124,17 +138,7 @@ async def shipment_list(
         .limit(200)
     )).all()
     items = []
-    for shipment, origin, target, courier in rows:
-        box_count = await session.scalar(
-            select(func.count()).select_from(ShipmentBox).where(
-                ShipmentBox.shipment_id == shipment.id
-            )
-        )
-        card_count = await session.scalar(
-            select(func.count()).select_from(ShipmentCard).where(
-                ShipmentCard.shipment_id == shipment.id
-            )
-        )
+    for shipment, origin, target, courier, box_count, card_count in rows:
         items.append({
             "id": shipment.id, "number": shipment.shipment_number,
             "source": origin.name, "destination": target.name,
@@ -160,7 +164,6 @@ async def shipment_detail(
     location = await _user_location(session, user)
     if location is None:
         raise HTTPException(status_code=403, detail="Для пользователя не настроена активная локация")
-    from sqlalchemy.orm import aliased
     source, destination = aliased(Location), aliased(Location)
     row = await session.execute(
         select(Shipment, source, destination, Courier)
@@ -184,7 +187,8 @@ async def shipment_detail(
         .order_by(DomainEvent.occurred_at, DomainEvent.id)
     )).all()
     timeline = [{
-        "event_type": event.event_type, "occurred_at": event.occurred_at,
+        "event_type": event.event_type, "event_label": EVENT_LABELS.get(event.event_type, event.event_type),
+        "occurred_at": event.occurred_at,
         "actor": actor.full_name if actor else "Система", "payload": event.payload or {},
     } for event, actor in timeline_rows]
     detail = {
