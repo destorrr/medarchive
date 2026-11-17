@@ -116,10 +116,11 @@ def test_login_labels_and_keyboard_focus_are_visible(browser_server, chromium):
     )
     assert labels_are_associated
 
-    page.keyboard.press("Tab")
-    page.keyboard.press("Tab")
+    # The login form intentionally autofocuses the username field.
     assert page.locator("#username").evaluate("(el) => el === document.activeElement")
-    focus = page.locator("#username").evaluate(
+    page.keyboard.press("Tab")
+    assert page.locator("#password").evaluate("(el) => el === document.activeElement")
+    focus = page.locator("#password").evaluate(
         "(el) => ({style: getComputedStyle(el).outlineStyle, width: getComputedStyle(el).outlineWidth})"
     )
     assert focus == {"style": "solid", "width": "3px"}
