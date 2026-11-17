@@ -18,7 +18,7 @@
         <span class="admin-record-count">{{ incidents|length }} записей</span>
     </div>
     {% if incidents %}
-    <div class="table-wrap">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Таблица инцидентов; прокручивается по горизонтали">
         <table class="admin-incidents-table">
             <thead>
                 <tr><th>Отправление</th><th>Состояние</th><th>Маршрут</th><th>Курьер</th><th>Причина</th><th>Зафиксирован</th><th></th></tr>
