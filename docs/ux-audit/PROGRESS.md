@@ -812,3 +812,36 @@ SQLite removal пока не готово к выполнению: есть runt
 ### Следующий шаг
 
 Составить подробную endpoint test-coverage matrix: метод/путь → role dependency → service method → actor active → ownership → object state → expected allow/deny → существующие тесты → пробел. Продолжить проверку оставшихся административных API endpoints и archive/custody handlers, не создавая новые тесты до согласования.
+
+
+## 2026-11-17 — UX-02: матрица покрытия изменяющих операций тестами
+
+Создан документ `UX-02-mutation-test-coverage-matrix.md`.
+
+### Проверенные тестовые модули
+
+- `test_postgresql_full_logistics_cycle.py` — сквозной HTTP-процесс branch → archive → central office → archive.
+- `test_postgresql_transfer_integration.py` — ролевой доступ к transfer и scope реестра/карточки отправления.
+- `test_postgresql_archive_fulfillment.py` — заявки, ограничения archive → ЦО, not-found и закрытие заявки после приёмки.
+- `test_postgresql_central_custody.py` — полный цикл внешнего хранения, отказ branch/archive/viewer и блокировка обычных операций.
+- `test_postgresql_admin_integration.py` — административные ограничения филиалов, пользователей, последнего admin, курьеров, полок, остатков и незавершённых отправлений; concurrency QR intake/deactivation.
+- `test_postgresql_admin_role_matrix.py` — запрет не-admin ролям на просмотренные admin HTML/API mutations.
+- `test_postgresql_interface_role_matrix.py` — GET-матрица страниц/навигации пяти ролей и QR label scope.
+- `test_postgresql_archive_integration.py` — inactive shelf, duplicate placement и запрет отправки размещённой карты до снятия.
+- `test_postgresql_incident_pages.py` — wrong recipient, обязательное пояснение, immutable manifest, atomic resolve и запрет повторного resolve.
+- `test_postgresql_packing_page_integration.py` — преимущественно проверка отображения страницы, не mutation coverage.
+
+### Результаты
+
+- Подтверждено сильное покрытие нескольких сквозных сценариев логистики, внешнего хранения, административных инвариантов и разрешения инцидентов.
+- Ролевые GET-матрицы не смешиваются с POST/PUT/прочими изменяющими операциями: наличие первой не доказывает полноту второй.
+- Не подтверждена единая матрица всех изменяющих endpoints × пять ролей × собственные/чужие объекты × допустимые/недопустимые состояния.
+- Не подтверждены систематические негативные тесты для каждого foreign card/box/shipment/request/shelf/courier ID.
+- Отдельный пользовательский тест отмены shipment в просмотренной выборке не найден; статус `cancelled` не трактуется как готовая функция.
+- Проверка статическая: файлы тестов прочитаны, но pytest, приложение, PostgreSQL и CI в этом проходе не запускались.
+
+### Ограничения и следующий шаг
+
+Создана карта TC-01…TC-08 с пробелами и приоритетами. До согласования продуктовых правил тесты и код не меняются. Следующий шаг — полный inventory всех POST/PUT/PATCH/DELETE PostgreSQL endpoints и их сопоставление с конкретными тестовыми функциями, включая оставшиеся admin API и archive/custody paths.
+
+**Изменения:** только документация в `docs/ux-audit/`. Исходники приложения, тесты, миграции, workflow, SQLite-конфигурация и базовая ветка не менялись.
