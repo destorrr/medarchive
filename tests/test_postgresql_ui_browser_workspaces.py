@@ -151,7 +151,7 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
     response = page.goto(f"{base_url}{path}")
     assert response is not None and response.status == 200, path
     assert page.locator("main").count() == 1, path
-    for width in (390, 768, 1280):
+    for width in (320, 390, 768, 1024, 1440):
         page.set_viewport_size({"width": width, "height": 900})
         page.wait_for_timeout(50)
         dimensions = page.evaluate(
@@ -163,6 +163,14 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
         "document.getElementById(label.htmlFor) !== null)"
     )
     assert labels_are_associated, path
+    page.keyboard.press("Tab")
+    keyboard_focus_is_visible = page.evaluate(
+        "() => { const el = document.activeElement; if (!el) return false; "
+        "const style = getComputedStyle(el); "
+        "return el.matches('a,button,input,select,textarea,[tabindex]') && "
+        "(style.outlineStyle !== 'none' || el.matches(':focus-visible')); }"
+    )
+    assert keyboard_focus_is_visible, path
 
 
 def test_postgresql_role_workspaces_render_responsively_in_chromium(
@@ -177,7 +185,7 @@ def test_postgresql_role_workspaces_render_responsively_in_chromium(
         ),
         "browser-central": (
             "/dashboard", "/central/packing", "/central/transfer",
-            "/central/requests", "/central/custody",
+            "/requests/new", "/central/custody",
         ),
         "browser-admin": (
             "/admin", "/admin/users", "/admin/branches", "/admin/couriers",
@@ -187,7 +195,10 @@ def test_postgresql_role_workspaces_render_responsively_in_chromium(
     for username, paths in workspaces.items():
         context = postgres_chromium.new_context(viewport={"width": 1280, "height": 900})
         page = context.new_page()
+        page_errors = []
+        page.on("pageerror", lambda error: page_errors.append(str(error)))
         _login(page, postgres_browser_server, username)
         for path in paths:
             _assert_page_responsive_and_labeled(page, postgres_browser_server, path)
+        assert not page_errors, page_errors
         context.close()
