@@ -42,7 +42,7 @@
         <span class="admin-record-count">{{ branches|length }} записей</span>
     </div>
     {% if branches %}
-    <div class="table-wrap">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Таблица филиалов; прокручивается по горизонтали">
         <table class="admin-branches-table">
             <thead><tr><th>Код</th><th>Название</th><th>Состояние</th><th>Действия</th></tr></thead>
             <tbody>
