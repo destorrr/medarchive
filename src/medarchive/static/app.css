@@ -727,3 +727,50 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
 
 .nav-icon { flex: 0 0 17px; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .sidebar nav a > span:first-of-type { min-width: 0; }
+
+/* PostgreSQL shipment register and read-only detail */
+.shipment-page-header { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; }
+.shipment-register, .shipment-summary, .shipment-manifest, .shipment-timeline-card { padding:22px; }
+.shipment-filter { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+.shipment-filter label { color:var(--color-text); font-size:13px; font-weight:650; }
+.shipment-filter select { min-width:180px; min-height:38px; }
+.shipment-table { min-width:850px; }
+.shipment-number-link { color:var(--color-primary); font-weight:700; text-decoration:none; }
+.shipment-number-link:hover { text-decoration:underline; }
+.shipment-route-arrow { margin:0 7px; color:var(--color-muted); }
+.shipment-list-note, .shipment-muted { color:var(--color-muted); font-size:12px; }
+.shipment-list-note { margin:14px 0 0; }
+.shipment-empty { padding:36px 18px; }
+.shipment-detail-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; align-items:start; }
+.shipment-detail-title { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.shipment-detail-title h2, .shipment-timeline-card h2, .shipment-manifest h2 { margin:0; font-size:17px; }
+.shipment-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:20px 0 0; }
+.shipment-facts div { min-width:0; }
+.shipment-facts dt { margin-bottom:5px; color:var(--color-muted); font-size:11px; }
+.shipment-facts dd { margin:0; font-size:13px; font-weight:600; overflow-wrap:anywhere; }
+.shipment-facts dd .shipment-muted { display:block; margin-top:3px; font-weight:400; }
+.shipment-manifest-group { padding:15px 0; border-top:1px solid var(--color-border); }
+.shipment-manifest-group h3 { margin:0 0 10px; font-size:14px; }
+.shipment-manifest-group ul { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.shipment-manifest-group li { display:flex; justify-content:space-between; gap:12px; font-size:12px; }
+.shipment-manifest-group li strong { flex:0 0 auto; }
+.shipment-manifest-group li span { text-align:right; color:var(--color-muted); }
+.shipment-timeline-card { grid-column:1 / -1; }
+.shipment-timeline { display:grid; gap:0; margin:18px 0 0; padding:0; list-style:none; }
+.shipment-timeline li { position:relative; display:flex; gap:12px; padding:0 0 18px; }
+.shipment-timeline li:not(:last-child):before { position:absolute; top:12px; bottom:0; left:5px; width:1px; background:var(--color-border); content:""; }
+.shipment-timeline-dot { z-index:1; flex:0 0 11px; width:11px; height:11px; margin-top:3px; border:2px solid var(--color-primary); border-radius:50%; background:var(--color-surface); }
+.shipment-timeline strong { font-size:13px; }
+.shipment-timeline p { margin:4px 0 0; color:var(--color-muted); font-size:12px; }
+.shipment-exception { margin-top:18px; padding:12px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-muted); }
+.shipment-exception p { margin:6px 0 0; font-size:13px; }
+.badge-draft { background:#eef2f7; color:#475569; }
+.badge-received { background:#e8f5ed; color:#187044; }
+.badge-cancelled { background:#f1f2f4; color:#596273; }
+@media (max-width:760px) {
+  .shipment-detail-grid { grid-template-columns:minmax(0,1fr); }
+  .shipment-timeline-card { grid-column:auto; }
+  .shipment-page-header { align-items:flex-start; flex-direction:column; }
+  .shipment-register, .shipment-summary, .shipment-manifest, .shipment-timeline-card { padding:17px; }
+  .shipment-facts { grid-template-columns:minmax(0,1fr); }
+}
