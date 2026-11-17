@@ -42,7 +42,7 @@
         <span class="admin-record-count">{{ couriers|length }} записей</span>
     </div>
     {% if couriers %}
-    <div class="table-wrap">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Таблица курьеров; прокручивается по горизонтали">
         <table class="admin-couriers-table">
             <thead><tr><th>Курьер</th><th>Телефон</th><th>Статус</th><th>Действие</th></tr></thead>
             <tbody>
