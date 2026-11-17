@@ -37,7 +37,7 @@
     <div class="panel-heading"><div><p class="eyebrow">Аудит</p><h2>История статусов</h2></div></div>
     {% if timeline %}<ol class="shipment-timeline">
       {% for event in timeline %}<li><span class="shipment-timeline-dot"></span><div>
-        <strong>{{ event.event_type }}</strong><p>{{ event.occurred_at.strftime("%d.%m.%Y %H:%M:%S") if event.occurred_at else "—" }} · {{ event.actor }}</p>
+        <strong>{{ event.event_label }}</strong><p>{{ event.occurred_at.strftime("%d.%m.%Y %H:%M:%S") if event.occurred_at else "—" }} · {{ event.actor }}</p>
         {% if event.payload and event.payload.get("note") %}<p>{{ event.payload.get("note") }}</p>{% endif %}
       </div></li>{% endfor %}
     </ol>{% else %}<p class="shipment-muted">События по отправлению не зарегистрированы.</p>{% endif %}
