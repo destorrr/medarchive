@@ -86,7 +86,7 @@ button, .btn { min-height: 36px; padding: 8px 14px; border: 1px solid transparen
 .badge-in_archive, .badge-placed, .badge-completed { color: var(--color-success); background: var(--color-success-soft); }
 .badge-pending_return, .badge-lost { color: var(--color-danger); background: var(--color-danger-soft); }
 .badge-new, .badge-received { color: #315fbd; background: var(--color-primary-soft); }
-.badge-cancelled, .badge-not_found { color: #667085; background: #f0f2f5; }
+.badge-cancelled, .badge-not_found { color: #596579; background: #f0f2f5; }
 .badge-packing { color: #6941a5; background: #f2edfa; }
 table, table.data { width: 100%; border-collapse: collapse; }
 table { font-size: 13px; }
