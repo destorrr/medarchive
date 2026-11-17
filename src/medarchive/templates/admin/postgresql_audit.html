@@ -63,7 +63,7 @@
         <span class="admin-record-count">Найдено: {{ total }}</span>
     </div>
     {% if events %}
-    <div class="table-wrap">
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Журнал административных действий; прокручивается по горизонтали">
         <table class="admin-audit-table">
             <thead><tr><th>Дата и время</th><th>Событие</th><th>Объект</th><th>Идентификатор</th><th>Сотрудник</th><th>Данные</th></tr></thead>
             <tbody>
