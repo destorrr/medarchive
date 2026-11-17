@@ -165,9 +165,10 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
       const namedComplementary = Array.from(document.querySelectorAll("aside"))
         .filter((el) => visible(el) && (el.getAttribute("aria-label")
           || el.getAttribute("aria-labelledby")));
-      const namedNavigation = Array.from(document.querySelectorAll("nav"))
-        .filter((el) => visible(el) && (el.getAttribute("aria-label")
-          || el.getAttribute("aria-labelledby")));
+      const primaryNavigation = Array.from(document.querySelectorAll(".sidebar nav"))
+        .filter(visible);
+      const namedPrimaryNavigation = primaryNavigation.filter((el) =>
+        el.getAttribute("aria-label") || el.getAttribute("aria-labelledby"));
       return {
         language: document.documentElement.getAttribute("lang"),
         title: document.title.trim(),
@@ -175,8 +176,8 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
         mainHasSkipTarget: Boolean(main && main.id === "main-content"),
         h1: headings,
         namedComplementaryCount: namedComplementary.length,
-        navigationCount: document.querySelectorAll("nav").length,
-        namedNavigationCount: namedNavigation.length
+        primaryNavigationCount: primaryNavigation.length,
+        namedPrimaryNavigationCount: namedPrimaryNavigation.length
       };
     }""")
     assert document_semantics["language"], (path, "document language is missing")
@@ -193,9 +194,9 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
         path, "sidebar complementary landmark must have an accessible name",
         document_semantics,
     )
-    assert document_semantics["navigationCount"] == 1 \
-        and document_semantics["namedNavigationCount"] == 1, (
-            path, "primary navigation landmark must have exactly one accessible name",
+    assert document_semantics["primaryNavigationCount"] == 1 \
+        and document_semantics["namedPrimaryNavigationCount"] == 1, (
+            path, "sidebar primary navigation must have exactly one accessible name",
             document_semantics,
         )
     for width in (320, 390, 768, 1024, 1440):
