@@ -7,7 +7,6 @@ import time
 from urllib.error import URLError
 from urllib.request import urlopen
 
-import pytest
 from playwright.sync_api import sync_playwright
 
 from medarchive.services.auth_service import AuthService
