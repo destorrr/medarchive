@@ -3,6 +3,8 @@ import os
 import socket
 import subprocess
 import sys
+
+import pytest
 import time
 from urllib.error import URLError
 from urllib.request import urlopen
