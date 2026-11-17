@@ -165,13 +165,18 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
       const namedComplementary = Array.from(document.querySelectorAll("aside"))
         .filter((el) => visible(el) && (el.getAttribute("aria-label")
           || el.getAttribute("aria-labelledby")));
+      const namedNavigation = Array.from(document.querySelectorAll("nav"))
+        .filter((el) => visible(el) && (el.getAttribute("aria-label")
+          || el.getAttribute("aria-labelledby")));
       return {
         language: document.documentElement.getAttribute("lang"),
         title: document.title.trim(),
         mainCount: document.querySelectorAll("main").length,
         mainHasSkipTarget: Boolean(main && main.id === "main-content"),
         h1: headings,
-        namedComplementaryCount: namedComplementary.length
+        namedComplementaryCount: namedComplementary.length,
+        navigationCount: document.querySelectorAll("nav").length,
+        namedNavigationCount: namedNavigation.length
       };
     }""")
     assert document_semantics["language"], (path, "document language is missing")
@@ -188,6 +193,11 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
         path, "sidebar complementary landmark must have an accessible name",
         document_semantics,
     )
+    assert document_semantics["navigationCount"] == 1 \
+        and document_semantics["namedNavigationCount"] == 1, (
+            path, "primary navigation landmark must have exactly one accessible name",
+            document_semantics,
+        )
     for width in (320, 390, 768, 1024, 1440):
         page.set_viewport_size({"width": width, "height": 900})
         page.wait_for_timeout(50)
