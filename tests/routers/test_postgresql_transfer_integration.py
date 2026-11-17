@@ -162,7 +162,7 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
                 assert "№ " + str(shipment.shipment_number) in listing.text
                 assert detail.status_code == 200
                 assert "Shipment Register Branch" in detail.text
-                assert "Shipment Register Archive" in detail.text
+                assert "Основные сведения" in detail.text
             hidden_list = await get_as(central_user, "/shipments")
             hidden_detail = await get_as(central_user, "/shipments/" + str(shipment.id))
             assert hidden_list.status_code == 200
