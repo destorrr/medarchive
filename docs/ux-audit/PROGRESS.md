@@ -783,3 +783,32 @@ SQLite removal пока не готово к выполнению: есть runt
 ### Следующий шаг
 
 Продолжить endpoint-level ACL/ownership inventory: по каждому изменяющему endpoint зафиксировать guard, сервисную авторизацию, проверку принадлежности объекта, позитивные/негативные тесты и незакрытые комбинации. Отдельно проверить весь кодовый путь отмены отправления.
+
+
+## 2026-11-17 — UX-02: endpoint ACL и ownership audit
+
+Создан документ `UX-02-endpoint-acl-ownership-audit.md` (коммит `dcbbaa2c622e2a0257eef15afe24ccc7958902aa`).
+
+### Проверено
+
+- Повторно получен актуальный HEAD: `d3e3615bfd19fcfd93e09861e3d18192416b8023`; compare до изменений: 76 ahead, 0 behind.
+- Сопоставлены role dependencies и сервисные проверки branch/central/archive workflow.
+- Проверены `create_box`, `add_card_to_box`, `remove_card_from_box`, `write_off_box`, `create_draft`, `add_box`, `add_standalone_card`, `hand_over`, `receive`, `resolve_exception`, `register_exception`.
+- Проверены административные инварианты деактивации филиалов, курьеров и полок, назначение ролей/филиалов и защита последнего admin.
+- Проверено, что `register_exception` допускает отправителя или получателя, но не меняет местонахождение груза.
+- Отдельно прослежена отмена shipment: статус `cancelled` отображается в реестре, но в просмотренном PostgreSQL workflow и пользовательских routers не найден метод/handler отмены; тест отмены также не найден в просмотренной выборке.
+
+### Выводы
+
+- Критичные inventory workflows используют двойной контроль: HTTP role dependency и повторную service-level проверку actor/location/object.
+- QR confirm не содержит отдельной query-проверки коробки в handler, но последующий `add_card_to_box` проверяет активного actor, принадлежность коробки и карты одной разрешённой локации и состояние объектов.
+- Сквозные и специализированные тесты подтверждают отдельные сценарии, однако нет единой доказательной матрицы всех изменяющих endpoints × пять ролей × foreign objects × object states.
+- Наличие статуса `cancelled` само по себе не доказывает реализованный процесс отмены.
+
+### Ограничения
+
+Проверка статическая; тесты/CI не запускались. Не менялись код приложения, тесты, миграции, workflow, SQLite-конфигурация и базовая ветка.
+
+### Следующий шаг
+
+Составить подробную endpoint test-coverage matrix: метод/путь → role dependency → service method → actor active → ownership → object state → expected allow/deny → существующие тесты → пробел. Продолжить проверку оставшихся административных API endpoints и archive/custody handlers, не создавая новые тесты до согласования.
