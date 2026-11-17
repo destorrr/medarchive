@@ -43,6 +43,33 @@ class TestSmoke:
         assert "/static/htmx.min.js" in response.text
         assert "unpkg.com" not in response.text
 
+    async def test_templates_and_assets_are_independent_of_working_directory(
+        self, app_client, monkeypatch, tmp_path
+    ):
+        login = await app_client.post(
+            "/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+
+        # Simulate a process launched after its working directory has changed.
+        monkeypatch.chdir(tmp_path)
+        dashboard = await app_client.get("/dashboard")
+        login_page = await app_client.get("/login")
+        css = await app_client.get("/static/app.css")
+        htmx = await app_client.get("/static/htmx.min.js")
+
+        assert dashboard.status_code == 200
+        assert login_page.status_code == 200
+        assert css.status_code == 200
+        assert htmx.status_code == 200
+        assert "login-card" in login_page.text
+        assert 'rel="stylesheet" href="/static/app.css"' in login_page.text
+        assert "<style" not in login_page.text
+        assert 'autocomplete="username"' in login_page.text
+        assert 'autocomplete="current-password"' in login_page.text
+
     async def test_root_redirects_to_login(self, app_client):
         r = await app_client.get("/", follow_redirects=False)
         assert r.status_code == 303
