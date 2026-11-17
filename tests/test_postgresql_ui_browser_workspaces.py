@@ -152,6 +152,42 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
     response = page.goto(f"{base_url}{path}")
     assert response is not None and response.status == 200, path
     assert page.locator("main").count() == 1, path
+    document_semantics = page.evaluate("""() => {
+      const visible = (el) => {
+        const style = getComputedStyle(el);
+        return style.display !== "none" && style.visibility !== "hidden"
+          && el.getClientRects().length > 0;
+      };
+      const main = document.querySelector("main");
+      const headings = Array.from(document.querySelectorAll("h1"))
+        .filter(visible).map((el) => ({text: (el.innerText || "").trim(),
+          insideMain: Boolean(main && main.contains(el))}));
+      const namedComplementary = Array.from(document.querySelectorAll("aside"))
+        .filter((el) => visible(el) && (el.getAttribute("aria-label")
+          || el.getAttribute("aria-labelledby")));
+      return {
+        language: document.documentElement.getAttribute("lang"),
+        title: document.title.trim(),
+        mainCount: document.querySelectorAll("main").length,
+        mainHasSkipTarget: Boolean(main && main.id === "main-content"),
+        h1: headings,
+        namedComplementaryCount: namedComplementary.length
+      };
+    }""")
+    assert document_semantics["language"], (path, "document language is missing")
+    assert document_semantics["title"], (path, "document title is empty")
+    assert document_semantics["mainCount"] == 1 and document_semantics["mainHasSkipTarget"], (
+        path, "main landmark or skip-link target is invalid", document_semantics
+    )
+    assert len(document_semantics["h1"]) == 1 and document_semantics["h1"][0]["insideMain"] \
+        and document_semantics["h1"][0]["text"], (
+            path, "page must have exactly one visible, non-empty h1 inside main",
+            document_semantics["h1"],
+        )
+    assert document_semantics["namedComplementaryCount"] == 1, (
+        path, "sidebar complementary landmark must have an accessible name",
+        document_semantics,
+    )
     for width in (320, 390, 768, 1024, 1440):
         page.set_viewport_size({"width": width, "height": 900})
         page.wait_for_timeout(50)
