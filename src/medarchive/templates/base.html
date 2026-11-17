@@ -18,7 +18,7 @@
         <div class="group-label">{{ role_label }}</div>
         <nav>
             {% for item in menu_items %}
-            <a href="{{ item.url }}" class="{% if request.url.path == item.url or (item.url == '/requests/new' and request.url.path.startswith('/requests/')) %}active{% endif %}" {% if request.url.path == item.url %}aria-current="page"{% endif %}>
+            <a href="{{ item.url }}" class="{% if request.url.path == item.url or (item.url == '/shipments' and request.url.path.startswith('/shipments/')) or (item.url == '/requests/new' and request.url.path.startswith('/requests/')) %}active{% endif %}" {% if request.url.path == item.url %}aria-current="page"{% endif %}>
                 <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     {% if item.url == '/dashboard' %}<path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z"/>
                     {% elif item.url == '/search' %}<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/>
