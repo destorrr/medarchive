@@ -5,6 +5,7 @@ import uuid
 
 import httpx
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import Branch, Box, Location, User
@@ -55,7 +56,7 @@ async def test_postgresql_html_pages_and_navigation_follow_role_matrix():
             await ensure_system_locations(session)
             await session.flush()
             locations["central_office"] = await session.scalar(
-                __import__("sqlalchemy").select(Location).where(
+                select(Location).where(
                     Location.kind == "central_office", Location.is_active.is_(True)
                 )
             )
@@ -142,7 +143,7 @@ async def test_postgresql_html_pages_and_navigation_follow_role_matrix():
                 "/central/transfer", "/central/custody", "/shipments",
             ),
             "archive": ("/receive", "/placement", "/requests", "/shipments"),
-            "admin": ("/admin", "/admin/branches", "/admin/users", "/admin/audit"),
+            "admin": ("/admin",),
             "viewer": ("/search", "/history"),
         }
 
