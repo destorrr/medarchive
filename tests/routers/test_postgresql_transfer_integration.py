@@ -7,10 +7,11 @@ import httpx
 import pytest
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from medarchive.adapters.postgresql.models import Branch, Courier, Location, Shipment, User
 from medarchive.config import Config
-from medarchive.dependencies import get_auth, get_pg_database
+from medarchive.dependencies import get_auth, get_pg_database, get_pg_session
 from medarchive.main import create_app
 
 DATABASE_URL = os.getenv("MEDARCHIVE_DATABASE_URL")
@@ -109,14 +110,22 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
     app = create_app(Config(database_url=DATABASE_URL, postgres_enabled=True,
                             auth_backend="postgresql", secret_key="postgres-shipment-register-secret"))
     database = await get_pg_database()
+    connection = await database.engine.connect()
+    outer_transaction = await connection.begin()
+    session = AsyncSession(
+        bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint",
+    )
+
+    async def session_override():
+        yield session
+
+    app.dependency_overrides[get_pg_session] = session_override
+
     branch_id = uuid.uuid4()
-    branch = Branch(id=branch_id, code="SR-" + uuid.uuid4().hex[:16], name="Shipment Register Branch", is_active=True)
+    branch = Branch(id=branch_id, code="SR-" + uuid.uuid4().hex[:16],
+                    name="Shipment Register Branch", is_active=True)
     branch_location = Location(id=uuid.uuid4(), kind="branch", branch_id=branch_id,
                                name=branch.name, is_active=True)
-    archive_location = None
-    central_location = None
-    created_archive = False
-    created_central = False
     branch_user = User(id=uuid.uuid4(), username="shipbranch-" + uuid.uuid4().hex[:12],
                        password_hash="test-only-hash", full_name="Branch Shipment User",
                        role="branch", branch_id=branch_id, is_active=True)
@@ -130,42 +139,54 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
                   password_hash="test-only-hash", full_name="Shipment Viewer",
                   role="viewer", is_active=True)
     courier = Courier(id=uuid.uuid4(), full_name="Register Test Courier", is_active=True)
-    shipment = Shipment(
-        id=uuid.uuid4(), from_location_id=branch_location.id,
-        to_location_id=branch_location.id, courier_id=courier.id,
-        issued_by=branch_user.id, status="draft",
-    )
-    central_shipment = None
+
     try:
-        async with database.session_factory() as session:
-            async with session.begin():
-                archive_location = await session.scalar(select(Location).where(Location.kind == "archive"))
-                central_location = await session.scalar(select(Location).where(Location.kind == "central_office"))
-                if archive_location is None:
-                    archive_location = Location(id=uuid.uuid4(), kind="archive", name="Shipment Register Archive", is_active=True)
-                    created_archive = True
-                if central_location is None:
-                    central_location = Location(id=uuid.uuid4(), kind="central_office", name="Shipment Register Central", is_active=True)
-                    created_central = True
-                shipment.to_location_id = archive_location.id
-                central_shipment = Shipment(
-                    id=uuid.uuid4(), from_location_id=central_location.id,
-                    to_location_id=archive_location.id, courier_id=courier.id,
-                    issued_by=central_user.id, status="draft",
+        async with session.begin():
+            archive_location = await session.scalar(
+                select(Location).where(Location.kind == "archive", Location.is_active.is_(True))
+            )
+            central_location = await session.scalar(
+                select(Location).where(Location.kind == "central_office", Location.is_active.is_(True))
+            )
+            if archive_location is None:
+                archive_location = Location(
+                    id=uuid.uuid4(), kind="archive", name="Shipment Register Archive", is_active=True,
                 )
-                session.add(branch)
-                await session.flush()
-                session.add_all([branch_location, branch_user, archive_user, central_user, viewer, courier])
-                if created_archive:
-                    session.add(archive_location)
-                if created_central:
-                    session.add(central_location)
-                await session.flush()
-                session.add_all([shipment, central_shipment])
-                await session.flush()
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+                session.add(archive_location)
+            if central_location is None:
+                central_location = Location(
+                    id=uuid.uuid4(), kind="central_office", name="Shipment Register Central", is_active=True,
+                )
+                session.add(central_location)
+
+            session.add(branch)
+            await session.flush()
+            session.add_all([
+                branch_location, branch_user, archive_user, central_user, viewer, courier,
+            ])
+            await session.flush()
+
+            shipment = Shipment(
+                id=uuid.uuid4(), from_location_id=branch_location.id,
+                to_location_id=archive_location.id, courier_id=courier.id,
+                issued_by=branch_user.id, status="draft",
+            )
+            central_shipment = Shipment(
+                id=uuid.uuid4(), from_location_id=central_location.id,
+                to_location_id=archive_location.id, courier_id=courier.id,
+                issued_by=central_user.id, status="draft",
+            )
+            session.add_all([shipment, central_shipment])
+            await session.flush()
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
             async def get_as(user, page):
-                return await client.get(page, cookies={"session": get_auth().create_session_token(user)})
+                return await client.get(page, cookies={
+                    "session": get_auth().create_session_token(user)
+                })
+
             for user in (branch_user, archive_user):
                 listing = await get_as(user, "/shipments")
                 detail = await get_as(user, "/shipments/" + str(shipment.id))
@@ -174,6 +195,7 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
                 assert detail.status_code == 200
                 assert "Shipment Register Branch" in detail.text
                 assert "Основные сведения" in detail.text
+
             central_list = await get_as(central_user, "/shipments")
             central_detail = await get_as(central_user, "/shipments/" + str(central_shipment.id))
             hidden_detail = await get_as(central_user, "/shipments/" + str(shipment.id))
@@ -184,32 +206,9 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
             assert hidden_detail.status_code == 404
             assert (await get_as(viewer, "/shipments")).status_code == 403
     finally:
-        async with database.session_factory() as session:
-            for shipment_id in (shipment.id, central_shipment.id if central_shipment else None):
-                if shipment_id is not None:
-                    persisted = await session.get(Shipment, shipment_id)
-                    if persisted is not None:
-                        await session.delete(persisted)
-            await session.flush()
-            for user in (branch_user, archive_user, central_user, viewer):
-                persisted_user = await session.get(User, user.id)
-                if persisted_user is not None:
-                    await session.delete(persisted_user)
-            persisted_courier = await session.get(Courier, courier.id)
-            if persisted_courier is not None:
-                await session.delete(persisted_courier)
-            await session.flush()
-            location_ids = [branch_location.id]
-            if created_archive:
-                location_ids.append(archive_location.id)
-            if created_central:
-                location_ids.append(central_location.id)
-            for location_id in location_ids:
-                persisted_location = await session.get(Location, location_id)
-                if persisted_location is not None:
-                    await session.delete(persisted_location)
-            persisted_branch = await session.get(Branch, branch_id)
-            if persisted_branch is not None:
-                await session.delete(persisted_branch)
-            await session.commit()
+        app.dependency_overrides.clear()
+        await session.rollback()
+        await outer_transaction.rollback()
+        await session.close()
+        await connection.close()
         await database.close()
