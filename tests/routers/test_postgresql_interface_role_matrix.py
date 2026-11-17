@@ -137,15 +137,26 @@ async def test_postgresql_html_pages_and_navigation_follow_role_matrix():
             "archive": "Архив", "admin": "Администратор", "viewer": "Просмотр",
         }
         expected_nav = {
-            "branch": ("/packing", "/transfer", "/branch/receive", "/shipments"),
-            "central_office": (
-                "/requests/new", "/central/receive", "/central/packing",
-                "/central/transfer", "/central/custody", "/shipments",
+            "branch": (
+                "/dashboard", "/search", "/history", "/shipments",
+                "/branch/receive", "/packing", "/transfer",
             ),
-            "archive": ("/receive", "/placement", "/requests", "/shipments"),
-            "admin": ("/admin",),
-            "viewer": ("/search", "/history"),
+            "central_office": (
+                "/dashboard", "/search", "/history", "/shipments",
+                "/requests/new", "/central/receive", "/central/packing",
+                "/central/transfer", "/central/custody",
+            ),
+            "archive": (
+                "/dashboard", "/search", "/history", "/shipments",
+                "/receive", "/placement", "/requests",
+            ),
+            "admin": ("/dashboard", "/search", "/history", "/admin"),
+            "viewer": ("/dashboard", "/search", "/history"),
         }
+        admin_navigation = (
+            "/admin", "/admin/branches", "/admin/users", "/admin/couriers",
+            "/admin/sections", "/admin/incidents", "/admin/audit",
+        )
 
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -157,6 +168,15 @@ async def test_postgresql_html_pages_and_navigation_follow_role_matrix():
                     assert response.status_code == expected, (
                         role, path, response.status_code, response.text[:300]
                     )
+                    if expected == 200 and path != "/search/results":
+                        navigation = (
+                            admin_navigation if role == "admin" and path.startswith("/admin")
+                            else expected_nav[role]
+                        )
+                        for href in navigation:
+                            assert f'href="{href}"' in response.text, (
+                                "page navigation", role, path, href
+                            )
 
                 dashboard = await client.get("/dashboard")
                 assert dashboard.status_code == 200
