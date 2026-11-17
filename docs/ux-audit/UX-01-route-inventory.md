@@ -67,3 +67,11 @@
 5. Возврат всех POST на список упрощает поток, но пользователь может потерять контекст конкретной строки/фильтра/прокрутки. Нужно проверить query parameters, flash messages и фокус после обновления.
 
 **Не утверждено:** объединение страниц, изменение переходов, inline-снятие с полки, новые статусы или действия.
+
+
+## 6. Резервное копирование и административная поверхность
+
+- Legacy SQLite router `routers/admin.py` содержит `GET /admin/backup`, `POST /admin/backup/create`, `POST /admin/backup/restore` и использует `BackupService` для файловой SQLite базы.
+- Эти маршруты подключаются только при `auth_backend=sqlite`; PostgreSQL admin router не содержит backup/restore UI.
+- PostgreSQL backup реализован эксплуатационно через `scripts/backup.sh`, systemd service и timer; это не веб-маршруты.
+- Поэтому в текущем PostgreSQL интерфейсе нет экранов backup/restore. Это наблюдение требует продуктового/эксплуатационного решения, но не следует автоматически добавлять UI в UX-переработку.
