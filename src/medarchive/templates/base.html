@@ -42,6 +42,13 @@
                 {% if item.badge is defined and item.badge %}<span class="cnt" aria-label="Ожидает обработки: {{ item.badge }}">{{ item.badge }}</span>{% endif %}
             </a>
             {% endfor %}
+            {% set has_shipments_link = menu_items | selectattr("url", "equalto", "/shipments") | list | length %}
+            {% if request.app.state.config.postgres_enabled and role_label|default("") in ["Филиал", "Центральный офис", "Архив"] and not has_shipments_link %}
+            <a href="/shipments" class="{% if request.url.path == '/shipments' or request.url.path.startswith('/shipments/') %}active{% endif %}" {% if request.url.path.startswith('/shipments') %}aria-current="page"{% endif %}>
+                <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7h18M3 17h18M7 3 3 7l4 4M17 13l4 4-4 4"/></svg>
+                <span>Отправления</span>
+            </a>
+            {% endif %}
         </nav>
         {% endif %}
         <div class="spacer"></div>
