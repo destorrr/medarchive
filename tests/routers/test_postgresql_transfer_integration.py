@@ -135,6 +135,7 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
         to_location_id=branch_location.id, courier_id=courier.id,
         issued_by=branch_user.id, status="draft",
     )
+    central_shipment = None
     try:
         async with database.session_factory() as session:
             async with session.begin():
@@ -147,7 +148,12 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
                     central_location = Location(id=uuid.uuid4(), kind="central_office", name="Shipment Register Central", is_active=True)
                     created_central = True
                 shipment.to_location_id = archive_location.id
-                session.add_all([branch, branch_location, branch_user, archive_user, central_user, viewer, courier, shipment])
+                central_shipment = Shipment(
+                    id=uuid.uuid4(), from_location_id=central_location.id,
+                    to_location_id=archive_location.id, courier_id=courier.id,
+                    issued_by=central_user.id, status="draft",
+                )
+                session.add_all([branch, branch_location, branch_user, archive_user, central_user, viewer, courier, shipment, central_shipment])
                 if created_archive:
                     session.add(archive_location)
                 if created_central:
@@ -163,17 +169,22 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
                 assert detail.status_code == 200
                 assert "Shipment Register Branch" in detail.text
                 assert "Основные сведения" in detail.text
-            hidden_list = await get_as(central_user, "/shipments")
+            central_list = await get_as(central_user, "/shipments")
+            central_detail = await get_as(central_user, "/shipments/" + str(central_shipment.id))
             hidden_detail = await get_as(central_user, "/shipments/" + str(shipment.id))
-            assert hidden_list.status_code == 200
-            assert "№ " + str(shipment.shipment_number) not in hidden_list.text
+            assert central_list.status_code == 200
+            assert "№ " + str(central_shipment.shipment_number) in central_list.text
+            assert "№ " + str(shipment.shipment_number) not in central_list.text
+            assert central_detail.status_code == 200
             assert hidden_detail.status_code == 404
             assert (await get_as(viewer, "/shipments")).status_code == 403
     finally:
         async with database.session_factory() as session:
-            persisted = await session.get(Shipment, shipment.id)
-            if persisted is not None:
-                await session.delete(persisted)
+            for shipment_id in (shipment.id, central_shipment.id if central_shipment else None):
+                if shipment_id is not None:
+                    persisted = await session.get(Shipment, shipment_id)
+                    if persisted is not None:
+                        await session.delete(persisted)
             for user in (branch_user, archive_user, central_user, viewer):
                 persisted_user = await session.get(User, user.id)
                 if persisted_user is not None:
