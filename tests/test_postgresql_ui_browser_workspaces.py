@@ -187,6 +187,28 @@ def _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path):
         if path == "/admin/users":
             dimensions = wrapper.evaluate("(el) => ({client: el.clientWidth, scroll: el.scrollWidth})")
             assert dimensions["scroll"] > dimensions["client"], (path, dimensions)
+            wrapper.evaluate("(el) => { el.scrollLeft = 0; el.focus(); }")
+            assert wrapper.evaluate("(el) => document.activeElement === el"), path
+            page.keyboard.press("End")
+            assert wrapper.evaluate("(el) => el.scrollLeft > 0"), (path, "keyboard did not scroll table")
+
+
+def _assert_admin_filters_and_forms(page, path):
+    expected = {
+        "/admin/users": ("#new-username", "#new-full-name", "#new-password", "#new-role"),
+        "/admin/branches": ("#branch-code", "#branch-name"),
+        "/admin/couriers": ("#courier-full-name", "#courier-phone"),
+        "/admin/sections": ("#shelf-section-name", "#shelf-name"),
+        "/admin/audit": ("#event_type", "#aggregate_type", "#actor_id", "#date_from", "#date_to"),
+    }
+    if path not in expected:
+        return
+    for selector in expected[path]:
+        assert page.locator(selector).count() == 1, (path, selector)
+        assert page.locator(selector).is_visible(), (path, selector)
+    form = page.locator("form").filter(has=page.locator(expected[path][0]))
+    assert form.count() == 1, (path, "expected form is missing")
+    assert form.locator("button[type=submit]").count() >= 1, path
 
 
 def _assert_status_contrast(page, path):
@@ -255,6 +277,7 @@ def test_postgresql_role_workspaces_render_responsively_in_chromium(
             _assert_page_responsive_and_labeled(page, postgres_browser_server, path)
             if path.startswith("/admin/"):
                 _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path)
+                _assert_admin_filters_and_forms(page, path)
             _assert_status_contrast(page, path)
         assert not page_errors, page_errors
         context.close()
