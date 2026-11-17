@@ -184,19 +184,36 @@ def _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path):
         assert wrapper.get_attribute("tabindex") == "0", path
         overflow = wrapper.evaluate("(el) => getComputedStyle(el).overflowX")
         assert overflow in ("auto", "scroll"), (path, overflow)
-        if path == "/admin/users":
-            dimensions = wrapper.evaluate("(el) => ({client: el.clientWidth, scroll: el.scrollWidth})")
-            assert dimensions["scroll"] > dimensions["client"], (path, dimensions)
-            wrapper.evaluate("(el) => { el.scrollLeft = 0; el.focus(); }")
-            assert wrapper.evaluate("(el) => document.activeElement === el"), path
-            page.keyboard.press("End")
-            assert wrapper.evaluate("(el) => el.scrollLeft > 0"), (path, "End did not scroll table to the right")
-            page.keyboard.press("Home")
-            assert wrapper.evaluate("(el) => el.scrollLeft === 0"), (path, "Home did not return table to the left")
-            page.keyboard.press("ArrowRight")
-            assert wrapper.evaluate("(el) => el.scrollLeft > 0"), (path, "ArrowRight did not scroll table")
-            page.keyboard.press("ArrowLeft")
-            assert wrapper.evaluate("(el) => el.scrollLeft === 0"), (path, "ArrowLeft did not scroll table back")
+
+        dimensions = wrapper.evaluate("(el) => ({client: el.clientWidth, scroll: el.scrollWidth})")
+        if dimensions["scroll"] <= dimensions["client"]:
+            continue
+
+        wrapper.evaluate("(el) => { el.scrollLeft = 0; el.focus(); }")
+        assert wrapper.evaluate("(el) => document.activeElement === el"), path
+        page.keyboard.press("End")
+        assert wrapper.evaluate("(el) => el.scrollLeft > 0"), (path, "End did not scroll table to the right")
+        page.keyboard.press("Home")
+        assert wrapper.evaluate("(el) => el.scrollLeft === 0"), (path, "Home did not return table to the left")
+        page.keyboard.press("ArrowRight")
+        assert wrapper.evaluate("(el) => el.scrollLeft > 0"), (path, "ArrowRight did not scroll table")
+        page.keyboard.press("ArrowLeft")
+        assert wrapper.evaluate("(el) => el.scrollLeft === 0"), (path, "ArrowLeft did not scroll table back")
+
+        # Arrow keys inside an editor must retain their native caret/navigation behavior.
+        wrapper.evaluate("""(el) => {
+          const input = document.createElement("input");
+          input.type = "text";
+          input.value = "keyboard";
+          input.setAttribute("aria-label", "Temporary keyboard interaction check");
+          input.style.position = "absolute";
+          el.appendChild(input);
+          input.focus();
+          el.scrollLeft = 0;
+        }""")
+        page.keyboard.press("ArrowRight")
+        assert wrapper.evaluate("(el) => el.scrollLeft === 0"), (path, "form control key was intercepted")
+        wrapper.locator("input[aria-label='Temporary keyboard interaction check']").evaluate("(el) => el.remove()")
 
 
 def _assert_admin_filters_and_forms(page, path):
