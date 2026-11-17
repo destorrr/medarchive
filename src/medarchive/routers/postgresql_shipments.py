@@ -107,13 +107,6 @@ async def shipment_list(
     location = await _user_location(session, user)
     if location is None:
         raise HTTPException(status_code=403, detail="Для пользователя не настроена активная локация")
-    query = (
-        select(Shipment, Location, Location, Courier)
-        .join(Location, Location.id == Shipment.from_location_id)
-        .join(Location, Location.id == Shipment.to_location_id)
-        .join(Courier, Courier.id == Shipment.courier_id)
-    )
-    # Use explicit aliases to avoid ambiguous joins in the rendered query.
     from sqlalchemy.orm import aliased
     source = aliased(Location)
     destination = aliased(Location)
