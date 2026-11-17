@@ -180,14 +180,28 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
         "if (active && active !== document.body) active.blur(); }"
     )
     page.keyboard.press("Tab")
-    keyboard_focus_is_visible = page.evaluate(
-        "() => { const el = document.activeElement; if (!el) return false; "
+    keyboard_focus_diagnostics = page.evaluate(
+        "() => { const el = document.activeElement; if (!el) return {activeElement: null}; "
         "const style = getComputedStyle(el); "
-        "return el.matches('a,button,input,select,textarea,[tabindex]') && "
-        "el.matches(':focus-visible') && style.outlineStyle !== 'none' && "
-        "parseFloat(style.outlineWidth) >= 2; }"
+        "return {tag: el.tagName, id: el.id, className: el.className, "
+        "href: el.getAttribute('href'), tabIndex: el.tabIndex, "
+        "focusVisible: el.matches(':focus-visible'), outlineStyle: style.outlineStyle, "
+        "outlineWidth: style.outlineWidth, outlineColor: style.outlineColor, "
+        "visibility: style.visibility, display: style.display, "
+        "transform: style.transform, rect: (() => { const r = el.getBoundingClientRect(); "
+        "return {x:r.x,y:r.y,width:r.width,height:r.height}; })()}; }"
     )
-    assert keyboard_focus_is_visible, (path, "first keyboard focus target has no visible focus indicator")
+    keyboard_focus_is_visible = (
+        keyboard_focus_diagnostics.get("tag") in {"A", "BUTTON", "INPUT", "SELECT", "TEXTAREA"}
+        or keyboard_focus_diagnostics.get("tabIndex", -1) >= 0
+    ) and keyboard_focus_diagnostics.get("focusVisible") and (
+        keyboard_focus_diagnostics.get("outlineStyle") != "none"
+        and float(keyboard_focus_diagnostics.get("outlineWidth", "0px").replace("px", "")) >= 2
+    )
+    assert keyboard_focus_is_visible, (
+        path, "first keyboard focus target has no visible focus indicator",
+        keyboard_focus_diagnostics,
+    )
 
 
 def _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path):
