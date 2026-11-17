@@ -172,14 +172,22 @@ def _assert_page_responsive_and_labeled(page, base_url, path):
         return !hasLabel && !hasAriaName;
     }).map((el) => ({tag: el.tagName, type: el.type || '', name: el.name || '', id: el.id || ''}))""")
     assert not unlabeled_controls, (path, "form controls without accessible names", unlabeled_controls)
+    # Start keyboard navigation from the document, not from an autofocus
+    # search field. Otherwise Tab advances from a page-specific initial focus
+    # and makes this shared accessibility check depend on the previous route.
+    page.evaluate(
+        "() => { const active = document.activeElement; "
+        "if (active && active !== document.body) active.blur(); }"
+    )
     page.keyboard.press("Tab")
     keyboard_focus_is_visible = page.evaluate(
         "() => { const el = document.activeElement; if (!el) return false; "
         "const style = getComputedStyle(el); "
         "return el.matches('a,button,input,select,textarea,[tabindex]') && "
-        "(style.outlineStyle !== 'none' || el.matches(':focus-visible')); }"
+        "el.matches(':focus-visible') && style.outlineStyle !== 'none' && "
+        "parseFloat(style.outlineWidth) >= 2; }"
     )
-    assert keyboard_focus_is_visible, path
+    assert keyboard_focus_is_visible, (path, "first keyboard focus target has no visible focus indicator")
 
 
 def _assert_mobile_tables_are_scrollable_and_keyboard_reachable(page, path):
