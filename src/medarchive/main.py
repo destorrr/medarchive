@@ -1,5 +1,6 @@
 """Точка входа FastAPI-приложения."""
 from contextlib import asynccontextmanager
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request, HTTPException
@@ -69,8 +70,10 @@ def create_app(config: Config | None = None) -> FastAPI:
     app = FastAPI(title="МедАрхив", version="0.1.0", lifespan=lifespan)
     app.state.config = config
 
-    # Serve versioned frontend assets locally; the application must work without CDN access.
-    app.mount("/static", StaticFiles(directory="src/medarchive/static"), name="static")
+    # Resolve package resources from this module, not from the process working directory.
+    # This keeps systemd, CLI and test launches consistent.
+    package_dir = Path(__file__).resolve().parent
+    app.mount("/static", StaticFiles(directory=str(package_dir / "static")), name="static")
 
     @app.middleware("http")
     async def protect_state_changing_requests(request: Request, call_next):
@@ -95,7 +98,7 @@ def create_app(config: Config | None = None) -> FastAPI:
         return RedirectResponse(url="/login", status_code=303)
 
     # Jinja2 templates
-    app.state.templates = Jinja2Templates(directory="src/medarchive/templates")
+    app.state.templates = Jinja2Templates(directory=str(package_dir / "templates"))
 
     # Init dependencies
     init_dependencies(config)
