@@ -41,6 +41,8 @@ class TestSmoke:
         assert response.status_code == 200
         assert "/static/app.css" in response.text
         assert "/static/htmx.min.js" in response.text
+        assert "Перейти к содержимому" in response.text
+        assert "class=\"nav-icon\"" in response.text
         assert "unpkg.com" not in response.text
 
     async def test_templates_and_assets_are_independent_of_working_directory(
@@ -69,6 +71,10 @@ class TestSmoke:
         assert "<style" not in login_page.text
         assert 'autocomplete="username"' in login_page.text
         assert 'autocomplete="current-password"' in login_page.text
+        assert ":focus-visible" in css.text
+        assert "@media (max-width: 680px)" in css.text
+        assert "prefers-reduced-motion: reduce" in css.text
+        assert "--color-subtle: #667085" in css.text
 
     async def test_root_redirects_to_login(self, app_client):
         r = await app_client.get("/", follow_redirects=False)
