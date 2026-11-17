@@ -142,3 +142,56 @@ docs/migration/sqlite-to-postgresql.md содержит зафиксирован
 ### Текущий статус
 
 Ключевые общие точки зависимости подтверждены повторно; SQLite removal по-прежнему не готов к безопасному выполнению. Наиболее важный архитектурный узел — общий `dependencies.py`/auth router/AuthService, где legacy SQLite и PostgreSQL credential flow пока пересекаются. До отдельного согласования ничего не удалять и не менять.
+
+## 9. Сверка runtime, production deployment, CI и SQLite-тестов (2026-11-17)
+
+Проверены актуальные blobs следующих файлов: .github/workflows/postgresql.yml, scripts/install.sh, scripts/medarchive.service, scripts/backup.sh, pyproject.toml, src/medarchive/main.py, src/medarchive/dependencies.py, src/medarchive/routers/auth.py, legacy routers, SQLite adapter, backup service, pytest fixtures и профильные тесты.
+
+### 9.1 Runtime и точка входа
+
+- Config.auth_backend по умолчанию равен sqlite; MEDARCHIVE_POSTGRES_ENABLED по умолчанию false. Для PG backend нужны обе настройки: MEDARCHIVE_AUTH_BACKEND=postgresql и MEDARCHIVE_POSTGRES_ENABLED=true.
+- main.py импортирует init_dependencies из общего dependencies.py при загрузке приложения. Общий модуль безусловно импортирует SQLite Database.
+- init_dependencies() безусловно создаёт объект SQLiteDatabase(config) и общий AuthService, даже когда выбран PostgreSQL. При PG включённом дополнительно создаётся PostgreSQL Database.
+- В PostgreSQL lifespan SQLite init() не вызывается; PostgreSQL routers подключаются отдельно. То есть подтверждённая связь PostgreSQL runtime с SQLite — import-time/initialization object dependency и обязательная установка aiosqlite, а не открытие SQLite соединения в штатном PG startup.
+- Общий auth router импортирует SQLite Database на уровне модуля, хотя его PG ветка логина использует PostgreSQLAuthService/UserRepository. Импорт SQLite Database в этом router фактически не нужен для PG ветки.
+- Legacy routers admin.py, archive.py, dashboard.py, packing.py, transfer.py напрямую импортируют SQLite database/repositories; они подключаются только при auth_backend=sqlite.
+- Legacy admin router содержит SQLite backup UI и вызывает BackupService; PostgreSQL admin HTML router отдельный и такого UI не имеет.
+
+### 9.2 Production install и backup
+
+- scripts/install.sh создаёт /etc/medarchive/medarchive.env с MEDARCHIVE_POSTGRES_ENABLED=true и MEDARCHIVE_AUTH_BACKEND=postgresql; scripts/medarchive.service также задаёт PostgreSQL backend.
+- Production backup shell/systemd использует PostgreSQL tools pg_dump/pg_restore и зашифрованные архивы age. scripts/backup.sh намеренно отказывается продолжать при наличии старых plaintext medarchive-*.dump.
+- Следовательно, эксплуатационная установка уже нацелена на PostgreSQL; SQLite default в Config относится к общему/default и legacy режиму, а не к шаблону production deployment.
+
+### 9.3 CI и фактическое покрытие
+
+- Workflow .github/workflows/postgresql.yml поднимает PostgreSQL 16, устанавливает пакет .[dev], применяет alembic upgrade head, проверяет текущую revision и наличие ключевых таблиц, валидирует shell scripts, запускает весь pytest -q -rs, затем выполняет зашифрованный backup/restore в отдельную БД.
+- Workflow trigger: push только в master и docs/target-architecture-spec; pull_request только в master. Push в рабочую ветку docs/ux-audit-project сам по себе этим workflow не запускается. Это конфигурация workflow, не доказательство статуса конкретных CI runs.
+- В тестах явно остаются SQLite-specific suites: tests/adapters/sqlite/test_database.py, test_repositories.py, legacy router tests, test_admin_backup.py, test_backup_service.py, test_cleanup_script.py. Base fixtures в tests/conftest.py создают SQLite database по умолчанию.
+- PostgreSQL-specific tests создают PostgreSQL Config явно/используют PostgreSQL integration fixtures. Workflow CI совмещает оба набора тестов; его команда запускает полный pytest suite, а не только PostgreSQL tests.
+- tests/test_auth_config.py явно фиксирует SQLite как default backend. Это тестируемое поведение текущей конфигурации, не только забытая документационная ссылка.
+
+### 9.4 Классификация оставшихся зависимостей
+
+| Область | Текущее состояние | Статус для будущего PostgreSQL-only |
+|---|---|---|
+| SQLite adapter и repositories | Legacy runtime; прямые imports из legacy routers | Удалить после отключения legacy routers и их тестов |
+| Общий dependencies.py | Безусловный SQLite import и объект Database | Развязать по backend; оставить только PG path в целевой версии |
+| Общий auth router | SQLite Database import не нужен PG path | Удалить import и разделить/упростить backend wiring |
+| AuthService | Общий password/session helper используется PostgreSQL | Сохранить полезную криптографическую часть, вынести из SQLite/legacy coupling |
+| Config | SQLite default и MEDARCHIVE_DB_PATH | Пересмотреть default и удалить SQLite-only config |
+| aiosqlite | Обязательная runtime dependency | Удалить после удаления всех runtime imports |
+| SQLite backup service/UI | Только legacy admin router | Удалить вместе с legacy router/template/service/tests |
+| cleanup_stale_box_cards.py | Standalone stdlib sqlite3 maintenance utility | Не включать в PG deployment; архивировать/удалить отдельным решением |
+| SQLite pytest suites/fixtures | Часть полного pytest suite | Заменить/удалить в отдельном этапе; не ломать текущий CI до этого |
+| PostgreSQL backup/restore | Отдельный shell/systemd/CI путь | Целевая эксплуатационная реализация уже есть |
+
+### 9.5 Оставшиеся ограничения
+
+- Это ручная сверка выбранных ключевых файлов и всех очевидных runtime/test/deployment entry points, а не AST-based полный import graph.
+- Не выполнялись локальный запуск приложения, pytest, pip install, runtime import tracing или CI run.
+- Не подтверждалась фактическая конфигурация работающего production экземпляра.
+- Не анализировался каждый старый план/документ и каждый текстовый asset на упоминания SQLite; исторические документы могут сохранять контекст прототипа.
+- Никакие файлы приложения, тесты, зависимости или workflow не менялись.
+
+**Вывод:** production deployment и CI уже используют PostgreSQL, но кодовая база и тестовый пакет остаются двухрежимными. Для безопасного PostgreSQL-only перехода нужен отдельный согласованный этап: разорвать общий import/dependency coupling, вынести AuthService credential helpers, удалить legacy routers/adapter/backup и SQLite tests/fixtures, затем убрать aiosqlite и SQLite config. До согласования ничего не удалять.
