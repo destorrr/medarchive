@@ -291,7 +291,6 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
                     assert f'href="{nav_path}"' in dashboard.text, (
                         role, "missing navigation", nav_path
                     )
-                forbidden_navigation = set(expected_navigation) - set()
                 for forbidden_path in all_role_pages:
                     if forbidden_path not in role_pages.get(role, ()):
                         assert f'href="{forbidden_path}"' not in dashboard.text, (
