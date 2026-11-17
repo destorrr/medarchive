@@ -175,6 +175,12 @@ async def test_postgresql_html_pages_and_navigation_follow_role_matrix():
                     assert response.status_code == expected, (
                         role, owner_role, response.status_code
                     )
+                    if expected == 200:
+                        visible_navigation = expected_nav[role]
+                        for href in visible_navigation:
+                            assert f'href="{href}"' in response.text, (
+                                "QR label navigation", role, owner_role, href
+                            )
 
     finally:
         await session.close()
