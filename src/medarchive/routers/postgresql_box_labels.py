@@ -78,6 +78,6 @@ async def box_label_page(
             "user_branch": location.name,
             "user_role_pill": {"branch": "Филиал", "central_office": "Центральный офис", "archive": "Архив", "admin": "Администратор"}.get(user.role, user.role),
             "role_label": {"branch": "Филиал", "central_office": "Центральный офис", "archive": "Архив", "admin": "Администратор"}.get(user.role, user.role),
-            "menu_items": [],
+            "menu_items": [{"url": url, "label": label} for url, label in role_menus[user.role]],
         },
     )
