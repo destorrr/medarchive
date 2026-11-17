@@ -289,3 +289,28 @@ Backend допускает несколько коробок в отправле
 1. Проверить полный набор legacy routers и services, импортируемых в main.py и dependencies, для оценки объёма удаления.
 2. Проверить оставшиеся API endpoints и объектные проверки по отправлениям, коробкам, заявкам и справочникам.
 3. Сверить документацию UX-01, закрыть пробелы и подготовить список решений для владельца продукта перед UX-02.
+
+
+## 2026-11-17 — расширенная SQLite-инвентаризация runtime и эксплуатации
+
+Проверены config.py, main.py, dependencies.py, routers/auth.py, все legacy routers, legacy services, SQLite adapters, CLI, scripts, Alembic, pytest fixtures и PostgreSQL CI workflow.
+
+### Новые подтверждённые факты
+
+- SQLite остаётся default в Config; целевой install.sh явно задаёт PostgreSQL backend, но разработческий default ещё legacy.
+- PostgreSQL login и get_pg_current_user используют общий AuthService для password hashing/session tokens. CLI также использует его для bootstrap первого PG admin. Удалять AuthService как SQLite-only нельзя: credential/session слой требуется выделить и сохранить.
+- Все legacy routers (admin, archive, dashboard, packing, transfer) и семь legacy services импортируют SQLite adapter/repositories; они отделены от PostgreSQL router branch в main.py.
+- scripts/cleanup_stale_box_cards.py — отдельный SQLite-only maintenance script на stdlib sqlite3; это не PostgreSQL cleanup tool.
+- tests/conftest.py по умолчанию строит SQLite fixture; legacy adapter/routers/services tests сосуществуют с PG тестами.
+- PostgreSQL CI workflow запускает Alembic, полный pytest и реальную проверку encrypted backup/restore. Его push trigger не включает docs/ux-audit-project; PR trigger направлен на master.
+- docs/migration/sqlite-to-postgresql.md фиксирует решение владельца: данные SQLite-прототипа переносить не требуется. Значит, SQLite removal — очистка legacy кода и проверка PG-only эксплуатации, не перенос данных.
+
+### Вывод по готовности
+
+SQLite removal пока не готово к выполнению: есть runtime/config/dependency, auth abstraction, legacy router/service, maintenance script, test fixture и CI scope, требующие согласованного решения. Техническая последовательность удаления внесена в SQLITE-INVENTORY.md; само удаление не начиналось.
+
+### Следующий блок
+
+1. Перепроверить полноту API/role/object guards и соответствие PostgreSQL интерфейса текущей доменной модели.
+2. Сверить UX-01 документы на противоречия и непокрытые пользовательские переходы.
+3. Подготовить короткий список вопросов владельцу продукта, без фиксации гипотез как требований.
