@@ -6,6 +6,8 @@ import uuid
 import httpx
 import pytest
 
+from sqlalchemy import select
+
 from medarchive.adapters.postgresql.models import Branch, Courier, Location, Shipment, User
 from medarchive.config import Config
 from medarchive.dependencies import get_auth, get_pg_database
@@ -111,8 +113,10 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
     branch = Branch(id=branch_id, code="SR-" + uuid.uuid4().hex[:16], name="Shipment Register Branch", is_active=True)
     branch_location = Location(id=uuid.uuid4(), kind="branch", branch_id=branch_id,
                                name=branch.name, is_active=True)
-    archive_location = Location(id=uuid.uuid4(), kind="archive", name="Shipment Register Archive", is_active=True)
-    central_location = Location(id=uuid.uuid4(), kind="central_office", name="Shipment Register Central", is_active=True)
+    archive_location = None
+    central_location = None
+    created_archive = False
+    created_central = False
     branch_user = User(id=uuid.uuid4(), username="shipbranch-" + uuid.uuid4().hex[:12],
                        password_hash="test-only-hash", full_name="Branch Shipment User",
                        role="branch", branch_id=branch_id, is_active=True)
@@ -134,8 +138,20 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
     try:
         async with database.session_factory() as session:
             async with session.begin():
-                session.add_all([branch, branch_location, archive_location, central_location,
-                                 branch_user, archive_user, central_user, viewer, courier, shipment])
+                archive_location = await session.scalar(select(Location).where(Location.kind == "archive"))
+                central_location = await session.scalar(select(Location).where(Location.kind == "central_office"))
+                if archive_location is None:
+                    archive_location = Location(id=uuid.uuid4(), kind="archive", name="Shipment Register Archive", is_active=True)
+                    created_archive = True
+                if central_location is None:
+                    central_location = Location(id=uuid.uuid4(), kind="central_office", name="Shipment Register Central", is_active=True)
+                    created_central = True
+                shipment.to_location_id = archive_location.id
+                session.add_all([branch, branch_location, branch_user, archive_user, central_user, viewer, courier, shipment])
+                if created_archive:
+                    session.add(archive_location)
+                if created_central:
+                    session.add(central_location)
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
             async def get_as(user, page):
                 return await client.get(page, cookies={"session": get_auth().create_session_token(user)})
@@ -166,7 +182,12 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
             if persisted_courier is not None:
                 await session.delete(persisted_courier)
             await session.flush()
-            for location_id in (branch_location.id, archive_location.id, central_location.id):
+            location_ids = [branch_location.id]
+            if created_archive:
+                location_ids.append(archive_location.id)
+            if created_central:
+                location_ids.append(central_location.id)
+            for location_id in location_ids:
                 persisted_location = await session.get(Location, location_id)
                 if persisted_location is not None:
                     await session.delete(persisted_location)
