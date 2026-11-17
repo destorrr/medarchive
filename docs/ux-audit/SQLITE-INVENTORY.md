@@ -115,3 +115,30 @@ docs/migration/sqlite-to-postgresql.md содержит зафиксирован
 **Не готово к удалению.** Подтверждены: legacy routers/services, SQLite adapter и dependency wiring, SQLite default config, aiosqlite, SQLite test fixture/tests, SQLite cleanup script и общий AuthService, который одновременно обслуживает PostgreSQL credentials. При этом PostgreSQL installation/backup/Alembic path уже существует.
 
 Безопасная последовательность отдельного согласованного этапа: (1) определить единственный PG startup/config contract и убрать SQLite default; (2) отделить общий password/session helper от legacy SQLite principal; (3) перевести общий auth/dependencies на PG-only; (4) проверить покрытие всех нужных сценариев PostgreSQL routers/services; (5) решить судьбу cleanup script и legacy backup UI/templates; (6) удалить SQLite routers/services/adapters/tests и aiosqlite; (7) проверить clean install, миграции, smoke, full pytest и backup/restore на чистом PostgreSQL. Этот порядок — техническая рекомендация, не разрешение начать удаление.
+
+
+## 8. Повторная точечная сверка ключевых файлов и общего auth runtime (2026-11-17)
+
+Повторно получены актуальные версии `config.py`, `dependencies.py`, `services/auth_service.py`, `routers/auth.py`, `cli.py`, `pyproject.toml`, `tests/conftest.py`, `docs/migration/sqlite-to-postgresql.md` и `scripts/cleanup_stale_box_cards.py`.
+
+### Уточнённые подтверждения
+
+- `config.py`: `MEDARCHIVE_DB_PATH` остаётся в конфигурации; `MEDARCHIVE_AUTH_BACKEND` по умолчанию — `sqlite`; допустимы оба backend; для PostgreSQL требуется `MEDARCHIVE_POSTGRES_ENABLED=true`.
+- `dependencies.py`: SQLite Database импортируется безусловно; `init_dependencies` создаёт SQLite Database и общий AuthService при любом backend. PostgreSQL Database создаётся отдельно при включённом PG. Legacy `get_db`, `get_current_user` и legacy role guard остаются в том же модуле, что и PG dependencies.
+- `routers/auth.py`: общий auth router безусловно импортирует SQLite Database и общий AuthService. Внутри POST login есть PostgreSQL-ветка с PostgreSQLAuthService/UserRepository, но SQLite imports сохраняются на уровне модуля. Поэтому auth router — подтверждённая import-time SQLite связь PostgreSQL приложения.
+- `services/auth_service.py`: общий AuthService используется не только SQLite. CLI PostgreSQL bootstrap создаёт его для password hashing; PostgreSQL dependencies/login передают его в PostgreSQLAuthService для credential/session функций. Удалять класс целиком нельзя без выделения общей реализации.
+- `cli.py`: фактический bootstrap администратора работает через PostgreSQL Database/UserRepository; SQLite не используется как backend CLI. Общий AuthService остаётся зависимостью только для хеширования пароля.
+- `pyproject.toml`: `aiosqlite>=0.20.0` остаётся обязательной runtime dependency; комментарий помечает её временной до удаления старых SQLite-модулей.
+- `tests/conftest.py`: базовая pytest fixture задаёт `MEDARCHIVE_DB_PATH` и импортирует SQLite Database. Следовательно, legacy тестовый фундамент остаётся SQLite-first, несмотря на отдельный PostgreSQL CI workflow.
+- `cleanup_stale_box_cards.py`: независимый скрипт использует stdlib `sqlite3`, SQLite backup API и UPDATE; он не является PostgreSQL maintenance tool.
+- `docs/migration/sqlite-to-postgresql.md`: отдельное решение владельца проекта указывает, что данные SQLite-прототипа не требуется переносить; удаление legacy-кода остаётся отдельным изменением после проверки зависимостей.
+
+### Что эта повторная проверка НЕ доказывает
+
+- Она не является доказательством отсутствия SQLite-упоминаний/вызовов в каждом из 256 файлов дерева.
+- Не выполнялся AST/import graph анализ, поиск по содержимому всех файлов, сборка пакета, запуск pytest или запуск PG-only приложения.
+- Не проверялась реальная среда развёртывания и не подтверждалось, какой backend сейчас используется в production.
+
+### Текущий статус
+
+Ключевые общие точки зависимости подтверждены повторно; SQLite removal по-прежнему не готов к безопасному выполнению. Наиболее важный архитектурный узел — общий `dependencies.py`/auth router/AuthService, где legacy SQLite и PostgreSQL credential flow пока пересекаются. До отдельного согласования ничего не удалять и не менять.
