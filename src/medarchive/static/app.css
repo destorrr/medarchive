@@ -5,7 +5,7 @@
   --color-surface-muted: #f8fafc;
   --color-text: #172033;
   --color-muted: #667085;
-  --color-subtle: #98a2b3;
+  --color-subtle: #667085;
   --color-border: #e4e9f0;
   --color-border-strong: #d0d7e2;
   --color-primary: #315fbd;
@@ -39,7 +39,7 @@ a:hover { color: var(--color-primary-hover); }
 .sidebar .brand { padding: 5px 11px 19px; border-bottom: 1px solid var(--color-border); line-height: 1.25; }
 .sidebar .brand b { display: block; color: #172b4d; font-size: 17px; font-weight: 750; letter-spacing: -.45px; }
 .sidebar .brand span { display: block; margin-top: 4px; color: var(--color-muted); font-size: 11px; letter-spacing: .15px; }
-.sidebar .group-label { padding: 19px 11px 7px; color: #98a2b3; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.sidebar .group-label { padding: 19px 11px 7px; color: #667085; font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 .sidebar nav { display: grid; gap: 3px; }
 .sidebar nav a { display: flex; align-items: center; min-height: 38px; gap: 9px; padding: 8px 11px; color: #475467; border-radius: 8px; font-size: 13px; font-weight: 550; text-decoration: none; transition: background .15s ease, color .15s ease; }
 .sidebar nav a:hover { color: #244d9e; background: #f4f7fc; }
@@ -70,7 +70,7 @@ a:hover { color: var(--color-primary-hover); }
 .form-group label, label { color: #344054; font-weight: 600; }
 .form-group label { display: block; margin-bottom: 6px; }
 input:not([type=checkbox]):not([type=radio]), select, textarea, .form-group select, select.row-sel { min-height: 38px; max-width: 100%; padding: 8px 11px; color: var(--color-text); background: #fff; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); }
-input::placeholder, textarea::placeholder { color: #98a2b3; }
+input::placeholder, textarea::placeholder { color: #667085; }
 input:focus, select:focus, textarea:focus { border-color: var(--color-primary); outline: 3px solid rgb(49 95 189 / 12%); }
 input[type=checkbox], input[type=radio] { accent-color: var(--color-primary); }
 button, .btn { min-height: 36px; padding: 8px 14px; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; font-weight: 620; text-decoration: none; transition: background .15s ease, border-color .15s ease, color .15s ease; }
@@ -724,3 +724,6 @@ mark { padding: 0 2px; background: #fff0bf; border-radius: 3px; }
   .login-card { padding: 23px 19px; }
   .login-card-header h1 { font-size: 22px; }
 }
+
+.nav-icon { flex: 0 0 17px; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.sidebar nav a > span:first-of-type { min-width: 0; }
