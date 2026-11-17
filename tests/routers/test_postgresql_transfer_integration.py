@@ -190,6 +190,7 @@ async def test_postgresql_shipment_register_and_detail_are_location_scoped():
                     persisted = await session.get(Shipment, shipment_id)
                     if persisted is not None:
                         await session.delete(persisted)
+            await session.flush()
             for user in (branch_user, archive_user, central_user, viewer):
                 persisted_user = await session.get(User, user.id)
                 if persisted_user is not None:
