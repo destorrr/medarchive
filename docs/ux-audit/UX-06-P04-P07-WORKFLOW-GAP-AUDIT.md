@@ -96,9 +96,9 @@ The audit store may record that a correction was authorized/performed, but the c
 - No source code, tests, migrations, schema, workflows or deployment files were changed by this audit.
 
 
-### Proposed P-07 allowlist for product-owner review (not yet approved)
+### Approved P-07 allowlist (2026-11-18)
 
-The following is a constrained proposal, not an implementation authorization or an approved product decision. The guiding rule is to correct a demonstrably wrong current business fact through a typed compensating command; never edit or delete the original event, and never use admin authority to bypass an ordinary workflow.
+The product owner approved the following constrained allowlist. This is a product decision, not an implementation authorization. The guiding rule is to correct a demonstrably wrong current business fact through a typed compensating command; never edit or delete the original event, and never use admin authority to bypass an ordinary workflow.
 
 | Category | Proposed admin correction | Guardrails / exclusions |
 |---|---|---|
@@ -112,6 +112,6 @@ The following is a constrained proposal, not an implementation authorization or 
 | Historical event actor, timestamp, payload or deletion | Prohibited | Source event remains immutable. If attribution itself is wrong, append a separately typed attribution-correction event with evidence and reference; original actor/time/payload remain visible as originally recorded |
 | User, role, reference data | Existing admin CRUD remains governed by its own D-15 rules | Not a P-07 historical business correction; changes must not rewrite past event attribution or retroactively change permissions recorded at event time |
 
-**Common command contract proposed for every allowed correction:** allowlisted command and field set; nonblank reason; target aggregate and original event/fact reference; authenticated admin actor; state/scope/invariant validation; idempotent command ID; append-only typed DomainEvent for the business correction plus atomic admin/security audit record; before/after values restricted to the allowlisted fields; no arbitrary JSON patch or direct runtime DML. Sensitive card/patient values must be minimized in audit payloads and shown only to roles already authorized for the object.
+**Required command contract for every allowed correction:** allowlisted command and field set; nonblank reason; target aggregate and original event/fact reference; authenticated admin actor; state/scope/invariant validation; idempotent command ID; append-only typed DomainEvent for the business correction plus atomic admin/security audit record; before/after values restricted to the allowlisted fields; no arbitrary JSON patch or direct runtime DML. Sensitive card/patient values must be minimized in audit payloads and shown only to roles already authorized for the object.
 
-**Product decisions requested:** approve or amend the category allowlist, especially (1) whether any card master-data fields may be corrected and whether card number/patient identity are categorically excluded pending a dedicated reconciliation flow; (2) whether current custody/location, BoxCycle membership and BoxPlacement corrections are allowed under the guards above; (3) whether the dedicated erroneous-write-off correction is in scope for admin; and (4) confirm that shipment/request history and original event attribution/payload are never overwritten.
+**Implementation detail still required:** enumerate the exact clerical card metadata fields permitted for correction. Card number and patient identity are excluded from P-07; any identity reconciliation requires a separately designed and approved process. The approved categories and prohibitions above must be translated into distinct typed commands and tests before implementation.
