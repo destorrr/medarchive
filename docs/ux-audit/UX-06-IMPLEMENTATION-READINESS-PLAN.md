@@ -496,3 +496,12 @@ Current tests establish operational location scope for branch/archive/central_of
 Добавлен `UX-06-P04-P07-WORKFLOW-GAP-AUDIT.md`. Статически подтверждено: PostgreSQL реализует списание пустой коробки, но отдельный card write-off workflow/command/route не обнаружен; статусы Card `inactive`/`under_review` не определяют согласованный процесс списания. Admin CRUD существует, но отдельные corrective commands для card/box/shipment/request/custody/placement/history не обнаружены; поле `DomainEvent.correction_of_event_id` само по себе не реализует процесс коррекции.
 
 В документе зафиксированы обязательные границы P-04 (инициирует ЦО, исполняет архив) и P-07 (allowlist, обязательная причина, append-only correction, атомарность), а также точные продуктовые решения, блокирующие соответствующие state machine и UI. Оба решения остаются открытыми.
+
+
+## 20. Technical contract consolidation (2026-11-18)
+
+Добавлен `UX-06-TECHNICAL-CONTRACT-DECISIONS-PROPOSAL.md` с рекомендациями по versioned JSONB result envelope, приватной application schema `medarchive`, ограниченной роли RLS при DB-SEC-01, SECURITY DEFINER throttle API, one-shot operator bootstrap, разделению infrastructure principals и event consumer compatibility.
+
+Ключевые рекомендации: не использовать mutable GUC как доказательство actor identity; на первом этапе проверять actor/role/object scope внутри защищённых DB-команд; не выдавать runtime table DML для throttle, а открыть узкие функции; bootstrap вынести из web startup; backup/monitoring/maintenance grants не проектировать до выбора реальной deployment topology.
+
+Consumer inventory остаётся неполным в части внешних интеграций и production jobs; не менять event contract до завершения branch-aware repo search и подтверждения внешних consumers. Все рекомендации — проектные, не реализация.
