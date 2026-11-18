@@ -482,3 +482,10 @@ Current tests establish operational location scope for branch/archive/central_of
 Документ также фиксирует обнаруженный legacy конфликт: PostgreSQL archive router по-прежнему предоставляет самостоятельное shelf placement карты (`/placement/card`), несовместимое с D-11. Нужен отдельный migration/retirement plan; legacy данные и код не удалять на этом этапе.
 
 Это проектная спецификация, не разрешение на реализацию. Выводы основаны на статическом чтении исходников на HEAD `5779eea`; HTTP, PostgreSQL, pytest и CI не запускались.
+
+
+## 18. Administrative/security audit coverage — static inspection 2026-11-18
+
+Добавлен `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. В просмотренных PostgreSQL auth/dependency/admin paths найдены 13 административных mutation event types, но не найдены durable audit events для успешного/неуспешного входа, throttling, logout, invalid/revoked session и authorization denial. Login throttle хранит HMAC-keyed counters, но не заменяет audit trail. Password reset включён в generic `admin.user_updated` с boolean-флагом. Предложены event catalog, allowlisted envelope/payload, atomicity, read permissions, migration preservation и тесты.
+
+Открытыми оставлены retention, digest key management, policy для noisy 401/403 и privileged reads, audit-store outage behavior и точная схема. Это статический аудит и проектное предложение; реализация не разрешена, тесты/HTTP/DB/CI не запускались.

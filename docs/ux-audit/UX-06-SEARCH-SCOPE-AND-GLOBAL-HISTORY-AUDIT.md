@@ -167,3 +167,10 @@ No tests were executed. These are assertions found in source, not current runtim
 Дополнительный legacy gap: `postgresql_archive.py` содержит GET/POST пути самостоятельного размещения и снятия карты с полки (`/placement/card`, `/placement/remove-card`), а также шаблонную обработку CardPlacement. Это противоречит D-11, где на полке находится только коробка. Целевое удаление этих путей должно сопровождаться инвентаризацией и миграцией legacy CardPlacement; на текущем этапе код и данные не менялись.
 
 Тестовая матрица теперь явно включает прямой доступ по ID, admin без Location, viewer denial, branch cutoff с проверкой count/pagination, завершённый manifest для участников, запрет чужого shipment/request и отсутствие standalone card shelf placement. Тесты не запускались.
+
+
+## 11. Authentication/security event coverage — статическое уточнение HEAD 50b06aa
+
+Проверены `routers/auth.py`, `dependencies.py`, `postgresql_auth_service.py`, `postgresql_login_throttle.py`, `auth_service.py`, `postgresql_admin_pages.py` и `postgresql_admin_service.py`. Найдены admin mutation events для 13 типов; login success/failure/throttle, logout, invalid/revoked session и authorization denial не имеют найденного durable audit producer. Throttle использует keyed digests и bounded counters, но это не security audit. Credential reset отражается как `admin.user_updated` с `password_changed`, без отдельного event type. Session cookie stateless, 12h; server-side session registry/revocation path не найден.
+
+Целевая event catalog/envelope, redaction, read permissions, atomicity, migration preservation и тесты вынесены в `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. Retention, digest key rotation, denial noise policy, privileged-read scope и audit-store outage policy остаются открытыми. Только статический source inspection; тесты и runtime checks не выполнялись.
