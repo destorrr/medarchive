@@ -115,3 +115,16 @@ The product owner approved the following constrained allowlist. This is a produc
 **Required command contract for every allowed correction:** allowlisted command and field set; nonblank reason; target aggregate and original event/fact reference; authenticated admin actor; state/scope/invariant validation; idempotent command ID; append-only typed DomainEvent for the business correction plus atomic admin/security audit record; before/after values restricted to the allowlisted fields; no arbitrary JSON patch or direct runtime DML. Sensitive card/patient values must be minimized in audit payloads and shown only to roles already authorized for the object.
 
 **Implementation detail still required:** enumerate the exact clerical card metadata fields permitted for correction. Card number and patient identity are excluded from P-07; any identity reconciliation requires a separately designed and approved process. The approved categories and prohibitions above must be translated into distinct typed commands and tests before implementation.
+
+
+### P-07 — уточнение field-level allowlist по текущей Card ORM (static inspection)
+
+На текущем HEAD модель `Card` содержит следующие поля: `card_number`, `full_name`, `date_of_birth`, `phone`, `origin_branch_id`, `current_location_id`, `current_shipment_id`, `status`, `custody_status`, `external_organization`, `external_comment`, `external_since`, `created_at`, `updated_at`, `created_by`.
+
+С учётом утверждённого запрета менять номер карты и идентичность пациента:
+- `card_number`, `full_name`, `date_of_birth` исключаются из P-07 clerical correction; их изменение требует отдельного процесса сверки/идентификации.
+- `origin_branch_id`, `created_at`, `created_by` являются provenance/attribution и не должны редактироваться.
+- `current_location_id`, `current_shipment_id`, `status`, `custody_status`, `external_organization`, `external_comment`, `external_since` — доменное состояние; их нельзя менять через metadata patch. Исправления выполняются только отдельными типизированными custody/location/status commands с соответствующими guards и событиями.
+- Единственное очевидное поле-кандидат для узкой clerical correction по текущей модели — `phone`. Оно содержит персональные данные и может быть исправлено только как контактный атрибут, с обязательной причиной, actor/time, before/after в ограниченном audit и без изменения идентичности карты/пациента.
+
+Предложение для утверждения владельцем продукта: разрешить P-07 исправлять только `Card.phone` как clerical metadata; все остальные поля — вне generic metadata correction. Это уточнение не расширяет право admin менять номер карты, ФИО, дату рождения или бизнес-состояние.

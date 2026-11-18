@@ -15,8 +15,8 @@
 
 | Вопрос | Статус | Что требуется |
 |---|---|---|
-| P-04/D-13 — списание медицинской карты | Открыто, владелец продукта | Основания, подтверждения, обязательные поля и проверки |
-| P-07 — admin correction | Открыто, владелец продукта | Allowlist действий, допустимые состояния, причины, before/after и защита истории |
+| P-04/D-13 — списание медицинской карты | Продуктово закрыто | Утверждены роли, отмена, один исполнитель, обязательный код и закрытый каталог `lost` / `damaged` / `other`; технические команды и guards остаются до реализации |
+| P-07 — admin correction | Продуктово закрыто | Утверждены категории и запреты; точные clerical card fields и typed command contracts остаются технической детализацией |
 | D-10/P-03 — Box ↔ BoxCycle | Read-only модель подтверждена | Сохранить семантику в target schema |
 | D-17 — QR карты | Read-only parser contract подтверждён | Не менять payload; обеспечить совместимость |
 | D-06 — viewer | Продуктовое решение принято, миграционный план открыт | Инвентаризация аккаунтов/ссылок/ACL и безопасная миграция |
@@ -27,8 +27,8 @@
 ### 3.1 Контракты команд и событий
 - Завершить canonicalization/hash contract по типам команд.
 - Определить replayable deterministic negative outcomes и result/error mapping.
-- Утвердить retention и lifecycle command ledger.
-- Утвердить versioned result envelope.
+- Реализовать утверждённый lifecycle command ledger: UUID v4, server-side schema-specific SHA-256 canonicalization, deterministic replay и tombstone для необратимых команд.
+- Завершить обычные command TTL после определения максимальных retry horizons; согласовать точный result envelope и API error mapping (не менять утверждённую replay semantics).
 - Утвердить каталог event_type/event_version/payload schemas и compatibility policy.
 - Завершить inventory всех DomainEvent consumers; текущие проверенные read surfaces не доказывают полноту списка.
 - Спроектировать отдельный admin/security audit, его permissions и корреляцию с DomainEvent/command ledger.
@@ -64,7 +64,7 @@
 | Target storage/request/shipment model | Проектно описана; требует preflight и конкретного DDL design |
 | DB command contracts | Значительная часть описана; idempotency/result/error details открыты |
 | Grants/principals | Проектная матрица есть; effective ACL и deployment topology не подтверждены |
-| Event/audit | Ownership концептуально разведено; schema, consumers и permissions открыты |
+| Event/audit | Authoritative ownership clarified; event catalog, schema, consumers, permissions, retention and outage policy open |
 | Data preflight/backfill | Не выполнен; production-like DB snapshot не проверялся |
 | API/UI implementation | Не начата и не разрешена |
 | Automated verification | В рамках этого этапа не запускалась |

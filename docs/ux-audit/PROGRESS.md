@@ -1686,3 +1686,8 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 4. Запрещено переписывать shipment route/manifest/handover/receipt/completion, ArchiveRequest composition/outcomes и исходные event actor/time/payload. Корректирующие факты добавляются отдельными типизированными событиями.
 
 Для каждой разрешённой команды обязательны allowlist полей/операции, причина, actor/time, ссылка на исходный факт, проверки состояния и полномочий, идемпотентность, append-only DomainEvent и атомарная запись admin/security audit. Точные clerical card fields ещё предстоит перечислить в техническом контракте. Продуктовый allowlist P-07 согласован; реализация не разрешена. Изменена только Markdown-документация.
+
+
+## 28. UX-06 — актуализация cross-document и technical contract status (2026-11-18)
+
+Повторная сверка на HEAD `dd6a7cb` выявила устаревшие записи в `UX-06-CROSS-DOCUMENT-CONSISTENCY-REVIEW.md` и `UX-06-READINESS-GAP-REVIEW.md`: P-04/P-07 ошибочно оставались открытыми, а command idempotency описывался как невыбранный. Обновлены статусы: P-04/P-07 продуктово закрыты; четыре положения command_id lifecycle/hash/replay/tombstone уже утверждены; audit ownership уточнён: DomainEvent — источник истины для бизнес-факта, AdminSecurityAudit — для привилегированного действия и его security контекста, с атомарной корреляцией без дублирования бизнес-payload. Статически прочитана текущая Card ORM; предложено разрешить только `Card.phone` как clerical metadata field, остальные поля исключить из generic patch или направить в отдельные доменные команды. Предложение `phone` требует отдельного подтверждения владельца продукта. Изменена только Markdown-документация; source, ORM, tests, migrations, workflows, deployment и данные не менялись.

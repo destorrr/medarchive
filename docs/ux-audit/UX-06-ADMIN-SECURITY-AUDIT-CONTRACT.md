@@ -97,6 +97,17 @@ For login events, do not store the attempted password, raw username, raw IP, or 
 
 ## 5. Atomicity and ownership
 
+**Authoritative-source rule (aligned with DB-SEC-03 and P-07):**
+
+| Record class | Authoritative record | Must not be duplicated as |
+|---|---|---|
+| Card/box/custody/placement/shipment/request business fact, including an admin correction to that fact | Typed/versioned append-only `DomainEvent` for the aggregate | A second copy of the business payload in the global admin/security feed |
+| Privileged admin correction action (actor, reason, authorization outcome, target, command/correlation references) | Separate append-only `AdminSecurityAudit` record | A generic `admin.*` business DomainEvent |
+| Pure admin CRUD (branch/user/shelf/courier) | `AdminSecurityAudit` | DomainEvent, unless a separate domain aggregate event is explicitly required by a future approved design |
+| Authentication/authorization/security event without a business aggregate | `AdminSecurityAudit` | DomainEvent |
+
+For an admin correction that changes a business aggregate, both authoritative records are committed atomically: DomainEvent records what business fact changed; AdminSecurityAudit records that a privileged correction was invoked, by whom, why, with what outcome and references to the business event. The audit entry should not copy the full before/after business payload; it may carry allowlisted summary fields and the `domain_event_id`/aggregate reference. The two records have distinct semantics and are not competing sources of truth.
+
 - A single admin command that mutates a business aggregate and requires a security/admin audit record must commit both authoritative records atomically, with shared command/correlation references. Do not duplicate the business fact into the global audit feed.
 - Pure authentication failures have no business aggregate; their security record and throttle mutation should have a clearly defined transaction outcome. A failed login should not be silently lost because the HTTP response is 200/429.
 - Successful login audit should be committed with the authentication decision before the session cookie is issued. Avoid issuing a cookie if the required audit write fails, unless an explicitly approved availability policy says otherwise.
