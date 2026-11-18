@@ -1453,3 +1453,12 @@ UX-05 остаётся в работе. Изменены только проек
 - предварительная матрица owner/migrator/runtime сформирована, но фактические PostgreSQL grants не проверялись.
 
 Статический read-only этап; код, миграции, тесты и deployment не менялись. PostgreSQL/Alembic/pytest/CI не запускались. Следующий этап — детальные контракты DB-команд для P-06/P-09/D-02, упаковки, приёмки, custody и admin operations.
+
+
+## 2026-11-18 — проектные контракты DB-команд
+
+Создан документ `UX-06-DB-COMMAND-CONTRACTS.md`. Детализированы envelope/actor/idempotency/transaction rules и целевые контракты parent archive request, processing/extraction, item removal/not_found, cancel, single handover, full shipment receipt, box lifecycle/repack/write-off, card intake, external custody, admin commands и DomainEvent.
+
+Зафиксированы ключевые атомарные границы P-06/P-09/D-02: start_processing извлекает все карты одной транзакцией; cancel до handover атомарно возвращает все extracted карты; handover передаёт все оставшиеся карты одним shipment; receive_all завершает shipment и parent только после полной приёмки. Regroup и extraction сохраняют разные правила D-11.
+
+Документ проектный, SQL API не создан. Остаются технические вопросы по command ledger/idempotency result, typed DB return contract, actor scope enforcement, отдельному admin/security audit и compatibility существующих event consumers. Код, миграции, тесты и deployment не менялись; PostgreSQL/Alembic/pytest/CI не запускались.
