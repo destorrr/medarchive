@@ -1482,3 +1482,13 @@ UX-05 остаётся в работе. Изменены только проек
 Добавлены контрольные Gate 0–7, транзакционная матрица P-06/P-09/D-02, обязательные DB/auth/concurrency/idempotency tests, evidence package, правила Alembic additive-first и rollback/restore. Отдельно перечислены остающиеся продуктовые и технические решения; ранее согласованные D/P/DB-SEC решения не пересматриваются.
 
 Документ не разрешает реализацию. Исходники, ORM, API/UI, тесты, миграции, workflows и deployment не менялись; PostgreSQL, SQL, Alembic, pytest и CI не запускались. Следующий этап — read-only cross-document consistency review UX-06 и сведение только действительно открытых решений для владельца продукта.
+
+## 2026-11-18 — UX-06 cross-document consistency review
+
+Создан `UX-06-CROSS-DOCUMENT-CONSISTENCY-REVIEW.md` на базе HEAD `86c13671b0ee52697a30bc8155ba10fc26dad104`. Сверены storage model, technical data model, invariants/test matrix, DB command contracts, DML/principals inventory, grants matrix, DB security/transaction architecture и implementation readiness plan.
+
+Ключевые согласованные процессы не содержат подтверждённых противоречий: коробочное хранение; раздельная семантика extraction/regroup; parent/item lifecycle; единый handover и полная приёмка; отмена до handover с возвратом извлечённых карт; actor trust и PostgreSQL principals.
+
+Выявлены уточнения: обязательность комментария для `not_found` пока не утверждена; удалённые ЦО позиции могут сохраняться как audit tombstone, но не должны попадать в текущий состав заявки; нужно определить authoritative ownership между DomainEvent и отдельным admin/security audit. Технически открыты command ledger/result contract и физическая тара ↔ BoxCycle. Сводка действительно открытых решений находится в review.
+
+Изменены только проектная документация. Исходники, ORM, API/UI, тесты, migrations, workflows и deployment не менялись. PostgreSQL, SQL, Alembic, pytest и CI не запускались. UX-06 остаётся в работе; реализация не разрешена.
