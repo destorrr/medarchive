@@ -388,7 +388,7 @@ Production cutover не допускается, пока не выполнены
 4. **D-03 — legacy incidents:** подготовить отдельный план retirement/reconciliation старых exception shipment paths и UI, не возвращая incident в целевой процесс. Не закрыто.
 
 ### Технические решения и доказательства — требуют завершения до соответствующих DDL/cutover gates
-5. **DB command idempotency:** аудит рекомендовал command ledger с уникальным command_id, server-side canonical input hash и версионируемым сохранённым результатом. Техническая рекомендация описана, но точные canonicalization, replayable negative outcomes и retention не утверждены. Не закрыто.
+5. **DB command idempotency:** четыре положения утверждены владельцем продукта 2026-11-18 как обязательный технический стандарт: client-generated UUID v4 с повторным использованием на retry; server-side schema-specific canonicalization + SHA-256 с версией алгоритма; replay успешных результатов и детерминированных бизнес-отказов после авторизации без фиксации auth failures/transient errors; бессрочное сохранение ключей необратимых операций с tombstone при очистке payload. Общий TTL остальных команд и retry horizons остаются технической детализацией. Решение закрыто; реализация/DDL не разрешены.
 6. **DB result contract:** предварительно предпочтён versioned JSON result envelope с result_code/result_version; требуется зафиксировать контракт и error mapping. Не закрыто.
 7. **DB schemas:** выбрать public или отдельные app/api schemas. Не закрыто.
 8. **RLS/actor context:** определить необходимость RLS и окончательный механизм actor/scope enforcement; GUC не считать доказательством actor identity. Не закрыто.
@@ -505,3 +505,12 @@ Current tests establish operational location scope for branch/archive/central_of
 Ключевые рекомендации: не использовать mutable GUC как доказательство actor identity; на первом этапе проверять actor/role/object scope внутри защищённых DB-команд; не выдавать runtime table DML для throttle, а открыть узкие функции; bootstrap вынести из web startup; backup/monitoring/maintenance grants не проектировать до выбора реальной deployment topology.
 
 Consumer inventory остаётся неполным в части внешних интеграций и production jobs; не менять event contract до завершения branch-aware repo search и подтверждения внешних consumers. Все рекомендации — проектные, не реализация.
+
+
+## 14. Command idempotency — стандарт утверждён (2026-11-18)
+
+Владелец продукта подтвердил все четыре положения раздела 11 документа `UX-06-DB-COMMAND-CONTRACTS.md` как обязательный технический стандарт МедАрхива. Согласованы UUID v4 lifecycle и reuse ключа на retry, server-side schema-specific canonicalization с SHA-256 и версией алгоритма, replay успешных и детерминированных бизнес-результатов после авторизации, а также запрет удаления ключей необратимых операций с сохранением tombstone при очистке результата.
+
+Решение по политике идемпотентности закрыто. Открытыми остаются только технические детали: inventory retry horizons и календарные сроки хранения ledger для остальных команд, а также окончательная классификация необратимых команд. Они должны быть определены до настройки purge/retention, но не отменяют утверждённый стандарт.
+
+Изменены только проектные Markdown-документы. Это не разрешение на реализацию: SQL/DDL, ORM, API, UI, тесты, миграции и deployment не менялись.
