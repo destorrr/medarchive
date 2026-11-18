@@ -1558,7 +1558,7 @@ UX-05 остаётся в работе. Изменены только проек
 Подтверждено статическим чтением ORM, initial migration, PostgreSQL archive/shipment/admin services и routers:
 - общий `DomainEvent` используется и для операционных событий, и для `admin.*`; admin audit page фильтрует общий журнал по префиксу, а карточка shipment читает события агрегата;
 - целевая authoritative ownership разведена по назначению: DomainEvent — бизнес-факты агрегатов; отдельный admin/security audit — привилегированные административные и security-sensitive действия. Для одной административной команды над бизнес-агрегатом допустимы обе записи, атомарно связанные command_id/correlation_id;
-- текущие ORM/migration не содержат event_version, command_id, correlation_id и command ledger; append-only grants/triggers в initial migration упомянуты как требование-комментарий, а не реализованная гарантия;
+- текущие ORM/migration не содержат event_version, command_id, correlation_id и command ledger; миграция 0002 создаёт append-only trigger на UPDATE/DELETE для DomainEvent; trigger не ограничивает INSERT, а effective grants и возможность обхода не проверялись;
 - рекомендован command ledger с уникальным command_id, server-side canonical input hash, versioned result payload и атомарной записью вместе с изменениями агрегата и событиями. Одинаковый ключ/вход возвращает сохранённый результат; повторное использование ключа с другим входом конфликтует; разные ключи на один агрегат сериализуются блокировкой агрегата.
 
 Остаточные технические вопросы: canonicalization/hash contract, перечень replayable negative outcomes, retention ledger, полный inventory consumers и точная схема admin/security audit. Изменена только Markdown-документация. Исходники, миграции, тесты, workflows и deployment не менялись; PostgreSQL, SQL, Alembic, pytest и CI не запускались. UX-06 остаётся в работе; реализация не разрешена.
@@ -1569,3 +1569,9 @@ UX-05 остаётся в работе. Изменены только проек
 При расширении проверки просмотрена миграция `0002_workflow_guards.py`. Она действительно создаёт функцию `medarchive_domain_events_append_only()` и trigger `trg_domain_events_append_only` на UPDATE/DELETE таблицы `domain_events`. Предыдущая формулировка аудита уточнена: защита от UPDATE/DELETE реализована миграционным trigger; при этом INSERT не ограничен этим trigger, а фактические grants/ownership и возможность обхода привилегированными principals не проверялись. Это уточнение не меняет вывод об отсутствии command ledger и полей command_id/event_version/correlation_id в текущей ORM.
 
 Изменена только Markdown-документация. PostgreSQL, SQL, Alembic, pytest и CI не запускались.
+
+## 2026-11-18 — итоговая сверка readiness UX-06
+
+Создан `UX-06-READINESS-GAP-REVIEW.md` и актуализирован раздел 10 `UX-06-IMPLEMENTATION-READINESS-PLAN.md`. Устаревшие вопросы D-10/P-03 (Box ↔ BoxCycle) и D-17 (QR parser contract) переведены в подтверждённые read-only findings; append-only DomainEvent уточнён с учётом trigger из миграции 0002. В readiness plan разделены два открытых продуктовых решения (P-04/D-13 и P-07), миграционные планы D-06/D-03 и технические блокеры: command ledger/result/error, event consumers/admin audit, schema/RLS/actor scope, login throttle, bootstrap/infrastructure principals, read permissions, rollout compatibility и legacy retention.
+
+Gate status: бизнес-модель в основном согласована, но UX-06 не готов к закрытию. Не выполнены production-like data preflight, effective ACL/deployment verification и технические спецификации ряда DB/security contracts. Код, ORM, API/UI, тесты, migrations, workflows, deployment и данные не менялись; PostgreSQL, SQL, Alembic, pytest и CI не запускались. Реализация и переход к UX-07 не разрешены.
