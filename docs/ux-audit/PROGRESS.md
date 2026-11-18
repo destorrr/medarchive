@@ -1419,3 +1419,19 @@ UX-05 остаётся в работе. Изменены только проек
 Решения вынесены в отдельный документ `PRODUCT-DECISIONS-DB-SECURITY.md`; архитектурный документ обновлён, вопросы владельцу продукта закрыты. Это утверждение проектной архитектуры, не разрешение на реализацию. Исходники, DDL, миграции, тесты и deployment configuration не менялись.
 
 Следующий шаг UX-06: read-only сопоставление DB-команд с текущими ORM-моделями, таблицами, workflow services и consumers DomainEvent; затем детальная спецификация контрактов и grants matrix.
+
+
+## 2026-11-18 — read-only сопоставление DB-команд с PostgreSQL реализацией
+
+Создан документ `UX-06-DB-COMMAND-MAPPING.md`. Проверены PostgreSQL ORM-модели, archive/shipment/custody/admin workflows, archive/shipment routers, session dependency и миграции 0001/0002/0010.
+
+Зафиксированы ключевые разрывы с утверждённой целевой архитектурой:
+- текущая `ArchiveRequest` — отдельная заявка на одну карту; parent request + items P-09 отсутствуют;
+- текущие статусы и переходы per-card не совпадают с целевым lifecycle draft/submitted/processing/completed/cancelled;
+- `CardPlacement` остаётся в ORM и участвует в текущих workflow, хотя D-11 исключает самостоятельное размещение карты на полке в целевой модели;
+- извлечение карты и fulfilment реализованы раздельными действиями, а не единым parent-level атомарным start-processing;
+- routers управляют commit/rollback вручную, несмотря на наличие общего `Database.transaction()`;
+- DomainEvent имеет общий append-only trigger, но typed/versioned contract и ограничение произвольного runtime INSERT требуют отдельного проектирования;
+- provisioning owner/migrator/runtime и command boundary в проверенных миграциях не обнаружены.
+
+Статический аудит, без запуска БД/SQL/Alembic/pytest/CI. Код, миграции, тесты и deployment configuration не менялись. Следующий шаг — полный inventory критичных DML paths и спецификация контрактов P-06/P-09/D-02.
