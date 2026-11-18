@@ -1579,3 +1579,12 @@ Gate status: бизнес-модель в основном согласован�
 ## 2026-11-18 — аудит role-scoped history/search
 
 Создан UX-06-ROLE-SCOPED-HISTORY-SEARCH-AUDIT.md; findings добавлены в legacy viewer/incident audit и readiness gap review. Статически подтверждено: branch history использует origin_branch_id и сохраняет доступ к истории карты после ухода из филиала (расхождение D-08); viewer разрешён в /history без event filter и в search handler (расхождение D-06); admin также получает нефильтрованный /history, что требует явного согласования D-07 × D-16. /admin/audit пока читает admin.% из DomainEvent, а не отдельный admin/security audit. HTTP tests, PostgreSQL, pytest и CI не запускались; код не менялся.
+
+
+## 2026-11-18 — согласовано уточнение D-07 × D-16 и продолжен search scope audit
+
+Владелец продукта подтвердил: admin сохраняет глобальный поиск и просмотр карточек объектов, включая идентифицирующие сведения, и полную историю конкретного объекта; глобальная лента ограничивается административным/security-аудитом. Глобальный operational feed не проектируется. Решение синхронизировано в D-07, role-scoped history/search audit и readiness plan.
+
+Статически раскрыт _search_context: branch/archive/central_office ограничены текущей Location и отправлениями in_transit; admin имеет глобальный поиск; viewer также технически проходит search endpoints без location scope, что противоречит D-06. DTO поиска карт возвращает ФИО и сведения о статусе/размещении, но не номер карты. HTTP tests и проверка object detail endpoints не выполнялись.
+
+Изменяется только Markdown-документация. Исходники, тесты, миграции, workflows, deployment и данные не менялись; PostgreSQL, SQL, pytest и CI не запускались.

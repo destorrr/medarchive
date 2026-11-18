@@ -19,13 +19,17 @@ postgresql_history_page разрешает роли branch/archive/central_offic
 
 postgresql_search_results также явно допускает viewer в require_pg_role. Это прямое расхождение с D-06, исключающим viewer из целевой системы. Полный scope search implementation через _search_context требует отдельного завершения; но сам допуск viewer уже является подтверждённым статическим фактом.
 
-## 3. Admin — D-07 × D-16
+## 3. Admin — D-07 × D-16: решение принято
 
-Admin также попадает в глобальный /history без event filter. D-07 сохраняет глобальный доступ admin к поиску, истории и данным, включая идентифицирующие сведения. D-16 одновременно устанавливает, что глобальным остаётся только административный/security audit, а операционная история движения показывается в карточках объектов.
+Уточнение владельца продукта от 2026-11-18 снимает неоднозначность:
+- admin сохраняет глобальный поиск и просмотр карточек объектов, включая идентифицирующие сведения;
+- admin сохраняет полную историю конкретного объекта;
+- глобальная лента ограничивается административным и security-аудитом;
+- глобальную ленту операционных событий движения не проектировать; операционная история показывается в карточках объектов.
 
-Это требует явного разрешения семантики: глобальный доступ admin к карточкам и истории конкретных объектов может сохраняться, но не должен автоматически означать отдельный глобальный operational journal. Если владелец продукта подразумевал глобальный operational feed, это будет отдельным изменением D-16, а не техническим допущением.
+Следовательно, текущий глобальный /history для admin не соответствует целевой модели и должен быть устранён при реализации. Это не ограничивает доступ admin к истории конкретной карты, коробки, отправления или заявки через соответствующую карточку.
 
-Текущая /admin/audit читает общий DomainEvent с фильтром admin.% — это не отдельный admin/security audit store, предусмотренный целевой архитектурой.
+Текущая /admin/audit читает общий DomainEvent с фильтром admin.% — это не отдельный admin/security audit store целевой архитектуры. При миграции нужно сохранить глобальную административную/security-видимость, но отделить источник и схему аудита от DomainEvent.
 
 ## 4. Дополнительные read surfaces
 
@@ -37,7 +41,7 @@ Admin также попадает в глобальный /history без event 
 
 1. D-06: блокировать viewer на всех search/history surfaces; провести account/actor reference preflight и добавить negative tests.
 2. D-08: заменить branch origin-based history scope на правило прекращения доступа к дальнейшей истории после handover в архив. Не расширять его за пределы P-08 shipment manifest.
-3. D-07 × D-16: уточнить границу admin global object access и global operational journal; default target — object history + separate global admin/security audit.
+3. D-07 × D-16: решение принято 2026-11-18 — admin global object search/details and per-object history remain; global feed is admin/security audit only. Remove admin from global operational /history in target design.
 4. Разделить источник /admin/audit от DomainEvent после внедрения admin/security audit.
 5. Завершить полный search read-scope inventory и проверить, что query results не раскрывают чужие карты/PII.
 6. Negative tests: branch cannot see post-handover card events; viewer denied on search/history; admin only sees global admin/security audit and permitted object details.
@@ -45,3 +49,17 @@ Admin также попадает в глобальный /history без event 
 ## 6. Ограничения
 
 Проверены исходники на ветке, но не выполнялись HTTP requests, pytest, PostgreSQL, SQL или CI. Production deployment и данные не проверялись. Исходники, тесты, миграции, workflows и deployment не менялись.
+
+## 7. Search read path — статическое уточнение 2026-11-18
+
+Проверен полный helper _search_context в src/medarchive/routers/postgresql_dashboard.py (HEAD 86c9de1):
+
+- Для branch, archive и central_office определяется активная Location соответствующего типа. Если location не найдена, возвращается пустой результат.
+- Карты фильтруются по current_location_id этой Location либо по current_shipment_id отправления со статусом in_transit, где Location является отправителем или получателем.
+- Коробки фильтруются аналогично: current_location_id либо активное отправление in_transit с участием Location.
+- Поиск карт сопоставляет card_number и full_name, но возвращаемый search DTO содержит full_name, статус и сведения о размещении; номер карты в DTO не включён. Ограничение выборки — 50 совпадений для каждого типа.
+- Admin не получает location_id и потому выполняет глобальный поиск карт и коробок. Это соответствует уточнённому D-07, если доступ остаётся только у admin и все выдаваемые поля/переходы проверяются на сервере.
+- Viewer также не получает location_id и технически проходит в search routes, поэтому фактически получает тот же глобальный search scope. Это прямой D-06 gap; блокировка viewer должна быть на всех трёх endpoints /search, /search/results и POST /search, а не только в меню.
+- Location scope поиска ограничен текущим местонахождением и отправлениями in_transit; он не выдаёт историю объекта. Доступ к карточке и её timeline должен отдельно проверяться в object detail route.
+
+Статический вывод не подтверждает фактические HTTP responses или эксплуатационную доступность маршрутов. Проверка шаблонов, object detail visibility и всех query endpoints остаётся частью дальнейшего аудита.
