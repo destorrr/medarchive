@@ -158,3 +158,12 @@ These are source-level test assertions inspected statically. They were not execu
 - tests/routers/test_postgresql_admin_integration.py verifies administrative CRUD and audit, but the inspected test inventory does not establish admin global object detail/history access or shipment detail access.
 
 No tests were executed. These are assertions found in source, not current runtime results.
+
+
+## 10. Object detail and timeline contract — статическое уточнение HEAD 5779eea
+
+Подготовлена отдельная спецификация `UX-06-OBJECT-DETAIL-AND-TIMELINE-CONTRACT.md`. Она определяет целевые detail/timeline поверхности для card, physical box + BoxCycle, shipment и parent ArchiveRequest; разделяет глобальный admin object access и object-scoped operational access; сохраняет P-08/D-09 для manifest sender/receiver и требует D-08 branch cutoff после handover.
+
+Дополнительный legacy gap: `postgresql_archive.py` содержит GET/POST пути самостоятельного размещения и снятия карты с полки (`/placement/card`, `/placement/remove-card`), а также шаблонную обработку CardPlacement. Это противоречит D-11, где на полке находится только коробка. Целевое удаление этих путей должно сопровождаться инвентаризацией и миграцией legacy CardPlacement; на текущем этапе код и данные не менялись.
+
+Тестовая матрица теперь явно включает прямой доступ по ID, admin без Location, viewer denial, branch cutoff с проверкой count/pagination, завершённый manifest для участников, запрет чужого shipment/request и отсутствие standalone card shelf placement. Тесты не запускались.

@@ -473,3 +473,12 @@ Additional blockers: prove security-event coverage beyond administrative CRUD; d
 Static inspection found tests that explicitly encode viewer access to /dashboard, /search, /search/results and /history, including rendering global history. These tests conflict with accepted D-06 and must be revised as part of a separately approved implementation/migration; do not treat passing legacy tests as proof of target authorization.
 
 Current tests establish operational location scope for branch/archive/central_office, but do not establish the branch post-handover history cutoff required by D-08, nor admin global object detail/timeline access required by D-07. Dashboard tests do not assert the absence of global DomainEvent movements for admin. HTTP/pytest were not run.
+
+
+## 17. Object detail and timeline authorization contract (2026-11-18)
+
+Добавлен `UX-06-OBJECT-DETAIL-AND-TIMELINE-CONTRACT.md`. Документ переводит D-07/D-08/D-09/D-11/D-16 и P-08/P-09 в матрицу доступа к карточкам карты, коробки, отправления и групповой заявки ЦО. Зафиксированы admin global object access без synthetic Location, operational object/participation scope, branch history cutoff после handover, полная история собственного shipment для sender/receiver, правила состава timeline, PII и негативные/позитивные тесты.
+
+Документ также фиксирует обнаруженный legacy конфликт: PostgreSQL archive router по-прежнему предоставляет самостоятельное shelf placement карты (`/placement/card`), несовместимое с D-11. Нужен отдельный migration/retirement plan; legacy данные и код не удалять на этом этапе.
+
+Это проектная спецификация, не разрешение на реализацию. Выводы основаны на статическом чтении исходников на HEAD `5779eea`; HTTP, PostgreSQL, pytest и CI не запускались.
