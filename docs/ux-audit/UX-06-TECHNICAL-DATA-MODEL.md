@@ -97,7 +97,7 @@ Box (1)
 | `added_at`, `added_by` | Кто и когда добавил карту в состав |
 | `extracted_at`, `extracted_by` | Факт извлечения при старте обработки |
 | `resolved_at`, `resolved_by` | Время и автор окончательного результата позиции |
-| `resolution_comment` | Обязателен для `removed_by_archive`; для `not_found` — пояснение по утверждённой форме |
+| `resolution_comment` | Обязателен для `removed_by_archive`; для `not_found` необязателен и сохраняется только если предоставлен |
 | `source_membership_id` | Ссылка на закрываемое членство, если применимо; FK RESTRICT для трассировки исходной коробки/цикла |
 | `returned_membership_id` | Ссылка на новое членство при возврате карты после исключения/отмены |
 | `created_at`, `updated_at` | Системные даты |
