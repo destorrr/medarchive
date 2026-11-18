@@ -489,3 +489,10 @@ Current tests establish operational location scope for branch/archive/central_of
 Добавлен `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. В просмотренных PostgreSQL auth/dependency/admin paths найдены 13 административных mutation event types, но не найдены durable audit events для успешного/неуспешного входа, throttling, logout, invalid/revoked session и authorization denial. Login throttle хранит HMAC-keyed counters, но не заменяет audit trail. Password reset включён в generic `admin.user_updated` с boolean-флагом. Предложены event catalog, allowlisted envelope/payload, atomicity, read permissions, migration preservation и тесты.
 
 Открытыми оставлены retention, digest key management, policy для noisy 401/403 и privileged reads, audit-store outage behavior и точная схема. Это статический аудит и проектное предложение; реализация не разрешена, тесты/HTTP/DB/CI не запускались.
+
+
+## 19. P-04/P-07 workflow gap audit (2026-11-18)
+
+Добавлен `UX-06-P04-P07-WORKFLOW-GAP-AUDIT.md`. Статически подтверждено: PostgreSQL реализует списание пустой коробки, но отдельный card write-off workflow/command/route не обнаружен; статусы Card `inactive`/`under_review` не определяют согласованный процесс списания. Admin CRUD существует, но отдельные corrective commands для card/box/shipment/request/custody/placement/history не обнаружены; поле `DomainEvent.correction_of_event_id` само по себе не реализует процесс коррекции.
+
+В документе зафиксированы обязательные границы P-04 (инициирует ЦО, исполняет архив) и P-07 (allowlist, обязательная причина, append-only correction, атомарность), а также точные продуктовые решения, блокирующие соответствующие state machine и UI. Оба решения остаются открытыми.

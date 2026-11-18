@@ -91,3 +91,7 @@
 Тот же route разрешает viewer и admin, но для этих ролей event_filters остаётся пустым, что приводит к выборке DomainEvent без role/aggregate scope. Viewer route access — расхождение с D-06. Для admin требуется явная трактовка D-07 × D-16: глобальный доступ к объектам/истории не следует автоматически приравнивать к глобальному operational event feed.
 
 Search handler также явно разрешает viewer; полный search-scope review ещё требуется. Эти находки повышают приоритет D-06 containment и должны войти в preflight/negative-test gates. Проверка статическая; HTTP tests не запускались.
+
+## 6. P-04/P-07 static workflow inventory (2026-11-18)
+
+Добавлен `UX-06-P04-P07-WORKFLOW-GAP-AUDIT.md`. В inspected PostgreSQL source найден `write_off_box`, но не найдено отдельного medical-card write-off command/route; текущие Card statuses не определяют процесс D-13/P-04. Admin service/pages содержат справочный CRUD, но explicit corrective commands по business aggregates не найдены; `correction_of_event_id` в DomainEvent model не доказывает реализованную коррекцию. P-04 и P-07 требуют продуктового allowlist/evidence решения перед соответствующей реализацией. Source-only inspection; runtime/tests не запускались.
