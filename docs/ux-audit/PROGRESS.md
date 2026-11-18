@@ -1462,3 +1462,14 @@ UX-05 остаётся в работе. Изменены только проек
 Зафиксированы ключевые атомарные границы P-06/P-09/D-02: start_processing извлекает все карты одной транзакцией; cancel до handover атомарно возвращает все extracted карты; handover передаёт все оставшиеся карты одним shipment; receive_all завершает shipment и parent только после полной приёмки. Regroup и extraction сохраняют разные правила D-11.
 
 Документ проектный, SQL API не создан. Остаются технические вопросы по command ledger/idempotency result, typed DB return contract, actor scope enforcement, отдельному admin/security audit и compatibility существующих event consumers. Код, миграции, тесты и deployment не менялись; PostgreSQL/Alembic/pytest/CI не запускались.
+
+
+## 2026-11-18 — проектная матрица PostgreSQL grants и principals
+
+Создан документ `UX-06-DB-GRANTS-MATRIX.md`. Зафиксировано целевое распределение owner/migrator/runtime по schemas, tables, sequences, functions/procedures, views и triggers; отдельно рассмотрены login throttle, first-admin bootstrap, Alembic, backup/restore, monitoring, RLS/application authorization, PUBLIC/default privileges и поэтапный отзыв runtime DML.
+
+Ключевое ограничение: runtime после cutover получает SELECT только по необходимости и EXECUTE только на allowlist защищённых команд; прямой DML к критичным workflow aggregates, DDL, TRUNCATE, ownership и SET ROLE в owner/migrator запрещены. Временные grants допускаются только адресно на непереведённые paths и с условием удаления.
+
+Это проектная матрица, не фактический аудит ACL: подключения к PostgreSQL и проверки pg_catalog не было. SQL GRANT/REVOKE, роли, схемы, функции, миграции, исходники, тесты и deployment не менялись. PostgreSQL/Alembic/pytest/CI не запускались.
+
+Следующий шаг UX-06 — consolidated implementation/readiness plan: зависимости, последовательность миграции, preflight, критерии допуска, rollback и открытые решения перед отдельным разрешением на реализацию.
