@@ -1549,3 +1549,16 @@ UX-05 остаётся в работе. Изменены только проек
 Документ фиксирует DB-SEC-01…04 gap matrix, deployment requirements и будущие negative CI gates. Ни один secret/ACL/role не изменялся.
 
 Изменена только проектная Markdown-документация. Исходники, ORM, API/UI, tests, migrations, workflows и deployment не менялись; PostgreSQL, SQL, pg_catalog, Alembic, pytest и CI не запускались. UX-06 остаётся в работе; реализация не разрешена.
+
+
+## 2026-11-18 — read-only аудит DomainEvent ownership и command idempotency
+
+Создан `UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md` на базе HEAD `2a1752459002bf8400f690e334bc97f6148e50c7`.
+
+Подтверждено статическим чтением ORM, initial migration, PostgreSQL archive/shipment/admin services и routers:
+- общий `DomainEvent` используется и для операционных событий, и для `admin.*`; admin audit page фильтрует общий журнал по префиксу, а карточка shipment читает события агрегата;
+- целевая authoritative ownership разведена по назначению: DomainEvent — бизнес-факты агрегатов; отдельный admin/security audit — привилегированные административные и security-sensitive действия. Для одной административной команды над бизнес-агрегатом допустимы обе записи, атомарно связанные command_id/correlation_id;
+- текущие ORM/migration не содержат event_version, command_id, correlation_id и command ledger; append-only grants/triggers в initial migration упомянуты как требование-комментарий, а не реализованная гарантия;
+- рекомендован command ledger с уникальным command_id, server-side canonical input hash, versioned result payload и атомарной записью вместе с изменениями агрегата и событиями. Одинаковый ключ/вход возвращает сохранённый результат; повторное использование ключа с другим входом конфликтует; разные ключи на один агрегат сериализуются блокировкой агрегата.
+
+Остаточные технические вопросы: canonicalization/hash contract, перечень replayable negative outcomes, retention ledger, полный inventory consumers и точная схема admin/security audit. Изменена только Markdown-документация. Исходники, миграции, тесты, workflows и deployment не менялись; PostgreSQL, SQL, Alembic, pytest и CI не запускались. UX-06 остаётся в работе; реализация не разрешена.
