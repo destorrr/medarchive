@@ -41,6 +41,16 @@ DomainEvent защищён триггером `medarchive_domain_events_append_o
 
 **Вывод:** по репозиторию нельзя подтвердить, что production runtime использует отдельную ограниченную роль, а миграции — отдельную привилегированную. Нельзя также утверждать, что runtime не является владельцем таблиц или не имеет DDL/широких DML прав. Это требует отдельной проверки конкретного окружения.
 
+### 2.4 Deployment templates
+
+Проверены также `docker-compose.yml`, `scripts/install.sh` и `scripts/medarchive.service`:
+
+- Docker Compose поднимает локальный PostgreSQL с одной ролью/пользователем `medarchive`; это dev-конфигурация с простым паролем, не production role model.
+- Installer создаёт системного Linux-пользователя `medarchive` и шаблон `/etc/medarchive/medarchive.env`, но не создаёт PostgreSQL roles, базы, grants или owner role. Он оставляет `MEDARCHIVE_DATABASE_URL` как placeholder `USER:PASSWORD@HOST` и просит администратора обеспечить подключение.
+- systemd запускает web-приложение от Linux-пользователя `medarchive` и читает единый env-файл. Этот Linux account не является автоматически отдельной PostgreSQL role.
+
+Это подтверждает, что provisioning PostgreSQL privileges и разделение runtime/migration identities должны быть определены операционной процедурой либо добавлены в будущий deployment contract. В текущем installer нет такого provisioning.
+
 ## 3. SQLAlchemy sessions и транзакционные границы
 
 ### 3.1 Adapter и dependency
