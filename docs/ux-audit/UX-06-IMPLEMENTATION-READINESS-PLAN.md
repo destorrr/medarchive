@@ -436,3 +436,11 @@ UX-06 теперь имеет согласованный набор проект
 - обеспечить атомарную корреляцию admin/security audit и DomainEvent, если одна административная команда меняет бизнес-агрегат.
 
 Это продуктовое решение закрыто; остаются технические задачи разделения audit ownership, schema, permissions, consumers и миграции исторических admin.* событий.
+
+## 13. DomainEvent consumer/producer inventory — уточнение 2026-11-18
+
+Read-only inspection at HEAD f0d4e60 identified PostgreSQL event producers in card intake, card custody, archive workflow, shipment workflow and PostgreSQL admin service. The admin service currently emits 13 `admin.*` event types for branch, courier, shelf and user create/update/activation mutations. These belong in the target admin/security audit, not the target business DomainEvent stream.
+
+Identified consumers: dashboard recent movements, global `/history`, shipment aggregate detail timeline, `/admin/audit`, and a shipment-specific exception-resolution detail read. The current admin audit template renders the full JSON payload. Tests statically inspected cover the 13 admin event types, actor attribution, password-hash exclusion, audit filtering/rendering, append-only trigger presence, shipment event assertions and branch history fixtures. Tests were not run.
+
+Additional blockers: prove security-event coverage beyond administrative CRUD; define payload allowlists/redaction and PII retention; inventory external/background/export consumers; preserve old admin.* evidence through a non-destructive migration; and define atomic dual-write/correlation when an administrative command also changes a business aggregate. No schema or source changes authorized.

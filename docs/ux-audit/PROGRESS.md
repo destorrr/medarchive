@@ -1588,3 +1588,13 @@ Gate status: бизнес-модель в основном согласован�
 Статически раскрыт _search_context: branch/archive/central_office ограничены текущей Location и отправлениями in_transit; admin имеет глобальный поиск; viewer также технически проходит search endpoints без location scope, что противоречит D-06. DTO поиска карт возвращает ФИО и сведения о статусе/размещении, но не номер карты. HTTP tests и проверка object detail endpoints не выполнялись.
 
 Изменяется только Markdown-документация. Исходники, тесты, миграции, workflows, deployment и данные не менялись; PostgreSQL, SQL, pytest и CI не запускались.
+
+## 2026-11-18 — DomainEvent producer/consumer inventory (статическое продолжение)
+
+На HEAD f0d4e60 дополнен read-only inventory:
+- producer paths: PostgreSQL card intake, card custody, archive workflow, shipment workflow and admin service;
+- PostgreSQL admin service emits 13 current `admin.*` types for branch/courier/shelf/user mutations; they должны перейти в отдельный admin/security audit, а не оставаться в целевом DomainEvent;
+- identified consumers: dashboard recent movements, global /history, shipment aggregate timeline, /admin/audit, shipment exception-resolution detail; audit template renders the full JSON payload;
+- static tests inspected: admin integration checks 13 event types, actor attribution, password-hash exclusion and audit filters; schema integration checks append-only trigger/indexes; shipment workflow tests assert event types; branch history tests seed events.
+
+Open gaps: complete security-event coverage, event payload allowlists/PII retention, object detail timelines for card/box/request, external/jobs/export consumers, and non-destructive migration of historical admin.* evidence. Test source was inspected but not executed. Only Markdown documentation changed; no source, ORM, tests, migrations, workflows, deployment or data changed; PostgreSQL, SQL, pytest and CI were not run.
