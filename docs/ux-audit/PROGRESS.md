@@ -1670,3 +1670,8 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 - `other` — «Прочие причины».
 
 При создании заявки ЦО выбирает одно значение. В техническом контракте используется стабильный код, UI показывает русскую подпись; произвольные значения не допускаются. Свободное пояснение остаётся необязательным, в том числе при выборе «Прочие причины». Продуктовый каталог оснований P-04 согласован. Изменена только Markdown-документация; исходники, схема, миграции, API/UI, тесты и deployment не менялись.
+
+
+## 26. P-07 — проект allowlist административных корректировок (2026-11-18)
+
+Подготовлен для решения владельца продукта ограниченный перечень корректировок: clerical card metadata; текущая custody/location; текущий BoxCycle/membership; BoxPlacement; отдельная компенсационная коррекция ошибочного списания карты. Предложено запретить переписывание shipment route/manifest/handover/receipt/completion, ArchiveRequest items/outcomes и исходных event actor/time/payload. Все допустимые операции — только typed protected commands, с причиной, ссылкой на исходный факт, actor/time, state guards, append-only DomainEvent и атомарной admin/security audit записью. Это предложение, не утверждённое решение и не разрешение на реализацию. Изменена только Markdown-документация.

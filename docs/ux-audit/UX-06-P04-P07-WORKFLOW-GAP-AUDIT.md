@@ -94,3 +94,24 @@ The audit store may record that a correction was authorized/performed, but the c
 - P-07 blocks the admin correction UI, command allowlist, event correction semantics, DB grants and negative/positive role tests.
 - Neither gap blocks continuing read-only audits or unrelated UX-06 documentation.
 - No source code, tests, migrations, schema, workflows or deployment files were changed by this audit.
+
+
+### Proposed P-07 allowlist for product-owner review (not yet approved)
+
+The following is a constrained proposal, not an implementation authorization or an approved product decision. The guiding rule is to correct a demonstrably wrong current business fact through a typed compensating command; never edit or delete the original event, and never use admin authority to bypass an ordinary workflow.
+
+| Category | Proposed admin correction | Guardrails / exclusions |
+|---|---|---|
+| Card master data | Correct explicitly designated clerical metadata fields only | No arbitrary patch; no silent replacement/merging of card identity; changes to card number or patient identity require a separately specified identity-reconciliation process and must retain old/new values under restricted audit |
+| Card custody / current location | Correct a demonstrably wrong current custody/location assignment | Only when no active shipment, unprocessed archive request, external-storage state or incompatible placement exists; append compensating custody/location event; do not fabricate or rewrite a handover |
+| Box / BoxCycle | Correct current-cycle association or membership when the recorded association is demonstrably wrong | Never reuse or rewrite a prior cycle ID; preserve cycle sequence; reject if either object participates in an active shipment/request or the correction would violate box/card composition rules |
+| Box placement | Correct current BoxPlacement (wrong shelf / missing or duplicate active placement) | Validate active shelf, archive custody and one-active-placement invariant; append placement correction; do not create CardPlacement or place individual cards on shelves |
+| Shipment route, manifest, handover, receipt, completion | No admin rewrite of route, manifest, sender/receiver confirmation, handover or completed receipt | Before handover use the ordinary shipment/request workflow; after handover or completion preserve the original evidence and resolve discrepancies through separately typed compensating facts, not manifest edits |
+| Archive request items / outcomes | No generic admin edit of request composition or result | Use the P-06/P-09 actor-specific workflow; not_found remains final; preserve archive removal reason and all request history |
+| Card write-off | A narrowly scoped correction of an erroneous completed write-off | Dedicated command only; mandatory reason, reference to original write-off event, actor/time, atomic admin/security audit and compensating business event; never delete the write-off event. This does not grant generic status editing |
+| Historical event actor, timestamp, payload or deletion | Prohibited | Source event remains immutable. If attribution itself is wrong, append a separately typed attribution-correction event with evidence and reference; original actor/time/payload remain visible as originally recorded |
+| User, role, reference data | Existing admin CRUD remains governed by its own D-15 rules | Not a P-07 historical business correction; changes must not rewrite past event attribution or retroactively change permissions recorded at event time |
+
+**Common command contract proposed for every allowed correction:** allowlisted command and field set; nonblank reason; target aggregate and original event/fact reference; authenticated admin actor; state/scope/invariant validation; idempotent command ID; append-only typed DomainEvent for the business correction plus atomic admin/security audit record; before/after values restricted to the allowlisted fields; no arbitrary JSON patch or direct runtime DML. Sensitive card/patient values must be minimized in audit payloads and shown only to roles already authorized for the object.
+
+**Product decisions requested:** approve or amend the category allowlist, especially (1) whether any card master-data fields may be corrected and whether card number/patient identity are categorically excluded pending a dedicated reconciliation flow; (2) whether current custody/location, BoxCycle membership and BoxPlacement corrections are allowed under the guards above; (3) whether the dedicated erroneous-write-off correction is in scope for admin; and (4) confirm that shipment/request history and original event attribution/payload are never overwritten.
