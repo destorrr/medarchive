@@ -379,32 +379,26 @@ Production cutover не допускается, пока не выполнены
 
 Эти вопросы не отменяют ранее утверждённые D/P/DB-SEC решения, но влияют на DDL и rollout. Они должны быть закрыты до соответствующего этапа.
 
-### Продуктовые/операционные — требуют решения владельца продукта
-1. **P-04/D-13 — списание медицинской карты:** определить основания, подтверждения и обязательные поля для инициирования ЦО и исполнения архивом. Открыто.
-2. **P-07 — admin correction:** утвердить allowlist корректирующих действий, допустимые состояния, обязательные причины и границы before/after audit. Открыто.
+### Продуктовые/операционные
+1. **P-04/D-13 — списание карты:** какие основания, подтверждения и обязательные поля нужны для инициирования ЦО и исполнения архивом.
+2. **P-07 — admin correction:** точный allowlist корректирующих действий, механизм before/after и защиты неизменяемой истории.
+3. **D-10/P-03 — физическая тара и BoxCycle:** точная связь повторно используемой физической тары с последовательными логистическими циклами и правила её идентификации.
+4. **D-17 — QR карты:** фактический payload и parser contract должны быть извлечены из исходников/тестов и подтверждены до реализации; формат не менять.
+5. **D-06 — viewer:** отдельная стратегия миграции существующих пользователей и legacy ACL.
+6. **D-03 — incidents:** отдельный план вывода legacy incident UI/data paths, без возврата понятия incident в целевой процесс.
 
-### Миграционные и операционные планы — не новые продуктовые решения
-3. **D-06 — viewer:** подготовить стратегию миграции существующих пользователей и legacy ACL; read-only аудит выявил потенциально чрезмерный history scope. Не закрыто.
-4. **D-03 — legacy incidents:** подготовить отдельный план retirement/reconciliation старых exception shipment paths и UI, не возвращая incident в целевой процесс. Не закрыто.
-
-### Технические решения и доказательства — требуют завершения до соответствующих DDL/cutover gates
-5. **DB command idempotency:** аудит рекомендовал command ledger с уникальным command_id, server-side canonical input hash и версионируемым сохранённым результатом. Техническая рекомендация описана, но точные canonicalization, replayable negative outcomes и retention не утверждены. Не закрыто.
-6. **DB result contract:** предварительно предпочтён versioned JSON result envelope с result_code/result_version; требуется зафиксировать контракт и error mapping. Не закрыто.
-7. **DB schemas:** выбрать public или отдельные app/api schemas. Не закрыто.
-8. **RLS/actor context:** определить необходимость RLS и окончательный механизм actor/scope enforcement; GUC не считать доказательством actor identity. Не закрыто.
-9. **Login throttle:** выбрать SECURITY DEFINER command path либо строго ограниченные права; сохранить отсутствие широкого runtime DML. Не закрыто.
-10. **Bootstrap:** спроектировать отдельный безопасный bootstrap path для первого admin и system locations с учётом owner/migrator/runtime principals. Не закрыто.
-11. **Infrastructure principals:** определить backup/restore/monitoring/maintenance permissions по фактической deployment topology. Не закрыто.
-12. **DomainEvent consumers:** имеющийся аудит выявил admin audit page и shipment history read path, но полный inventory всех внутренних/внешних consumers и compatibility plan не завершён. Не закрыто.
-13. **Read permissions:** завершить таблицу SELECT/views/PII/scope по каждой роли и проверить фактическую ACL/RLS на целевой среде. Не закрыто.
-14. **Rollout compatibility:** определить поддерживаемые версии приложения и dual-path период. Не закрыто.
-15. **Legacy retention:** определить период read-only хранения CardPlacement и критерии безопасного удаления. Не закрыто.
-
-### Технические вопросы, закрытые read-only аудитом
-- **D-10/P-03 — физическая тара и BoxCycle:** текущая модель уже разделяет постоянную физическую тару Box и последовательные BoxCycle; ORM и интеграционные тесты подтверждают связь BoxCycle.box_id и повторное использование тары с новым циклом. Осталось сохранить эту семантику в target schema и миграции; отдельного продуктового решения сейчас не требуется.
-- **D-17 — QR карты:** фактический parser contract извлечён из кода и интеграционных тестов; формат не менять. Перед реализацией сохранить совместимость и включить регрессионные проверки.
-- **DomainEvent append-only UPDATE/DELETE:** миграция 0002 создаёт trigger и trigger function, запрещающие UPDATE/DELETE. Это не доказывает отсутствие INSERT abuse или обхода через привилегированные principals; effective grants и trigger bypass проверяются на preflight/cutover.
-- **DomainEvent ownership и command ledger:** разделение authoritative records и рекомендуемая ledger-модель описаны в UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md; это проектная рекомендация, не реализованная схема и не согласование всех параметров.
+### Технические
+7. **DB command idempotency:** command ledger schema, input hash и typed result persistence.
+8. **DB result contract:** composite types или версионированный JSON contract; выбрать один стабильный подход.
+9. **DB schemas:** сохранить public или ввести отдельные app/api schemas.
+10. **RLS/actor context:** требуется ли RLS дополнительно и как исключить подделку actor context runtime ролью.
+11. **Login throttle:** SECURITY DEFINER functions или узкие table grants.
+12. **Bootstrap:** отдельный principal и безопасный процесс первого admin/system locations.
+13. **Infrastructure principals:** точные backup/restore/monitoring/maintenance permissions под deployment topology.
+14. **DomainEvent consumers:** полный список consumers и compatibility plan.
+15. **Read permissions:** минимальный набор SELECT/views для PII и проверка scope по каждой роли.
+16. **Rollout compatibility:** поддерживаемые версии приложения и срок dual-path режима.
+17. **Legacy retention:** срок read-only хранения CardPlacement и условия будущего удаления.
 
 Не следует задавать эти вопросы повторно, если соответствующее решение уже дано в проектной переписке; этот список — реестр для закрытия только оставшихся пунктов.
 
@@ -424,4 +418,4 @@ UX-06 теперь имеет согласованный набор проект
 
 Это означает, что основные технические зависимости и последовательность будущей реализации описаны. Это **не означает**, что все открытые решения закрыты или что реализация разрешена.
 
-Следующий шаг — закрыть два продуктовых решения P-04/D-13 и P-07, завершить технические контракты/инвентаризации из раздела 10, выполнить read-only preflight по данным и deployment на согласованной непроизводственной копии, затем пройти итоговую проверку согласованности и Gate 0–2. UX-06 может быть представлен к рассмотрению после этих действий; реализация и production cutover требуют отдельных разрешений и gates.
+Следующий шаг — провести итоговую проверку UX-06 на противоречия между документами и отдельно сформировать короткий перечень решений, которые действительно требуют владельца продукта. После этой проверки UX-06 можно представить к рассмотрению и запросить отдельное разрешение на реализацию.

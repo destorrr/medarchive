@@ -136,3 +136,37 @@ Read-only preflight/инвентаризация должна дополните
 - Не проверялись production credentials, внешние ACL, deployment role memberships и backup/restore.
 - Исходники, ORM, API/UI, tests, migrations, workflows и deployment не изменялись.
 - Этот документ — технический аудит и план preflight/retirement, а не разрешение на реализацию и не решение о судьбе конкретных пользовательских записей.
+
+
+## 5. Дополнительная проверка role-scoped history/search read paths
+
+При последующей проверке postgresql_dashboard.py обнаружены два важных расхождения с D-06/D-08/D-16.
+
+### 5.1 Branch сохраняет историю карты после ухода из филиала
+
+В postgresql_history_page для роли branch подзапрос visible_cards фильтруется по Card.origin_branch_id == user.branch_id. Комментарий рядом с кодом прямо описывает сохранение доступа к audit trail зарегистрированной карты после её ухода из помещения филиала.
+
+Это расходится с D-08: после передачи карты из филиала в архив исходный филиал не видит дальнейшую историю карты. Право просмотра собственного shipment manifest по P-08 не расширяет доступ к последующим событиям карты.
+
+Статический вывод: текущая выборка потенциально включает события карты после её передачи из филиала. HTTP-поведение и реальные данные не проверялись. Target predicate должен ограничивать историю филиала событиями до/в пределах его участия, а не постоянным origin_branch_id. Shipment history участника сохраняется отдельно по P-08.
+
+### 5.2 Viewer и admin получают глобальный /history
+
+Тот же route разрешает роли branch, archive, central_office, viewer, admin. event_filters инициализируется пустым списком и заполняется только для трёх операционных ролей. Для viewer и admin history_filter становится None, поэтому запрос к DomainEvent выполняется без role/aggregate scope.
+
+- Для viewer это прямое расхождение с D-06: роль исключена из целевой системы и не должна получать доступ к history/search.
+- Для admin это требует согласования D-07 с D-16. D-07 сохраняет глобальный доступ admin к данным и истории, но D-16 требует оставить глобальным только административный/security audit, а операционную историю показывать в карточках объектов. Нельзя автоматически трактовать D-07 как разрешение на отдельный глобальный operational event feed.
+
+### 5.3 Search route
+
+В просмотренном search handler postgresql_search_results также явно разрешает viewer наряду с операционными ролями и admin. Полный анализ _search_context/всех search query scopes требуется завершить; текущий факт достаточен для отдельного negative gate на блокировку viewer.
+
+### 5.4 Требуемые действия
+
+1. В миграционном плане D-06 предусмотреть блокировку viewer до/во время cutover, preflight его account references и negative tests для всех search/history endpoints.
+2. Перепроектировать branch history predicate по D-08; сохранить P-08 доступ только к манифестам собственных отправлений.
+3. Зафиксировать явную трактовку D-07 × D-16 для admin: глобальный просмотр карточек/их истории через object detail не должен незаметно превращаться в global operational journal.
+4. Admin audit должен читать отдельный admin/security audit source после его внедрения; не считать текущий фильтр admin.* в DomainEvent целевой реализацией.
+5. Добавить negative tests: branch не видит события карты после handover в архив; viewer получает отказ на search/history; admin не получает глобальный operational feed, если отдельное продуктовое решение не разрешит его явно.
+
+Проверка статическая по исходнику. HTTP tests, PostgreSQL, pytest и CI не запускались. Исходники не менялись.

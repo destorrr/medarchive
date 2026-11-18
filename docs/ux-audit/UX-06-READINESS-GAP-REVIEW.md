@@ -83,3 +83,11 @@
 ## 7. Граница аудита
 
 Изменяются только проектные документы. Код приложения, ORM, API/UI, tests, migrations, workflows, deployment и данные не менялись. PostgreSQL/pg_catalog, SQL, Alembic, pytest и CI не запускались. Фактические ACL, production data state и operational deployment не проверялись.
+
+## 8. Дополнительный security/role-scope finding
+
+Последующая статическая проверка postgresql_dashboard.py выявила, что /history для branch строит visible_cards по Card.origin_branch_id, сохраняя историю после ухода карты из филиала. Это расходится с D-08; P-08 даёт только просмотр собственного shipment manifest, а не дальнейшей истории карты.
+
+Тот же route разрешает viewer и admin, но для этих ролей event_filters остаётся пустым, что приводит к выборке DomainEvent без role/aggregate scope. Viewer route access — расхождение с D-06. Для admin требуется явная трактовка D-07 × D-16: глобальный доступ к объектам/истории не следует автоматически приравнивать к глобальному operational event feed.
+
+Search handler также явно разрешает viewer; полный search-scope review ещё требуется. Эти находки повышают приоритет D-06 containment и должны войти в preflight/negative-test gates. Проверка статическая; HTTP tests не запускались.
