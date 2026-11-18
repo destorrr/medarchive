@@ -1405,3 +1405,17 @@ UX-05 остаётся в работе. Изменены только проек
 - Предложены единый Unit of Work, стабильный lock order, транзакционные сценарии P-06/P-09/D-02, idempotency и typed DomainEvent contract; отдельная RequestEvent не рекомендуется без отдельного основания.
 - Документ содержит rollout additive-first, критерии готовности и четыре вопроса владельцу продукта. Все положения — проектные предложения; реализация не разрешена.
 - Изменены только Markdown-документы; PostgreSQL, SQL, Alembic, pytest и CI не запускались.
+
+
+## 2026-11-18 — согласованы решения UX-06 по DB security
+
+Владелец продукта принял все четыре решения из `UX-06-DB-SECURITY-TRANSACTION-ARCHITECTURE.md`:
+
+- **DB-SEC-01:** базовая модель `application-authenticated actor`, без отдельного identity broker; ограничение доверия к application layer явно сохраняется.
+- **DB-SEC-02:** защищённые DB-команды для критических переходов и запрет прямого runtime DML на критичные workflow-таблицы после поэтапного миграционного перехода.
+- **DB-SEC-03:** общий append-only `DomainEvent` с типизированными версионируемыми событиями; отдельная `RequestEvent` не вводится.
+- **DB-SEC-04:** три PostgreSQL principals — `medarchive_owner` NOLOGIN, `medarchive_migrator` LOGIN, `medarchive_runtime` LOGIN — с разными учётными данными и отдельными connection URLs.
+
+Решения вынесены в отдельный документ `PRODUCT-DECISIONS-DB-SECURITY.md`; архитектурный документ обновлён, вопросы владельцу продукта закрыты. Это утверждение проектной архитектуры, не разрешение на реализацию. Исходники, DDL, миграции, тесты и deployment configuration не менялись.
+
+Следующий шаг UX-06: read-only сопоставление DB-команд с текущими ORM-моделями, таблицами, workflow services и consumers DomainEvent; затем детальная спецификация контрактов и grants matrix.
