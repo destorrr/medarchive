@@ -1435,3 +1435,21 @@ UX-05 остаётся в работе. Изменены только проек
 - provisioning owner/migrator/runtime и command boundary в проверенных миграциях не обнаружены.
 
 Статический аудит, без запуска БД/SQL/Alembic/pytest/CI. Код, миграции, тесты и deployment configuration не менялись. Следующий шаг — полный inventory критичных DML paths и спецификация контрактов P-06/P-09/D-02.
+
+
+## 2026-11-18 — инвентаризация PostgreSQL DML paths и principals
+
+Создан документ `UX-06-DB-DML-AND-PRINCIPALS-INVENTORY.md`.
+
+Инвентаризированы основные write paths: card intake/QR, packing и BoxCycle membership, archive placement, per-card archive requests, shipment handover/receipt, external custody, admin справочники/пользователи, system-location bootstrap, first-admin CLI, login throttle и Alembic. Отдельно отмечен legacy SQLite cleanup script, не являющийся PostgreSQL runtime path.
+
+Зафиксировано:
+- workflow services выполняют ORM mutations/DomainEvent inserts и flush на общей AsyncSession;
+- routers завершают транзакции ручными commit/rollback;
+- Database.transaction() существует, но не является общим используемым use-case boundary;
+- admin.* события пока пишутся в DomainEvent, что требует отдельного security/admin audit контура;
+- login throttle имеет raw SQL upsert/delete и требует отдельного минимального runtime permission path;
+- текущий CLI bootstrap использует обычный effective database URL;
+- предварительная матрица owner/migrator/runtime сформирована, но фактические PostgreSQL grants не проверялись.
+
+Статический read-only этап; код, миграции, тесты и deployment не менялись. PostgreSQL/Alembic/pytest/CI не запускались. Следующий этап — детальные контракты DB-команд для P-06/P-09/D-02, упаковки, приёмки, custody и admin operations.
