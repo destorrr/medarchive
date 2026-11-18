@@ -521,3 +521,8 @@ Consumer inventory остаётся неполным в части внешни�
 Добавлен `UX-06-DOMAIN-EVENT-CONSUMER-INVENTORY.md`. В просмотренных PostgreSQL router paths перечислены consumers dashboard recent movements/history, shipment detail timeline, admin audit и точечное чтение shipment exception resolution. Поправка: legacy `/history` вызывает `MovementService.get_recent_movements` и читает SQLite `card_movements`, а не PostgreSQL `DomainEvent`; прежние упоминания этого legacy route как DomainEvent consumer неточны. Backup использует полный `pg_dump` и не является прикладным event consumer. В просмотренном source tree не обнаружены app-level queue worker, outbox dispatcher или webhook publisher; внешние/серверные jobs этим не исключаются.
 
 Readiness остаётся открытым до подтверждения внешних consumers/deployment jobs и effective DB grants. Не менять event types/payload/retention до такого подтверждения. Только Markdown документация; runtime проверки не выполнялись.
+
+
+## 21. P-04 — mandatory structured write-off reason approved (2026-11-18)
+
+Владелец продукта подтвердил обязательный структурированный код основания для заявки ЦО на списание медицинской карты; свободный комментарий необязателен и сохраняется, если предоставлен. Решение закрывает вопрос обязательности кода/комментария, но каталог кодов ещё требуется определить. Открыты необходимость внешнего акта/вложения, второго подтверждающего сотрудника архива и правила отмены заявки. Полномочия P-04 не меняются: ЦО инициирует, архив исполняет. Только Markdown; реализации и тестов нет.
