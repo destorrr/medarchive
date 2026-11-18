@@ -1473,3 +1473,12 @@ UX-05 остаётся в работе. Изменены только проек
 Это проектная матрица, не фактический аудит ACL: подключения к PostgreSQL и проверки pg_catalog не было. SQL GRANT/REVOKE, роли, схемы, функции, миграции, исходники, тесты и deployment не менялись. PostgreSQL/Alembic/pytest/CI не запускались.
 
 Следующий шаг UX-06 — consolidated implementation/readiness plan: зависимости, последовательность миграции, preflight, критерии допуска, rollback и открытые решения перед отдельным разрешением на реализацию.
+
+
+## 2026-11-18 — сводный implementation/readiness plan UX-06
+
+Создан документ `UX-06-IMPLEMENTATION-READINESS-PLAN.md`. Сведены зависимости и очередность будущей реализации: baseline/preflight, закрытие контрактов, DB security foundation, additive schema, backfill/reconciliation, вертикальный перевод storage/request/shipment/admin workflows, per-aggregate privilege cutover, hardening и legacy retirement.
+
+Добавлены контрольные Gate 0–7, транзакционная матрица P-06/P-09/D-02, обязательные DB/auth/concurrency/idempotency tests, evidence package, правила Alembic additive-first и rollback/restore. Отдельно перечислены остающиеся продуктовые и технические решения; ранее согласованные D/P/DB-SEC решения не пересматриваются.
+
+Документ не разрешает реализацию. Исходники, ORM, API/UI, тесты, миграции, workflows и deployment не менялись; PostgreSQL, SQL, Alembic, pytest и CI не запускались. Следующий этап — read-only cross-document consistency review UX-06 и сведение только действительно открытых решений для владельца продукта.
