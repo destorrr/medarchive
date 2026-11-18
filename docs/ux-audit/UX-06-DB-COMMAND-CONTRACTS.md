@@ -438,3 +438,14 @@ HTTP mapping остаётся responsibility API adapter, не DB command: ус�
 - Детерминированные бизнес-отказы сохраняются только после успешной авторизации. Ошибки envelope/identity/access и временные инфраструктурные ошибки не превращаются в терминальные бизнес-результаты.
 
 Согласование не утверждает конкретные календарные сроки retention для обычных команд: они будут определены после инвентаризации retry horizons и требований к хранению.
+
+
+### 11.9 Authoritative event and audit ownership (technical contract)
+
+The two append-only stores have distinct authority; they are not duplicate copies of one event stream:
+
+- **DomainEvent** is authoritative for the business fact and aggregate state transition, including a correction to card, custody, BoxCycle, BoxPlacement, shipment or archive-request domain state.
+- **AdminSecurityAudit** is authoritative for the privileged/security action: authenticated admin actor, action/command, mandatory reason, authorization/outcome, target aggregate, and references to the resulting DomainEvent and command/correlation IDs.
+- A P-07 command that changes a business aggregate writes one typed DomainEvent and one linked AdminSecurityAudit record in the same transaction. The audit record does not duplicate the full business before/after payload; it contains only allowlisted security context and references. DomainEvent does not become the global admin/security feed.
+- Pure admin CRUD and authentication/authorization/security events write AdminSecurityAudit only; they do not create a business DomainEvent unless a future explicitly approved domain event is required for a separate aggregate.
+- If either required write fails, the entire privileged mutation rolls back. No success response may be returned for a partially audited correction.

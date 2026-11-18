@@ -157,3 +157,8 @@ Tests are proposed only; none were executed.
 - No unrestricted audit payload viewer.
 - No assumption that ordinary admin object reads all require durable audit events.
 - No changes to authentication/session behavior, schema, code, tests, workflows or deployment in this documentation stage.
+
+
+## 10. P-07 audit ownership clarification (2026-11-18)
+
+For privileged business corrections, `DomainEvent` is authoritative for the corrected business fact; `AdminSecurityAudit` is authoritative for the fact that an administrator invoked the privileged correction, with actor, mandatory reason, outcome, target and references. Both are committed atomically under the same command/correlation context, but the audit record does not duplicate the full business payload. Pure admin CRUD and auth/security events use AdminSecurityAudit only. This is aligned with DB-SEC-03: one business DomainEvent stream, no RequestEvent and no global operational feed.

@@ -95,3 +95,13 @@ Search handler также явно разрешает viewer; полный searc
 ## 6. P-04/P-07 static workflow inventory (2026-11-18)
 
 Добавлен `UX-06-P04-P07-WORKFLOW-GAP-AUDIT.md`. В inspected PostgreSQL source найден `write_off_box`, но не найдено отдельного medical-card write-off command/route; текущие Card statuses не определяют процесс D-13/P-04. Admin service/pages содержат справочный CRUD, но explicit corrective commands по business aggregates не найдены; `correction_of_event_id` в DomainEvent model не доказывает реализованную коррекцию. P-04 и P-07 требуют продуктового allowlist/evidence решения перед соответствующей реализацией. Source-only inspection; runtime/tests не запускались.
+
+
+## 9. Актуализация статусов после решений P-04/P-07 (2026-11-18)
+
+Разделы 2 и 6 выше содержат исторический snapshot на дату исходной сверки. Их прежние статусы P-04/P-07 «открыто» superseded последующими решениями владельца продукта и текущими документами `PRODUCT-DECISIONS-D-01-D-18.md`, `UX-06-P04-P07-WORKFLOW-GAP-AUDIT.md` и `UX-06-IMPLEMENTATION-READINESS-PLAN.md`:
+- P-04/D-13 продуктово закрыто: согласованы workflow, границы отмены, исполнитель и закрытый каталог оснований.
+- P-07 продуктово закрыто по категориям/запретам; точный field-level allowlist карточки ещё требует решения, предложен кандидат `Card.phone`.
+- Command idempotency lifecycle/hash/replay/tombstone утверждён как технический стандарт; остаются ordinary-command TTL, итоговый result envelope/API mapping и эксплуатационные горизонты retry.
+
+Это обновление статуса не означает выполнения миграций, DDL, тестов или implementation readiness sign-off.
