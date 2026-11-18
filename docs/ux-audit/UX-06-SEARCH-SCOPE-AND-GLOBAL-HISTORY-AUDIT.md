@@ -109,3 +109,41 @@ These are source-level test assertions inspected statically. They were not execu
 - enumerate security-sensitive actions and decide which events must be recorded;
 - define audit schema, event catalog/versioning, payload allowlists, read permissions, retention, migration and atomic dual-record contract;
 - perform HTTP/DB negative tests only in a separately authorized implementation/verification stage.
+
+
+## 8. Object detail visibility и dashboard global feed — статическое уточнение HEAD d132839
+
+### 8.1 Admin: текущий доступ и недостающие object detail surfaces
+
+- Глобальный search допускает admin, но результат карты содержит ФИО/статус/размещение и не содержит номера карты; карточки результатов в search_fragment.html не являются ссылками на объект.
+- В inspected PostgreSQL routers нет универсального card detail route или box detail/history route. /boxes/{box_id}/label — отдельный printable label route; он явно разрешает admin для любой активной коробки, но не предоставляет object history.
+- /shipments/{shipment_id} содержит manifest и DomainEvent timeline, но shipment_reader допускает только branch, central_office и archive. _user_location для admin пытается найти Location.kind='admin' и возвращает None; handler отвечает 403. Следовательно, admin не может открыть этот полноценный shipment detail через штатный route.
+- /admin/incidents/{shipment_id} — специальный legacy exception/incident detail route, не универсальная карточка отправления; он не заменяет целевой object detail, а его процесс подлежит D-03 retirement.
+- /requests показывает только активную очередь и доступен archive role; отдельного object detail route для ArchiveRequest не обнаружено.
+- Единственная подтверждённая полноценная object timeline — shipment detail для sender/receiver roles. Card, box и archive request timelines в просмотренном наборе PostgreSQL routes не обнаружены.
+
+Целевое следствие D-07: admin должен иметь отдельный global object-detail authorization path, не требующий фиктивной operational Location. Он должен давать глобальный доступ к объектной карточке и её истории, включая идентифицирующие данные, но не создавать global operational feed. Для остальных ролей остаются отдельные object-level scope predicates; D-08 ограничивает историю исходного branch после handover, P-08/D-09 регулируют manifest sender/receiver access.
+
+### 8.2 Dashboard: подтверждённая global operational feed утечка
+
+В postgresql_dashboard.py dashboard handler строит recent events как SELECT DomainEvent ORDER BY occurred_at DESC LIMIT 5. Фильтр по current Location применяется только для branch, central_office и archive. Для admin и viewer фильтра нет. dashboard.html отображает эти записи в секции «Последние движения».
+
+Это прямое несоответствие D-16 и принятому уточнению D-07 × D-16: admin получает global operational feed на dashboard, хотя глобальная лента должна содержать только admin/security audit. Viewer также получает эту ленту, что дополнительно противоречит D-06.
+
+Целевое поведение:
+- admin dashboard не показывает global operational DomainEvent feed; вместо него допустимы административные/security audit summaries либо отсутствие глобального event feed;
+- viewer исключается из dashboard route и всех связанных UI/read paths в рамках D-06 migration;
+- operational roles сохраняют recent movements только в своей Location scope;
+- admin сохраняет глобальные счётчики и поиск/карточки объектов, но object history открывает по конкретному объекту.
+
+### 8.3 Негативные проверки для будущей реализации
+
+1. Admin может открыть card/box/shipment/archive-request object detail и его timeline глобально, не имея Location.kind='admin'.
+2. Admin dashboard не содержит operational DomainEvent feed и не показывает глобальные движения карт/коробок/отправлений.
+3. Admin global audit показывает только admin/security audit records; operational shipment/card events там отсутствуют.
+4. Sender/receiver сохраняют manifest и shipment timeline после завершения по P-08/D-09.
+5. Branch не получает card timeline events after handover to archive (D-08).
+6. Search result карточки не обещают ссылку на object detail, пока соответствующий route и visibility guard не существуют.
+7. Archive request detail остаётся ограничен разрешёнными ролями; чужая роль не получает manifest/request PII.
+
+Ограничение: это статическое чтение PostgreSQL routers/templates; HTTP responses, tests и DB policies не исполнялись.

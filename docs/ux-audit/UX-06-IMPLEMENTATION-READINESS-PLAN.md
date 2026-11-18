@@ -449,3 +449,20 @@ Additional blockers: prove security-event coverage beyond administrative CRUD; d
 ## 14. Command idempotency — уточнение технического baseline (2026-11-18)
 
 В UX-06-DB-COMMAND-CONTRACTS.md добавлено проектное предложение по UUID command_id lifecycle, server-side schema-specific canonicalization/hash, разделению command_id/correlation_id/request_id, конкурентной регистрации через unique key, replay с повторной проверкой actor/read permission, классификации negative outcomes, result envelope и retention/tombstone. Эти пункты не считаются согласованными до ответа владельца продукта. Реализация и DDL не разрешены.
+
+
+## 15. Admin object detail и dashboard feed — дополнительные UX-06 gaps (2026-11-18)
+
+Статически подтверждено:
+- admin global search существует, но search result cards не ведут на универсальные card/box detail routes; такие routes в inspected PostgreSQL router set не обнаружены;
+- shipment detail содержит manifest/timeline, но его role guard исключает admin и требует operational Location; admin-specific incident detail — только legacy exception page, не object detail;
+- archive request queue доступна archive role и отдельного request detail route не обнаружено;
+- dashboard recent movements выполняет нефильтрованный DomainEvent query для admin и viewer и показывает глобальную ленту на dashboard.
+
+Целевые требования:
+1. добавить object-scoped detail/history read surfaces для card, box, shipment и archive request; admin получает global object access без synthetic Location;
+2. убрать operational DomainEvent feed с admin dashboard; global feed только admin/security audit;
+3. закрыть viewer dashboard/search/history routes и мигрировать legacy accounts по D-06;
+4. сохранить location/participation scope для операционных ролей, D-08 для branch history и P-08/D-09 для shipment manifest.
+
+Это статические findings, не HTTP подтверждение. Код и тесты не менялись.

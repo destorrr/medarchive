@@ -1605,3 +1605,14 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 В UX-06-DB-COMMAND-CONTRACTS.md добавлен проектный baseline: UUID v4 per user intent; повтор ключа при transport retry; schema-specific canonicalization v1 и server-side SHA-256; разделение command_id/correlation_id/request_id; atomic ledger+aggregate+events+audit+result; concurrency через unique command_id; replay без повторной мутации и с повторной проверкой актуального actor/read scope; сохранение детерминированных бизнес-отказов, но не auth failures/transient errors; tombstone для защиты от повторного исполнения после очистки payload.
 
 Это предложение требует отдельного подтверждения по четырём пунктам: генерация UUID v4 и lifecycle, canonicalization/hash, политика replayable negative outcomes, retention/tombstone. Технический contract не реализован. Только Markdown изменён; исходники, ORM, тесты, миграции, workflows, deployment и данные не менялись; PostgreSQL, SQL, pytest и CI не запускались.
+
+
+## 2026-11-18 — object detail access и dashboard feed audit
+
+Статически проверены PostgreSQL routers и шаблоны:
+- admin global search выдаёт карточки результатов без ссылки на object detail; универсальные card/box detail/history routes в просмотренном наборе не найдены;
+- shipment detail timeline существует, но shipment_reader исключает admin, а _user_location требует Location.kind, поэтому admin не может открыть штатную карточку отправления; legacy /admin/incidents/{shipment_id} не является универсальной object card;
+- archive request queue доступна archive role, отдельная request detail route не обнаружена;
+- dashboard recent movements для admin и viewer загружает последние пять DomainEvent без location filter и отображается как «Последние движения» — это нарушение D-16 и D-06 соответственно.
+
+В целевой модели требуется admin global object-detail access без synthetic location, per-object timelines, отсутствие global operational feed на admin dashboard, сохранение scope для операционных ролей и отдельный admin/security audit. HTTP tests не запускались; выводы статические. Только Markdown документация изменена; source/tests/migrations/workflows/deployment/data untouched; PostgreSQL/SQL/pytest/CI не запускались.
