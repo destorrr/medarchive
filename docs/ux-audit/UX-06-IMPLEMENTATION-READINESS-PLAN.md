@@ -466,3 +466,10 @@ Additional blockers: prove security-event coverage beyond administrative CRUD; d
 4. сохранить location/participation scope для операционных ролей, D-08 для branch history и P-08/D-09 для shipment manifest.
 
 Это статические findings, не HTTP подтверждение. Код и тесты не менялись.
+
+
+## 16. Test-suite legacy access expectations (2026-11-18)
+
+Static inspection found tests that explicitly encode viewer access to /dashboard, /search, /search/results and /history, including rendering global history. These tests conflict with accepted D-06 and must be revised as part of a separately approved implementation/migration; do not treat passing legacy tests as proof of target authorization.
+
+Current tests establish operational location scope for branch/archive/central_office, but do not establish the branch post-handover history cutoff required by D-08, nor admin global object detail/timeline access required by D-07. Dashboard tests do not assert the absence of global DomainEvent movements for admin. HTTP/pytest were not run.

@@ -1616,3 +1616,15 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 - dashboard recent movements для admin и viewer загружает последние пять DomainEvent без location filter и отображается как «Последние движения» — это нарушение D-16 и D-06 соответственно.
 
 В целевой модели требуется admin global object-detail access без synthetic location, per-object timelines, отсутствие global operational feed на admin dashboard, сохранение scope для операционных ролей и отдельный admin/security audit. HTTP tests не запускались; выводы статические. Только Markdown документация изменена; source/tests/migrations/workflows/deployment/data untouched; PostgreSQL/SQL/pytest/CI не запускались.
+
+
+## 2026-11-18 — сопоставление read-scope findings с тестами
+
+Статически проверены тесты role matrix, dashboard, history, branch search/history и admin integration:
+- test_postgresql_history.py явно использует viewer и ожидает 200 на /history и /dashboard с глобальными DomainEvent fixture;
+- test_postgresql_interface_role_matrix.py включает viewer в /dashboard, /search, /search/results и /history;
+- тесты branch/archive/central search/history проверяют location scope, но не доказывают cutoff branch history после handover по D-08;
+- dashboard tests не проверяют отсутствие global operational feed для admin;
+- admin integration tests не подтверждают global object detail/history access admin и доступ к shipment detail.
+
+Это legacy test expectations, противоречащие целевым D-06/D-07/D-08/D-16; при реализации они должны быть заменены target negative/positive tests. Тесты не запускались.

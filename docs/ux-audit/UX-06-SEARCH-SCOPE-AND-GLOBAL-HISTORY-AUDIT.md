@@ -147,3 +147,14 @@ These are source-level test assertions inspected statically. They were not execu
 7. Archive request detail остаётся ограничен разрешёнными ролями; чужая роль не получает manifest/request PII.
 
 Ограничение: это статическое чтение PostgreSQL routers/templates; HTTP responses, tests и DB policies не исполнялись.
+
+
+## 9. Existing test assertions that encode legacy access (static inspection)
+
+- tests/routers/test_postgresql_history.py creates a user with role viewer and asserts /history and /dashboard return 200 and render global history data. This is explicit legacy behavior that conflicts with D-06 and must be replaced by negative access tests after the migration plan is approved.
+- tests/routers/test_postgresql_interface_role_matrix.py explicitly includes /dashboard, /search, /search/results and /history for viewer. The same test matrix does not include /shipments for admin; admin navigation is limited to dashboard/search/history/admin pages.
+- tests/routers/test_postgresql_branch_search_history.py verifies current-location scope for branch/archive/central_office but does not establish branch history cutoff after handover; the fixture includes an archived own-origin card in setup, while assertions shown for the first scenario focus on location search/history.
+- tests/routers/test_postgresql_dashboard.py checks authentication/session integration and that dashboard/search pages render for viewer; it does not assert that global operational movements are hidden.
+- tests/routers/test_postgresql_admin_integration.py verifies administrative CRUD and audit, but the inspected test inventory does not establish admin global object detail/history access or shipment detail access.
+
+No tests were executed. These are assertions found in source, not current runtime results.
