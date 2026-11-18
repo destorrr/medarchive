@@ -23,14 +23,14 @@ At minimum the target must distinguish:
 
 The write-off must be blocked while the card is in an active shipment, has an incompatible custody state, or is otherwise subject to a conflicting workflow. Exact guards and transaction boundary require DDL/workflow design.
 
-Do not infer that a free-text comment, attachment, commission act, external document number or second-person approval is mandatory; those are product choices still requiring approval. Do not reuse the box write-off operation or its rules for a medical card.
+Do not infer that a free-text comment, attachment, commission act or external document number is mandatory. The product owner has explicitly decided that an external document/act, its number and an attachment are not required and must not block initiation or execution. If external-document details are available, they may be retained as optional metadata; this does not assert that file-upload capability exists or is approved for implementation. A second-person archive approval remains an open product decision. Do not reuse the box write-off operation or its rules for a medical card.
 
 ### Decision required from product owner
 
 Define the minimum evidence/fields for initiation and execution:
 - whether a structured reason code is mandatory, and the allowed reason catalog;
 - whether a comment is required, optional or disallowed;
-- whether an external document/act reference or attachment is required;
+- external document/act reference, number and attachment are not mandatory; optional metadata retention may be considered, while file-upload capability remains a separate implementation decision;
 - whether archive execution requires a second-person confirmation or only the executing archive employee;
 - whether Central Office may cancel an unexecuted request, and at what point cancellation becomes unavailable.
 
@@ -42,7 +42,7 @@ These decisions should be made before the card write-off state machine and DB co
 - Свободный текстовый комментарий/пояснение — **необязателен**; если указан, сохраняется вместе с заявкой и историей решения.
 - Сам справочник кодов и его значения ещё требуется определить до фиксации workflow/API/DB contract. Нельзя подменять код основания произвольной строкой.
 
-Решение закрывает вопрос обязательности структурированного основания и комментария. Отдельно остаются: необходимость внешнего документа/акта или вложения, необходимость второго подтверждающего сотрудника архива, правила отмены заявки ЦО и момент запрета отмены. Полномочия остаются неизменными: ЦО инициирует, архив исполняет.
+Решение закрывает вопрос обязательности структурированного основания и комментария. Внешний документ/акт, его номер и вложение не обязательны и не могут блокировать заявку или исполнение; при наличии реквизиты можно сохранить как необязательные сведения. Это не утверждает наличие или реализацию загрузки файлов. Открытыми остаются необходимость второго подтверждающего сотрудника архива, правила отмены заявки ЦО и момент запрета отмены. Полномочия остаются неизменными: ЦО инициирует, архив исполняет.
 
 
 ## 2. P-07 — admin corrective actions
