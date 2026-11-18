@@ -1396,3 +1396,12 @@ UX-05 остаётся в работе. Изменены только проек
 - Подготовлена рекомендация: разделить runtime/migration/owner roles, закрыть прямые записи в критичные таблицы через DB command boundary, централизовать транзакционный Unit of Work и определить typed event contract. RequestEvent пока не рекомендуется без отдельного требования.
 - Создан документ UX-06-DB-SECURITY-AND-TRANSACTIONS-AUDIT.md. Это статический аудит GitHub-исходников: к PostgreSQL не подключались, grants/ownership не читали, SQL/pytest/Alembic/CI не запускали.
 - Изменены только Markdown-документы. Исходники, ORM, миграции, тесты, workflows, конфигурация БД и master не затронуты.
+
+
+### UX-06 — целевая архитектура DB security и транзакций (2026-11-18)
+- Подготовлен проект UX-06-DB-SECURITY-TRANSACTION-ARCHITECTURE.md на основе статического аудита DBSEC-01…DBSEC-06.
+- Предложены principals owner NOLOGIN, migrator LOGIN, runtime LOGIN; отдельные migration/runtime URLs; least-privilege grants и закрытые DB command functions для критичных переходов.
+- Описаны application-authenticated actor baseline и отдельный более сильный signed-assertion вариант, без смешения их гарантий.
+- Предложены единый Unit of Work, стабильный lock order, транзакционные сценарии P-06/P-09/D-02, idempotency и typed DomainEvent contract; отдельная RequestEvent не рекомендуется без отдельного основания.
+- Документ содержит rollout additive-first, критерии готовности и четыре вопроса владельцу продукта. Все положения — проектные предложения; реализация не разрешена.
+- Изменены только Markdown-документы; PostgreSQL, SQL, Alembic, pytest и CI не запускались.
