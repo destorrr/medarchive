@@ -1562,3 +1562,10 @@ UX-05 остаётся в работе. Изменены только проек
 - рекомендован command ledger с уникальным command_id, server-side canonical input hash, versioned result payload и атомарной записью вместе с изменениями агрегата и событиями. Одинаковый ключ/вход возвращает сохранённый результат; повторное использование ключа с другим входом конфликтует; разные ключи на один агрегат сериализуются блокировкой агрегата.
 
 Остаточные технические вопросы: canonicalization/hash contract, перечень replayable negative outcomes, retention ledger, полный inventory consumers и точная схема admin/security audit. Изменена только Markdown-документация. Исходники, миграции, тесты, workflows и deployment не менялись; PostgreSQL, SQL, Alembic, pytest и CI не запускались. UX-06 остаётся в работе; реализация не разрешена.
+
+
+## 2026-11-18 — уточнение append-only гарантий DomainEvent
+
+При расширении проверки просмотрена миграция `0002_workflow_guards.py`. Она действительно создаёт функцию `medarchive_domain_events_append_only()` и trigger `trg_domain_events_append_only` на UPDATE/DELETE таблицы `domain_events`. Предыдущая формулировка аудита уточнена: защита от UPDATE/DELETE реализована миграционным trigger; при этом INSERT не ограничен этим trigger, а фактические grants/ownership и возможность обхода привилегированными principals не проверялись. Это уточнение не меняет вывод об отсутствии command ledger и полей command_id/event_version/correlation_id в текущей ORM.
+
+Изменена только Markdown-документация. PostgreSQL, SQL, Alembic, pytest и CI не запускались.
