@@ -1628,3 +1628,10 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 - admin integration tests не подтверждают global object detail/history access admin и доступ к shipment detail.
 
 Это legacy test expectations, противоречащие целевым D-06/D-07/D-08/D-16; при реализации они должны быть заменены target negative/positive tests. Тесты не запускались.
+
+
+## 2026-11-18 — DomainEvent consumer inventory: уточнение и границы
+
+Добавлен `UX-06-DOMAIN-EVENT-CONSUMER-INVENTORY.md`. В просмотренных PostgreSQL router paths перечислены consumers: dashboard recent movements и scoped history, shipment detail timeline, /admin/audit (admin.%), а также точечное чтение shipment.exception_resolved. Исправлена прежняя неточность: legacy `/history` в `dashboard.py` читает SQLite `card_movements` через MovementService, а не DomainEvent. Backup использует полный pg_dump, поэтому включает DomainEvent как часть БД, но не является event consumer. В просмотренном source tree не обнаружены отдельный app worker/queue consumer, outbox dispatcher или webhook publisher. Это не исключает cron/systemd jobs вне репозитория, внешние ETL/BI, ручные SQL readers и интеграции; требуется подтверждение владельца эксплуатации.
+
+Проверка статическая. PostgreSQL/SQL/Alembic/pytest/CI и backup/restore не запускались. Исходники, тесты, миграции, workflows, deployment и данные не менялись; только Markdown.

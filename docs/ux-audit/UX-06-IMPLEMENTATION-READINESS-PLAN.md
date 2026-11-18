@@ -514,3 +514,10 @@ Consumer inventory остаётся неполным в части внешни�
 Решение по политике идемпотентности закрыто. Открытыми остаются только технические детали: inventory retry horizons и календарные сроки хранения ledger для остальных команд, а также окончательная классификация необратимых команд. Они должны быть определены до настройки purge/retention, но не отменяют утверждённый стандарт.
 
 Изменены только проектные Markdown-документы. Это не разрешение на реализацию: SQL/DDL, ORM, API, UI, тесты, миграции и deployment не менялись.
+
+
+## 18. DomainEvent consumer inventory — уточнение (2026-11-18)
+
+Добавлен `UX-06-DOMAIN-EVENT-CONSUMER-INVENTORY.md`. В просмотренных PostgreSQL router paths перечислены consumers dashboard recent movements/history, shipment detail timeline, admin audit и точечное чтение shipment exception resolution. Поправка: legacy `/history` вызывает `MovementService.get_recent_movements` и читает SQLite `card_movements`, а не PostgreSQL `DomainEvent`; прежние упоминания этого legacy route как DomainEvent consumer неточны. Backup использует полный `pg_dump` и не является прикладным event consumer. В просмотренном source tree не обнаружены app-level queue worker, outbox dispatcher или webhook publisher; внешние/серверные jobs этим не исключаются.
+
+Readiness остаётся открытым до подтверждения внешних consumers/deployment jobs и effective DB grants. Не менять event types/payload/retention до такого подтверждения. Только Markdown документация; runtime проверки не выполнялись.
