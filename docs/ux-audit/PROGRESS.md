@@ -1519,3 +1519,17 @@ UX-05 остаётся в работе. Изменены только проек
 Синхронизированы документы `PRODUCT-DECISIONS-D-01-D-18.md` (D-04), `PRODUCT-DECISIONS-P-01-P-08.md` (P-09), `UX-06-DB-COMMAND-CONTRACTS.md` (§2.6), `UX-06-TECHNICAL-DATA-MODEL.md` (§3.2), `UX-06-INVARIANTS-DB-TEST-MATRIX.md` (DB-15) и `UX-06-CROSS-DOCUMENT-CONSISTENCY-REVIEW.md`. В review вопрос `not_found` переведён из открытых в согласованные.
 
 Изменена только проектная Markdown-документация. Исходники, ORM, API/UI, тесты, migrations, workflows и deployment не менялись; PostgreSQL, SQL, Alembic, pytest и CI не запускались.
+
+
+## 2026-11-18 — read-only аудит legacy viewer, incidents и ACL
+
+Создан `UX-06-LEGACY-VIEWER-INCIDENT-RETIREMENT-AUDIT.md` на базе HEAD `ae37df8a27320b76d47812b9466b16431e888339`.
+
+Подтверждено статическим чтением:
+- `viewer` всё ещё разрешён в PostgreSQL ORM/initial migration, admin service и форме пользователей. Он допущен к dashboard/search/history; в `postgresql_history_page` scope строится только для branch/central_office/archive, поэтому viewer получает запрос без role-specific event filter. Это потенциальный глобальный history access и прямое расхождение с D-06; HTTP-тесты не запускались.
+- В PostgreSQL нет отдельной сущности/таблицы incidents в рассмотренной ORM: legacy incident — статус `shipments.exception`, exception metadata, DomainEvent, очереди получателей и admin UI. В SQLite базовом SCHEMA отдельной incidents table также нет; legacy IncidentService вычисляет проблемные shipments/boxes и выполняет корректирующие операции.
+- Отдельная ACL/permissions сущность в просмотренных ORM/migration files не обнаружена; приложение использует role guards и query scopes. Реальные PostgreSQL grants/RLS/role memberships не проверялись.
+
+Документ определяет preflight для viewer accounts/actor references, exception shipments/manifest consistency и фактических ACL; запрещает автоматическую смену ролей, молчаливое закрытие exception shipments и удаление исторических ссылок. Выделены отдельные gates для viewer containment, incident reconciliation, history retention и negative verification.
+
+Изменена только проектная Markdown-документация. Исходники, ORM, API/UI, тесты, migrations, workflows и deployment не менялись; БД, SQL, pg_catalog, pytest и CI не запускались. UX-06 остаётся в работе; реализация не разрешена.
