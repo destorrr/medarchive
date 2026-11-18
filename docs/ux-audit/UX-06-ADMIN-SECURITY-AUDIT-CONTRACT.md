@@ -131,7 +131,7 @@ Before DDL, decide:
 3. HMAC key management/rotation for source and identity digests;
 4. whether selected privileged reads (bulk export, sensitive-data export, mass lookup) must be audited, while avoiding noisy logging of every normal object detail view;
 5. audit export/download permissions, access logging and tamper-evidence/backup requirements;
-6. behavior when the audit store is temporarily unavailable (fail closed for privileged mutations and successful login, or explicitly bounded degraded mode).
+6. **Approved outage behavior (2026-11-18): fail closed** for privileged mutations and successful login when the mandatory audit record cannot be committed atomically. Ordinary reads are not automatically blocked. A blanket synchronous audit requirement for every 401/403 is not approved; denial-event policy remains separately bounded and open.
 
 Do not infer statutory retention from the application code. This project audit did not review jurisdiction-specific legal requirements or production policy.
 
@@ -162,3 +162,16 @@ Tests are proposed only; none were executed.
 ## 10. P-07 audit ownership clarification (2026-11-18)
 
 For privileged business corrections, `DomainEvent` is authoritative for the corrected business fact; `AdminSecurityAudit` is authoritative for the fact that an administrator invoked the privileged correction, with actor, mandatory reason, outcome, target and references. Both are committed atomically under the same command/correlation context, but the audit record does not duplicate the full business payload. Pure admin CRUD and auth/security events use AdminSecurityAudit only. This is aligned with DB-SEC-03: one business DomainEvent stream, no RequestEvent and no global operational feed.
+
+
+## 11. Approved audit-store outage policy (2026-11-18)
+
+The product owner approved the following baseline:
+
+1. **Privileged mutations — fail closed.** A privileged/admin mutation must not take effect unless its mandatory `AdminSecurityAudit` record can be committed in the same database transaction. If the audit insert or transaction commit fails, the entire mutation rolls back. For a privileged business correction, the corresponding authoritative `DomainEvent` and the `AdminSecurityAudit` record are committed atomically; neither may survive alone.
+2. **Successful login — fail closed.** After credentials and account state are successfully validated, the application must not establish/issue a new authenticated session unless the required successful-authentication audit event is durably committed. Session issuance must occur only after the audit transaction commits. If audit persistence fails, no authenticated session is issued.
+3. **Ordinary reads — not automatically blocked.** Audit-store unavailability alone does not deny normal authorized reads. This does not bypass ordinary authentication, authorization, or database availability requirements.
+4. **401/403 and other denials — separate bounded policy.** This approval does not require a synchronous durable audit write for every failed authentication, invalid session, throttled attempt, or authorization denial. Event selection, aggregation/rate limiting, and failure behavior for denial telemetry remain a separate technical policy.
+5. **No silent degraded success.** The application must not report a privileged mutation or successful login as completed when its required audit record was not committed. Operational alerts/diagnostics must avoid credentials, tokens and unnecessary patient data.
+
+This is an approved target behavior, not an implementation claim. The current application behavior remains as described in the static findings until separately implemented and verified. Tests, SQL/DDL, migrations and runtime checks have not been performed as part of this decision.

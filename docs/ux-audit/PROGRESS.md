@@ -1712,3 +1712,15 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 Остаточные gates UX-06 теперь преимущественно технические/операционные: полный inventory внешних DomainEvent consumers и DB grants; deployment topology и effective principals; конкретные схемы/версии typed commands и event catalog; audit retention/privacy/key management/outage policy; retry horizons и ledger retention; reconciliation/migration preflight; согласованная матрица тестов и доказательств. Эти пункты не означают повторного открытия утверждённых продуктовых решений.
 
 Проверка статическая по документации и Git tree. Код, ORM, SQL/DDL, миграции, тесты, CI, PostgreSQL и production deployment не запускались и не менялись.
+
+
+## 31. AdminSecurityAudit — fail-closed outage policy approved (2026-11-18)
+
+Владелец продукта утвердил целевое поведение при недоступности обязательного аудита:
+
+- привилегированная мутация не выполняется, если обязательная запись AdminSecurityAudit не может быть сохранена в той же транзакции; бизнес-изменение, DomainEvent и security audit откатываются совместно;
+- успешный вход не создаёт/не выдаёт новую authenticated session, пока обязательное событие успешной аутентификации не зафиксировано;
+- обычные авторизованные чтения автоматически не блокируются только из-за недоступности audit store;
+- синхронная durable audit запись для каждого 401/403, throttled attempt или иного отказа не утверждена; bounded denial-event policy остаётся отдельной технической задачей.
+
+Решение зафиксировано как целевой контракт, а не описание текущей реализации. Остались retention/legal hold, privacy/digest и key rotation, privileged-read scope, export/tamper evidence и bounded denial-event policy. Изменена только Markdown-документация; source, ORM, SQL/DDL, migrations, tests, workflows и deployment не менялись. Runtime/DB/CI/pytest не запускались.
