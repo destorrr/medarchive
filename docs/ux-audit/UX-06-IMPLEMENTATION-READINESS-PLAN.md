@@ -526,3 +526,8 @@ Readiness остаётся открытым до подтверждения вн
 ## 21. P-04 — mandatory structured write-off reason approved (2026-11-18)
 
 Владелец продукта подтвердил обязательный структурированный код основания для заявки ЦО на списание медицинской карты; свободный комментарий необязателен и сохраняется, если предоставлен. Решение закрывает вопрос обязательности кода/комментария, но каталог кодов ещё требуется определить. Открыты необходимость внешнего акта/вложения, второго подтверждающего сотрудника архива и правила отмены заявки. Полномочия P-04 не меняются: ЦО инициирует, архив исполняет. Только Markdown; реализации и тестов нет.
+
+
+### P-07 field-level card correction decision (2026-11-18)
+
+The product owner rejected the proposed `Card.phone` clerical correction. The ordinary P-07 card-field allowlist is empty: no card master-data field, including `phone`, is editable through P-07. Any future contact/identity-data correction requires a separately designed and approved process. Previously approved P-07 domain corrections (custody/location, current BoxCycle/membership, BoxPlacement and compensating write-off correction) remain separate typed commands, not generic card metadata patches.
