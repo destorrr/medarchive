@@ -1386,3 +1386,13 @@ UX-05 остаётся в работе. Изменены только проек
 - Зафиксирован риск доверия к пользовательскому session GUC как контексту операции; требуется защищённая граница DB-команд и аудит реальных DB grants.
 - Добавлены конкурентные тесты, проверки прямого SQL обхода и preflight/backfill сверки.
 - Документ описывает целевой контракт, не реализацию. Исходники, ORM, миграции, тесты, workflows и настройки БД не менялись; PostgreSQL, SQL, pytest, Alembic и CI не запускались.
+ 
+
+### UX-06 — статический аудит DB roles, транзакций и actor provenance (2026-11-18)
+- Проверены PostgreSQL adapter/config/dependencies, workflow services, основные PostgreSQL routers, DomainEvent ORM, Alembic env и все revisions 0001–0011.
+- В репозитории не обнаружены provisioning DB roles/grants, GRANT/REVOKE, SECURITY DEFINER или разделение runtime/migration credentials. Приложение и Alembic читают один MEDARCHIVE_DATABASE_URL; фактические production grants не проверялись и остаются неизвестными.
+- FastAPI handlers открывают session через dependency и явно управляют commit/rollback; workflow services выполняют flush и полагаются на внешнюю транзакцию. Database.transaction() существует, но не является единым используемым router boundary.
+- DomainEvent append-only защищён триггером от UPDATE/DELETE, но actor_user_id поступает от приложения; БД не имеет независимого подтверждения личности пользователя. Обычный session GUC не предлагается как доказательство actor provenance.
+- Подготовлена рекомендация: разделить runtime/migration/owner roles, закрыть прямые записи в критичные таблицы через DB command boundary, централизовать транзакционный Unit of Work и определить typed event contract. RequestEvent пока не рекомендуется без отдельного требования.
+- Создан документ UX-06-DB-SECURITY-AND-TRANSACTIONS-AUDIT.md. Это статический аудит GitHub-исходников: к PostgreSQL не подключались, grants/ownership не читали, SQL/pytest/Alembic/CI не запускали.
+- Изменены только Markdown-документы. Исходники, ORM, миграции, тесты, workflows, конфигурация БД и master не затронуты.
