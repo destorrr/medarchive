@@ -32,7 +32,7 @@ Define the minimum evidence/fields for initiation and execution:
 - whether a comment is required, optional or disallowed;
 - external document/act reference, number and attachment are not mandatory; optional metadata retention may be considered, while file-upload capability remains a separate implementation decision;
 - archive execution is performed by one authorized employee; a second-person confirmation is not required, and executor/time are recorded in the immutable history;
-- whether Central Office may cancel an unexecuted request, and at what point cancellation becomes unavailable.
+- cancellation policy is approved: before archive processing starts, Central Office may cancel with a mandatory reason; after processing starts, only archive may cancel with a mandatory reason; after the write-off is executed, cancellation is unavailable and an erroneous write-off is handled through a separate P-07 administrative correction that preserves the original event.
 
 These decisions should be made before the card write-off state machine and DB command contract are frozen.
 
@@ -42,7 +42,7 @@ These decisions should be made before the card write-off state machine and DB co
 - Свободный текстовый комментарий/пояснение — **необязателен**; если указан, сохраняется вместе с заявкой и историей решения.
 - Сам справочник кодов и его значения ещё требуется определить до фиксации workflow/API/DB contract. Нельзя подменять код основания произвольной строкой.
 
-Решение закрывает вопрос обязательности структурированного основания и комментария. Внешний документ/акт, его номер и вложение не обязательны и не могут блокировать заявку или исполнение; при наличии реквизиты можно сохранить как необязательные сведения. Это не утверждает наличие или реализацию загрузки файлов. Второе подтверждение сотрудника архива не требуется: списание выполняет один уполномоченный сотрудник с фиксацией исполнителя и времени. Открытыми остаются правила отмены заявки ЦО и момент запрета отмены. Полномочия остаются неизменными: ЦО инициирует, архив исполняет.
+Решение закрывает вопрос обязательности структурированного основания и комментария. Внешний документ/акт, его номер и вложение не обязательны и не могут блокировать заявку или исполнение; при наличии реквизиты можно сохранить как необязательные сведения. Это не утверждает наличие или реализацию загрузки файлов. Второе подтверждение сотрудника архива не требуется: списание выполняет один уполномоченный сотрудник с фиксацией исполнителя и времени. Правила отмены утверждены: до начала обработки архивом заявку может отменить ЦО с обязательной причиной; после начала обработки — только архив с обязательной причиной; после фактического списания отмена невозможна. Ошибочное списание исправляется отдельной административной коррекцией P-07 без удаления исходного события. Полномочия остаются неизменными: ЦО инициирует, архив исполняет.
 
 
 ## 2. P-07 — admin corrective actions
