@@ -352,3 +352,78 @@ Actor — central_office. Проверить, что карта на балан�
 ## 10. Граница
 
 Документ описывает ожидаемое поведение будущих команд. SQL functions/procedures, grants, новые таблицы, ORM, миграции, tests и deployment не создавались и не менялись. PostgreSQL, Alembic, pytest и CI не запускались.
+
+
+## 11. Уточнение idempotency contract — проектное предложение (2026-11-18)
+
+Этот раздел конкретизирует открытые пункты разделов 8–9. Это рекомендуемый технический baseline для согласования, не принятое владельцем продукта решение и не разрешение на реализацию.
+
+### 11.1 Генерация command_id и повтор
+
+- Для пользовательской команды клиент создаёт UUID v4 один раз при подтверждении действия и сохраняет его до получения терминального ответа. Сетевой retry, повтор отправки после timeout и восстановление запроса используют тот же command_id.
+- Любое новое намерение пользователя, изменённый состав/параметры или новая попытка после полученного бизнес-отказа получает новый command_id.
+- Для внутренних system jobs command_id создаёт доверенный server-side caller до первого вызова и сохраняет его при retry.
+- command_id глобально уникален в пределах одной базы/среды; не включать actor_id в пространство уникальности вместо проверки совпадения владельца команды.
+
+### 11.2 Canonical input и hash
+
+Hash вычисляется только сервером/защищённой DB-командой после разбора входа по конкретной command schema. Клиентский hash не принимается.
+
+Рекомендуемый алгоритм:
+1. Валидировать command_type и command_version по allowlist.
+2. Построить semantic input object только из полей, влияющих на результат команды. Transport headers, request timestamp, retry count, trace/span IDs и correlation_id не включать.
+3. Применить schema-specific normalization: UUID привести к lowercase canonical form; даты/время — к UTC и единому формату; числовые значения — к однозначному представлению; применить defaults до hashing; определить для каждого поля, различаются ли absent и null.
+4. Для object keys использовать стабильную сортировку; строки сериализовать в UTF-8 с фиксированными правилами escaping. Unicode normalization и trim не применять глобально: только если это прямо определено семантикой конкретного поля.
+5. Массивы сохранять в исходном порядке, если порядок семантически значим; сортировать и дедуплицировать только для schema-полей, определённых как mathematical set (например, набор card IDs в команде, где порядок не влияет на manifest).
+6. Вычислить SHA-256 от domain-separated bytes, включающих canonicalization version, command_type, command_version, actor_user_id и canonical semantic input. Пример логической структуры: medarchive-command\ncanon-v1\n<command_type>\n<command_version>\n<actor_uuid>\n<canonical-json>.
+
+Отдельно хранить canonicalization_version. При изменении алгоритма не переинтерпретировать старые hashes; повтор существующего command_id сравнивается по сохранённой версии canonicalization.
+
+### 11.3 Корреляция
+
+- command_id — ключ идемпотентности одной команды.
+- correlation_id — идентификатор более широкой бизнес-операции/цепочки команд; он может охватывать несколько command_id.
+- correlation_id не влияет на input_hash. При replay возвращаются исходные command_id/correlation_id и сохранённый результат; новое trace ID не меняет семантику команды.
+- request_id остаётся transport/request reference и не заменяет command_id или correlation_id.
+
+### 11.4 Транзакционный протокол и конкурентный retry
+
+- Ledger row, aggregate mutations, DomainEvent, admin/security audit и typed result commit-ятся одной транзакцией.
+- Уникальный PK по command_id; конкурентная регистрация выполняется через INSERT ... ON CONFLICT DO NOTHING либо эквивалентный механизм, не оставляющий транзакцию в aborted state после ожидаемого конфликта.
+- Конкурентный запрос с тем же command_id ждёт завершения первой транзакции. После её commit он читает ledger: совпавший actor/type/version/hash возвращает сохранённый результат; несовпадение — idempotency_key_reused без выполнения команды.
+- Незавершённый ledger row не должен быть видим как committed in_progress. Временное состояние допустимо только внутри незавершённой транзакции; при crash/rollback исчезают и ledger row, и все бизнес-эффекты.
+- После нахождения существующей записи повторно не выполнять мутацию. Перед выдачей сохранённого результата повторно проверить, что actor существует и активен; если результат содержит чувствительные данные — дополнительно проверить актуальное право прочитать эти данные. Повтор не должен раскрывать результат деактивированному/лишённому полномочий пользователю.
+
+### 11.5 Какие отрицательные результаты сохранять
+
+Рекомендуемое разделение:
+
+| Ситуация | Записывать завершённую ledger запись? | Поведение retry |
+|---|---|---|
+| Невалидный envelope, неизвестный command type/version, отсутствующий/неактивный actor | Нет | Повторная проверка; security/diagnostic log отдельно по политике |
+| Отказ аутентификации/авторизации или scope (forbidden) | Нет | Повторная проверка актуальных полномочий; не кэшировать отказ как бизнес-результат |
+| Детерминированный бизнес-результат после успешной авторизации: not_found, invalid_state, conflict, validation_error | Да | Тот же ключ возвращает тот же отказ; новое намерение/повтор после изменения состояния — новый command_id |
+| Успешная команда / подтверждённый already_applied в рамках конкретного idempotency contract | Да | Возвращается исходный сохранённый result envelope |
+| Deadlock/serialization failure, timeout, connection loss до подтверждённого commit, internal error | Нет, транзакция откатывается | Повторить всю команду с тем же command_id; если commit мог завершиться, сначала проверить ledger |
+
+Не следует сохранять transient infrastructure errors как терминальный результат. Для отказа авторизации отдельно сохранять минимальный security audit факт, но не копировать его в бизнес DomainEvent.
+
+### 11.6 Result envelope и API mapping
+
+Сохранять стабильные поля: result_code, result_version, result_payload, completed_at. Payload ограничен схемой конкретной команды и не содержит лишних PII/секретов. В envelope также возвращать command_id, correlation_id и ссылки на созданные aggregate/event IDs, если они нужны клиенту.
+
+HTTP mapping остаётся responsibility API adapter, не DB command: успешный original/replay result сохраняет один semantic outcome; DB не возвращает SQLSTATE, имена constraints или внутренний текст исключения. Для idempotency_key_reused использовать явный conflict outcome.
+
+### 11.7 Retention и защита от повторного исполнения после очистки
+
+- Для необратимых логистических и административных команд command identity/tombstone хранить не меньше срока authoritative history; предпочтительный baseline — не удалять ключи необратимых действий, а минимизировать payload результата.
+- Для остальных команд срок ledger должен превышать максимальный retry horizon всех клиентов, jobs и интеграций. До определения этого horizon TTL не утверждать.
+- Если result payload очищается по retention, сохранять tombstone с command_id, actor, command_type/version, input_hash, canonicalization_version, завершённым result_code и ссылками на authoritative records. Удаление строки целиком вновь разрешило бы повторное исполнение старого ключа и потому запрещено без доказанного срока невозможности replay.
+- Точный retention schedule, архивирование и purge policy остаются открытыми до определения legal/operational retention и backup lifecycle.
+
+### 11.8 Пункты для отдельного согласования
+
+1. Подтвердить ли UUID v4, создаваемый клиентом один раз на пользовательское намерение, с сохранением того же ключа на retry?
+2. Подтвердить ли описанную canonicalization v1 с SHA-256 и schema-specific normalization?
+3. Подтвердить ли replay policy: сохранять детерминированные бизнес-отказы после авторизации, но не сохранять authentication/authorization отказ и transient errors?
+4. Подтвердить ли, что ключи необратимых команд никогда не удаляются (допускается очистка payload с сохранением tombstone), а общий TTL остальных команд будет определён после inventory retry horizons?

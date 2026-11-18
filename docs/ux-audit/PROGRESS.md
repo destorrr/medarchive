@@ -1598,3 +1598,10 @@ Gate status: бизнес-модель в основном согласован�
 - static tests inspected: admin integration checks 13 event types, actor attribution, password-hash exclusion and audit filters; schema integration checks append-only trigger/indexes; shipment workflow tests assert event types; branch history tests seed events.
 
 Open gaps: complete security-event coverage, event payload allowlists/PII retention, object detail timelines for card/box/request, external/jobs/export consumers, and non-destructive migration of historical admin.* evidence. Test source was inspected but not executed. Only Markdown documentation changed; no source, ORM, tests, migrations, workflows, deployment or data changed; PostgreSQL, SQL, pytest and CI were not run.
+
+
+## 2026-11-18 — уточнение контракта идемпотентности DB-команд
+
+В UX-06-DB-COMMAND-CONTRACTS.md добавлен проектный baseline: UUID v4 per user intent; повтор ключа при transport retry; schema-specific canonicalization v1 и server-side SHA-256; разделение command_id/correlation_id/request_id; atomic ledger+aggregate+events+audit+result; concurrency через unique command_id; replay без повторной мутации и с повторной проверкой актуального actor/read scope; сохранение детерминированных бизнес-отказов, но не auth failures/transient errors; tombstone для защиты от повторного исполнения после очистки payload.
+
+Это предложение требует отдельного подтверждения по четырём пунктам: генерация UUID v4 и lifecycle, canonicalization/hash, политика replayable negative outcomes, retention/tombstone. Технический contract не реализован. Только Markdown изменён; исходники, ORM, тесты, миграции, workflows, deployment и данные не менялись; PostgreSQL, SQL, pytest и CI не запускались.

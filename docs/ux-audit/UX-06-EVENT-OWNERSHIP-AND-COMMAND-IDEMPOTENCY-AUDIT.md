@@ -176,3 +176,8 @@
 ## 9. Граница
 
 Изменения ограничены проектной документацией. ORM, SQL/DDL, миграции, routers, services, tests, workflows и deployment не менялись. PostgreSQL, pg_catalog, SQL, Alembic, pytest и CI не запускались. Реализация не разрешена.
+
+
+## 10. Согласование с уточнённым command idempotency baseline (2026-11-18)
+
+Подробное проектное предложение по command_id generation, canonical input hashing, correlation, concurrent replay, negative outcomes, result envelope и retention добавлено в раздел 11 UX-06-DB-COMMAND-CONTRACTS.md. Оно намеренно помечено как предложение, а не утверждённое решение. До SQL API остаются четыре вопроса владельца продукта: UUID v4/client lifecycle; canonicalization v1/SHA-256; сохранение детерминированных бизнес-отказов; tombstone/retention для необратимых команд.
