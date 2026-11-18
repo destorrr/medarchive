@@ -1533,3 +1533,19 @@ UX-05 остаётся в работе. Изменены только проек
 Документ определяет preflight для viewer accounts/actor references, exception shipments/manifest consistency и фактических ACL; запрещает автоматическую смену ролей, молчаливое закрытие exception shipments и удаление исторических ссылок. Выделены отдельные gates для viewer containment, incident reconciliation, history retention и negative verification.
 
 Изменена только проектная Markdown-документация. Исходники, ORM, API/UI, тесты, migrations, workflows и deployment не менялись; БД, SQL, pg_catalog, pytest и CI не запускались. UX-06 остаётся в работе; реализация не разрешена.
+
+
+
+## 2026-11-18 — read-only аудит deployment principals и supporting DB paths
+
+Создан `UX-06-DEPLOYMENT-PRINCIPALS-BOOTSTRAP-AUDIT.md` на базе HEAD `1679ee67329a1b40f2974bae14031c7c26bafd3e`.
+
+Подтверждено статическим чтением config, Alembic, CLI, systemd, installer, backup и login throttle:
+- DB-SEC-04 пока не реализован: приложение, Alembic, first-admin CLI и backup используют один `MEDARCHIVE_DATABASE_URL`; раздельные runtime/migrator URLs и principals в текущем конфигурационном/deployment пути не обнаружены.
+- Startup web app выполняет `ensure_system_locations` через runtime session; CLI bootstrap первого admin использует тот же URL.
+- Login throttle делает raw SELECT/UPSERT/DELETE к `auth_login_throttles`; для DB-SEC-02 нужен отдельный узкий grant/function contract.
+- CI/Docker используют локальные тестовые credentials и не проверяют grants от трёх отдельных principals. Наличие encrypted backup не означает отдельный backup DB principal.
+
+Документ фиксирует DB-SEC-01…04 gap matrix, deployment requirements и будущие negative CI gates. Ни один secret/ACL/role не изменялся.
+
+Изменена только проектная Markdown-документация. Исходники, ORM, API/UI, tests, migrations, workflows и deployment не менялись; PostgreSQL, SQL, pg_catalog, Alembic, pytest и CI не запускались. UX-06 остаётся в работе; реализация не разрешена.
