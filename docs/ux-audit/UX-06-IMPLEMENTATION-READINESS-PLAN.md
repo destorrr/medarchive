@@ -531,3 +531,28 @@ Readiness остаётся открытым до подтверждения вн
 ### P-07 field-level card correction decision (2026-11-18)
 
 The product owner rejected the proposed `Card.phone` clerical correction. The ordinary P-07 card-field allowlist is empty: no card master-data field, including `phone`, is editable through P-07. Any future contact/identity-data correction requires a separately designed and approved process. Previously approved P-07 domain corrections (custody/location, current BoxCycle/membership, BoxPlacement and compensating write-off correction) remain separate typed commands, not generic card metadata patches.
+
+
+## 22. Актуальный статус после согласования P-04/P-07 и технических стандартов (2026-11-18)
+
+Этот раздел имеет приоритет над ранними формулировками разделов 10, 12, 18–20 и 21, где отдельные решения ещё значились открытыми. Ранние записи сохранены как исторический журнал.
+
+### Продуктовые решения, закрытые владельцем
+
+- P-04/D-13: инициатор — ЦО; исполнитель — один уполномоченный сотрудник архива; обязательный закрытый reason code `lost` / `damaged` / `other`; комментарий и внешний документ необязательны; отмена до/после начала обработки ограничена ролями и обязательной причиной; после списания отмена невозможна, ошибочное списание — отдельная P-07 компенсация.
+- P-07: обычный allowlist изменений master-data полей Card пуст, включая `phone`; domain corrections для custody/location, BoxCycle/membership, BoxPlacement и erroneous write-off выполняются только отдельными typed commands. Shipment evidence, ArchiveRequest outcomes и исходные event attribution/payload не переписываются.
+- DB-SEC-01…04, общая append-only DomainEvent модель и четыре положения command idempotency baseline утверждены. Не запрашивать повторное продуктовое согласование этих пунктов.
+
+### Текущие технические/операционные gates
+
+1. **External consumer and grants inventory:** получить подтверждение владельца эксплуатации по cron/systemd jobs, ETL/BI, ручным SQL consumers, read replicas и интеграциям; сверить effective DB roles/grants на реальном deployment до изменения event schema/payload/retention.
+2. **Deployment principal topology:** описать фактические app/migrator/backup/monitoring/maintenance identities, URLs и secret distribution. Базовые principals `medarchive_owner` NOLOGIN, `medarchive_migrator` LOGIN и `medarchive_runtime` LOGIN уже утверждены; дополнительные роли зависят от подтверждённой топологии.
+3. **Typed command/event catalog:** завершить per-command input/result schemas, versioning, state guards, event types, negative outcomes и mapping API errors. P-04/P-07 typed command contracts должны отражать утверждённые правила, не generic override.
+4. **Admin/security audit policy:** определить retention/legal hold, digest/IP policy и key rotation, audit scope для privileged reads, export permissions/tamper evidence и поведение при недоступности audit store. Рекомендация для обсуждения: fail closed для привилегированных мутаций и успешной выдачи новой сессии, если обязательная audit запись не может быть атомарно сохранена; не распространять это автоматически на обычные чтения и все 401/403.
+5. **Command ledger retention:** сохранить tombstone для необратимых команд; для остальных определить максимальные retry horizons всех клиентов/jobs/integrations и только затем установить календарный TTL/purge policy.
+6. **Migration/reconciliation preflight:** инвентаризировать legacy SQLite/viewer/incident/CardPlacement и исторические admin events; определить mapping, проверки полноты и rollback/retention до любых миграций.
+7. **Evidence/test matrix:** для каждой команды/роли зафиксировать позитивные, негативные, concurrent retry, rollback, append-only, grants и migration-preservation сценарии. Тесты пока не запускались.
+
+### Текущая граница
+
+Продолжается только read-only аудит и Markdown-проектирование. UX-06 не закрыт; UX-07 не начинается; реализация приложения, SQL/DDL, ORM, миграции, API/UI, тесты, workflows и deployment не разрешены и не менялись. PostgreSQL/CI/pytest не запускались.

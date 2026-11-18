@@ -1696,3 +1696,19 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 ## 29. P-07 — отказ от clerical card field correction (2026-11-18)
 
 Владелец продукта отклонил предложение разрешить администратору исправлять `Card.phone`. Обычный P-07 allowlist полей карточки пуст: `card_number`, `full_name`, `date_of_birth`, `phone` и другие master-data поля не исправляются через P-07. Будущая потребность в изменении контактных/идентификационных данных требует отдельного процесса и отдельного решения. Утверждённые P-07 корректировки доменного состояния (custody/location, BoxCycle/membership, BoxPlacement и компенсация ошибочного списания) остаются отдельными typed commands, не generic metadata patch. Изменена только Markdown-документация.
+
+
+## 30. UX-06 — актуальный статус решений и остаточных технических gates (2026-11-18)
+
+Повторная сверка на HEAD `d3fc9d541676ae40096875bfc4282482598e2de3` подтвердила, что поздние согласования имеют приоритет над ранними историческими записями:
+
+- **P-04 продуктово закрыт:** инициатор — ЦО, исполнитель — один уполномоченный сотрудник архива; код основания обязателен (`lost`, `damaged`, `other`), комментарий и внешний документ необязательны; отмена регулируется стадией обработки; после списания отмена невозможна, ошибка исправляется отдельной P-07 компенсацией.
+- **P-07 продуктово закрыт:** allowlist обычных изменений полей Card пуст, включая `phone`; допустимы только утверждённые отдельные доменные корректировки custody/location, текущей связи BoxCycle/состава, BoxPlacement и компенсация ошибочного списания. Исторические факты не переписываются.
+- **DB-SEC-01…04 и command idempotency baseline утверждены** согласно соответствующим техническим документам. Не следует повторно запрашивать эти продуктовые решения.
+- **Audit ownership уточнён:** DomainEvent — authoritative business fact; AdminSecurityAudit — privileged/security action; command ledger — idempotency/result replay. Для корректировки бизнес-агрегата DomainEvent и AdminSecurityAudit записываются атомарно, без копирования полного бизнес-payload в глобальный аудит.
+
+Исторические записи 21, 24–29 и ранние разделы readiness, где P-04/P-07, каталог причин, отмена или idempotency указаны как открытые, сохраняются как журнал состояния на дату записи и не являются текущим статусом.
+
+Остаточные gates UX-06 теперь преимущественно технические/операционные: полный inventory внешних DomainEvent consumers и DB grants; deployment topology и effective principals; конкретные схемы/версии typed commands и event catalog; audit retention/privacy/key management/outage policy; retry horizons и ledger retention; reconciliation/migration preflight; согласованная матрица тестов и доказательств. Эти пункты не означают повторного открытия утверждённых продуктовых решений.
+
+Проверка статическая по документации и Git tree. Код, ORM, SQL/DDL, миграции, тесты, CI, PostgreSQL и production deployment не запускались и не менялись.
