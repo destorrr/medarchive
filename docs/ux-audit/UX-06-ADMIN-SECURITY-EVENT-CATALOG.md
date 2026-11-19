@@ -121,17 +121,17 @@ All payloads require maximum size/depth and schema validation. Unknown keys and 
 - Global audit remains admin-only under D-07/D-16; branch, archive and Central Office roles receive no global feed or audit payload endpoint.
 - The event list renders event-specific labels and allowlisted fields; no generic raw-JSON viewer.
 - Audit detail access should be narrower than general admin object access where payload contains security context. Admin's global object/history access does not justify exposing secrets or unnecessary PII in audit.
-- Audit read/export operations themselves should be access-controlled and logged under an approved policy; avoid recursive logging loops. A separate access log or security platform may be more appropriate than recursively inserting a row into the same audit feed.
+- Audit read operations remain admin-only. Opening the feed and viewing event details are not logged; no audit-feed export or export-specific access log exists in the target product. Separate business-data export operations remain audited under their own event types.
 - Business history remains in the object's DomainEvent timeline with its existing object-level authorization.
 
 ## 6. Retention, integrity and operational gates — unresolved
 
 No statutory or universal retention period is inferred. Before schema/DDL, the owner and operational/legal stakeholders must define:
-1. retention by event family (mandatory admin/authentication, bounded denial telemetry, export/access events);
+1. retention by event family (mandatory admin/authentication, bounded denial telemetry, and business-data export events);
 2. legal hold, preservation, deletion/archival and backup/restore behavior;
 3. whether source/identity digests are needed, their purpose and expiry;
 4. HMAC key custody, separation, rotation, version overlap and destruction;
-5. audit export permission, approval, access logging and artifact expiry;
+5. business-data export permissions, access logging and artifact lifecycle;
 6. tamper-evidence requirements, privileged DBA threat model, backup immutability and independent monitoring;
 7. event-volume limits, partitioning/index strategy and alerting for failed mandatory writes versus telemetry drops.
 
@@ -168,12 +168,12 @@ Retention periods, HMAC/IP policy and tamper-evidence controls are not product d
 
 ## 10. Retention and integrity proposal
 
-See `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` for proposed event retention classes (without guessed durations), legal-hold/purge lifecycle, default exclusion of raw IP/identity digests, per-event HMAC and externally signed checkpoint design. This is a technical/operational proposal only; retention schedules, key custody, checkpoint infrastructure and audit-export access policy remain unapproved.
+See `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` for proposed event retention classes (without guessed durations), legal-hold/purge lifecycle, default exclusion of raw IP/identity digests, per-event HMAC and externally signed checkpoint design. This is a technical/operational proposal only; retention schedules, key custody, checkpoint infrastructure and business-data export audit controls remain unapproved.
 
 
 ## 11. Audit access and export policy proposal
 
-See `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It retains admin-only feed/detail access, separates export from read, proposes mandatory export reason and bounded/minimized artifacts, and uses a separate append-only access-log channel to avoid recursive writes. Export permission split, detail-view telemetry and feed-open failure policy require product-owner decisions.
+See `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It retains admin-only feed/detail read access, prohibits export of the AdminSecurityAudit feed entirely, and confirms that ordinary feed/detail reads are not logged. Separate business-data export events remain in scope under section 2.3.
 
 
 ## 12. Product decision — admin audit-feed export approved (2026-11-19)

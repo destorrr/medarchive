@@ -567,12 +567,12 @@ The catalog remains a proposal, not a final approved schema. PR-READ-01 is resol
 
 ## 12. Audit retention and integrity proposal (2026-11-19)
 
-Technical proposal: `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It separates retention classes without inventing periods; defines legal-hold and purge/backup reconciliation requirements; recommends no IP/identity digest by default; proposes per-event HMAC plus externally signed checkpoint manifests; and defines audit export/access and verification acceptance criteria. It does not approve durations, select infrastructure or authorize implementation.
+Technical proposal: `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It separates retention classes without inventing periods; defines legal-hold and purge/backup reconciliation requirements; recommends no IP/identity digest by default; proposes per-event HMAC plus externally signed checkpoint manifests; and defines integrity and business-data export audit acceptance criteria. It does not approve durations, select infrastructure or authorize implementation.
 
 
 ## 13. Audit access and export policy (2026-11-19)
 
-Proposal: `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It specifies admin-only read, admin-only read access with no audit-feed export; ordinary feed/detail reads are not logged. Acceptance criteria cover server-side scope enforcement, non-admin denial, durable export evidence and artifact expiry. Product decision: audit-feed export is not a product feature and must not be implemented. Neither feed opening nor individual event-detail views are logged.
+Proposal: `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It specifies admin-only read, admin-only read access with no audit-feed export; ordinary feed/detail reads are not logged. Acceptance criteria cover server-side read-scope enforcement and non-admin denial. Audit-feed export is not a product feature and must not be implemented. Neither feed opening nor individual event-detail views are logged. Separate business-data export evidence remains governed by the event catalog.
 
 
 ## 37. UX-06 — экспорт AdminSecurityAudit разрешён всем admin с причиной (2026-11-19)

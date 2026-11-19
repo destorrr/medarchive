@@ -60,22 +60,22 @@ Retention/legal hold, digest/IP and key lifecycle, business-data export/access l
 
 Added `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It proposes R1 privileged action, R2 sensitive export, R3 bounded telemetry and R4 integrity-checkpoint retention classes, with no guessed durations; legal hold and controlled purge/backup reconciliation; no raw IP/identity digest by default; per-event HMAC with externally managed keys; and signed checkpoint manifests in independently administered immutable storage. A global linear hash chain is not recommended as first cut because concurrent transactions and serialized chain-head writes create ordering/contention concerns.
 
-The product owner confirmed (2026-11-19) that the organization has no approved retention periods for administrative audit, security events or personal-data export records. Legal/records/privacy assessment and approval of a versioned R1–R4 schedule is therefore a blocking pre-production governance gate; no interim duration is inferred. Also requires digest necessity decision, KMS/HSM and key custody confirmation, checkpoint storage/cadence, DBA/operator threat model, audit export/access logging and external consumer/grant inventory.
+The product owner confirmed (2026-11-19) that the organization has no approved retention periods for administrative audit, security events or personal-data export records. Legal/records/privacy assessment and approval of a versioned R1–R4 schedule is therefore a blocking pre-production governance gate; no interim duration is inferred. Also requires digest necessity decision, KMS/HSM and key custody confirmation, checkpoint storage/cadence, DBA/operator threat model, business-data export audit/access logging and external consumer/grant inventory.
 
 
 ## 8. Audit access/export policy — 2026-11-19
 
-Added `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It preserves admin-only global audit access; separates viewing from export; proposes mandatory export reason, bounded/minimized export, actor-bound expiring artifacts, and separate append-only logging for export/download facts only. Resolved: neither feed opening nor individual event-detail views are logged. Still open: artifact expiry/limits and the product owner rejected AdminSecurityAudit export entirely; this is no longer an open question.
+Updated `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` to the final admin-only read contract. The product owner rejected AdminSecurityAudit export entirely; no audit-feed export artifacts or export access-log events are in scope. Feed opening and individual event-detail views are not logged. Separate business-data exports/downloads remain auditable under the event catalog.
 
 
 ## 9. Audit-feed export decision (2026-11-19)
 
-The product owner approved audit-feed export for any existing `admin` user with a mandatory non-empty reason. No separate export permission or second-admin approval is required. Export must be bounded, field-allowlisted, protected and durably recorded. Other roles remain excluded.
+Historical decision, superseded 2026-11-19: the product owner later rejected AdminSecurityAudit export entirely. This earlier approval is not part of the current target contract.
 
 
 ## Owner decision — patient-identifying data in audit export (2026-11-19)
 
-Resolved: AdminSecurityAudit feed exports may include patient-identifying fields, including patient full names and medical-card numbers. This permission is limited to explicitly allowlisted export columns and does not relax event-payload minimization or admin-only access. The export still requires a non-empty reason, bounded scope and volume, protected artifact handling, authorization recheck on download, and mandatory durable export/download evidence. Retention, legal hold and artifact expiry remain open gates. Documentation only; implementation is not authorized.
+Historical decision, superseded 2026-11-19: the product owner later rejected AdminSecurityAudit export entirely. The earlier patient-identifier export permission, artifact controls and download evidence are not current requirements. This does not affect separately audited business-data exports.
 
 
 ## 10. Owner decision — no AdminSecurityAudit export (2026-11-19)
