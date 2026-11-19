@@ -175,3 +175,17 @@ The product owner approved the following baseline:
 5. **No silent degraded success.** The application must not report a privileged mutation or successful login as completed when its required audit record was not committed. Operational alerts/diagnostics must avoid credentials, tokens and unnecessary patient data.
 
 This is an approved target behavior, not an implementation claim. The current application behavior remains as described in the static findings until separately implemented and verified. Tests, SQL/DDL, migrations and runtime checks have not been performed as part of this decision.
+
+
+## 12. Event catalog proposal (2026-11-19)
+
+A detailed candidate catalog, envelope, payload allowlist, bounded denial telemetry policy and privileged-read boundary is maintained in `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md`. It is a proposal, not an approved final event schema or implementation authorization.
+
+Key distinctions:
+- mandatory transactional records: successful login, privileged admin/reference-data mutations, credential resets, and approved P-07 corrections;
+- bounded telemetry: failed/throttled login, rejected sessions, selected authorization denials and logout; no mandatory durable write for every 401/403;
+- privileged reads: proposed audit of successful exports/downloads and thresholded cross-scope bulk lookup; ordinary object views, normal search, dashboards and object timelines are not automatically audited.
+
+The envelope proposal includes immutable event ID, schema version, closed event type, DB timestamp, actor/role/scope snapshot, outcome/reason, target, command/correlation IDs, source channel and strict event-specific payload. Raw credentials, tokens, hashes, patient identifiers and unrestricted request/error data are prohibited by default.
+
+Still unresolved: owner approval of privileged-read scope; retention/legal hold; digest/IP necessity and HMAC key lifecycle; export/access logging; tamper evidence and operational controls. The detailed catalog records one product decision request (PR-READ-01).

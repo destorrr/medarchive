@@ -45,3 +45,12 @@
 ## 5. Evidence
 
 Документ основан на статической сверке Markdown-документов и Git tree на указанном HEAD. Это не подтверждает состояние production grants, внешних jobs или deployment. Runtime/DB/CI/tests не запускались.
+
+
+## 6. AdminSecurityAudit event catalog — 2026-11-19
+
+Added `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md` as a versioned design proposal. It separates mandatory transactional audit records from bounded denial/security telemetry and defines a proposed common envelope, per-event payload allowlists, prohibited data, read permissions and acceptance evidence.
+
+**One product decision remains:** PR-READ-01 — whether successful thresholded cross-scope bulk lookup should be audited alongside exports/downloads of patient-identifying data. Recommendation: yes for explicitly privileged/large bulk operations; no audit for ordinary single-card views, routine search, dashboards or object timelines. Until approved, this is not a final event requirement.
+
+Retention/legal hold, digest/IP and key lifecycle, export/access logging, tamper evidence, external consumers/grants and deployment topology remain open technical/operational gates. No statutory retention period is assumed.

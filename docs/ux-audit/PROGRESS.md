@@ -1724,3 +1724,14 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 - синхронная durable audit запись для каждого 401/403, throttled attempt или иного отказа не утверждена; bounded denial-event policy остаётся отдельной технической задачей.
 
 Решение зафиксировано как целевой контракт, а не описание текущей реализации. Остались retention/legal hold, privacy/digest и key rotation, privileged-read scope, export/tamper evidence и bounded denial-event policy. Изменена только Markdown-документация; source, ORM, SQL/DDL, migrations, tests, workflows и deployment не менялись. Runtime/DB/CI/pytest не запускались.
+
+
+## 32. UX-06 — AdminSecurityAudit event catalog proposal (2026-11-19)
+
+На HEAD `1659ad1` подготовлен отдельный `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md`. Каталог разделяет обязательные транзакционные события (успешный вход, административные/справочные изменения, credential reset, P-07 corrections) и ограниченную security-телеметрию (неуспешный/заблокированный вход, отклонённая сессия, выбранные отказы доступа, logout). Не предлагается durable запись каждого 401/403.
+
+Добавлен проект общего envelope: event ID, schema version, closed event type, DB timestamp, actor/role/scope, outcome/reason, target, command/correlation IDs, source channel и строгий allowlisted payload. Зафиксирован запрет на credentials, hashes, tokens, patient identifiers, raw request bodies, SQL/stack traces и неограниченные ошибки. Обычный просмотр карточки, стандартный поиск, dashboard и object timeline не становятся автоматически аудитируемыми.
+
+Подготовлен scope privileged reads: успешные экспорты/скачивания персональных данных и thresholded cross-scope bulk lookup. Единственный продуктовый вопрос PR-READ-01: включать ли bulk lookup наряду с экспортами. Retention/legal hold, digest/IP и HMAC key lifecycle, export/access logging и tamper evidence оставлены открытыми; законные сроки хранения не предполагаются.
+
+Изменены только Markdown-документы. Исходники, ORM, SQL/DDL, миграции, тесты, workflows и deployment не менялись. PostgreSQL, pytest и CI не запускались.

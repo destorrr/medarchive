@@ -556,3 +556,10 @@ The product owner rejected the proposed `Card.phone` clerical correction. The or
 ### Текущая граница
 
 Продолжается только read-only аудит и Markdown-проектирование. UX-06 не закрыт; UX-07 не начинается; реализация приложения, SQL/DDL, ORM, миграции, API/UI, тесты, workflows и deployment не разрешены и не менялись. PostgreSQL/CI/pytest не запускались.
+
+
+## 11. AdminSecurityAudit catalog design gate (2026-11-19)
+
+A detailed proposal is available in `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md`. It defines candidate mandatory transactional events, bounded security telemetry, privileged-read event candidates, common envelope, payload allowlists/prohibitions, read permissions and required acceptance evidence.
+
+The catalog is not yet a final approved schema. PR-READ-01 asks whether thresholded cross-scope bulk lookup is in scope alongside successful exports/downloads. Retention/legal hold, digest/IP and HMAC lifecycle, export/access logging and tamper-evidence policy remain unresolved. No implementation, DDL or tests are authorized by this proposal.
