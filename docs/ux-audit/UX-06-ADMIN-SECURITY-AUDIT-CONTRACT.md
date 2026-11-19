@@ -129,7 +129,7 @@ Before DDL, decide:
 1. retention periods by family (authentication, authorization, admin changes) and any legal/operational hold;
 2. whether source IP is never stored, stored only as keyed digest, or retained in a restricted separate source;
 3. HMAC key management/rotation for source and identity digests;
-4. whether selected privileged reads (bulk export, sensitive-data export, mass lookup) must be audited, while avoiding noisy logging of every normal object detail view;
+4. privileged-read scope is resolved: successful exports/downloads of patient-identifying data and reports/manifests are audited; mass lookup and ordinary object views/search are excluded. Individual AdminSecurityAudit event-detail views are not logged.
 5. audit export/download permissions, access logging and tamper-evidence/backup requirements;
 6. **Approved outage behavior (2026-11-18): fail closed** for privileged mutations and successful login when the mandatory audit record cannot be committed atomically. Ordinary reads are not automatically blocked. A blanket synchronous audit requirement for every 401/403 is not approved; denial-event policy remains separately bounded and open.
 
@@ -198,7 +198,7 @@ PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAu
 
 ## 14. Audit access/export gate (2026-11-19)
 
-`UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` proposes admin-only feed/detail access, separate controlled export with mandatory reason, bounded field allowlist and actor-bound expiring artifacts. It rejects per-row/per-page recursive logging into AdminSecurityAudit and proposes a separate append-only access-log channel for feed-open and export/download facts. Product decisions remain open: whether every admin may export or a restricted subset/second approval is required; whether individual detail views are logged; and whether feed-open telemetry is mandatory or best-effort. No implementation is claimed.
+`UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` proposes admin-only feed/detail access, separate controlled export with mandatory reason, bounded field allowlist and actor-bound expiring artifacts. It rejects per-row/per-page recursive logging into AdminSecurityAudit and proposes a separate append-only access-log channel for feed-open and export/download facts. Product decisions: any admin may export with a mandatory non-empty reason; no separate permission or second-admin approval. Individual event-detail views are not logged. Feed-open telemetry mandatory/best-effort remains open. No implementation is claimed.
 
 
 ## 15. Product decision — admin audit-feed export approved (2026-11-19)
