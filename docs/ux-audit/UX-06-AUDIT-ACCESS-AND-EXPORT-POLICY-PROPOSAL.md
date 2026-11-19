@@ -1,118 +1,56 @@
-# UX-06 — AdminSecurityAudit access and export policy proposal
+# UX-06 — AdminSecurityAudit access policy
 
-**Status:** audit-feed export is approved for any admin with a mandatory non-empty reason; patient-identifying fields are permitted in explicitly allowlisted export columns. Remaining technical and retention details are open.  
-**Prepared:** 2026-11-19  
-**Baseline:** `docs/ux-audit-project`, HEAD `e8d5e26b02b61e560e0a3a7685c212e26642932f`.
+**Status:** целевой продуктовый контракт; экспорт самой ленты AdminSecurityAudit полностью исключён решением владельца продукта от 2026-11-19. Документ не является разрешением на реализацию.  
+**Prepared:** 2026-11-19
 
-## 1. Existing approved boundary
+## 1. Доступ к глобальной ленте
 
-- The global administrative/security audit feed is admin-only.
-- Branch, archive and central-office roles do not receive global audit access.
-- This does not remove the existing admin global access to cards and object history.
-- The global feed contains administrative/security audit facts, not operational DomainEvent history.
-- Business object timelines remain in their object-specific views and scope rules.
-- Audit access must not expose passwords, tokens, keys, patient payloads, raw request/response bodies or unrestricted JSON.
-- Sensitive data export events remain in scope; mass card lookup/search remains excluded from audit.
+- Глобальная лента AdminSecurityAudit доступна только пользователям с существующей ролью `admin`.
+- Роли `branch`, `archive` и `central_office` не получают доступа к глобальной ленте.
+- Администратор сохраняет глобальный просмотр карточек и истории конкретных объектов согласно D-07; это не превращает операционную историю в глобальную audit-ленту.
+- Глобальная лента содержит только административные и security-события. Операционные факты остаются в DomainEvent и истории соответствующих объектов.
+- Просмотр ленты, фильтрация, пагинация и открытие деталей событий не создают access-log событий.
+- Используются типизированные представления и allowlist полей для каждого типа события; произвольный raw JSON viewer не допускается.
+- На каждом запросе сервер проверяет роль и доступ; фильтры и размеры страниц ограничены.
 
-## 2. Approved permission model
+## 2. Экспорт AdminSecurityAudit запрещён как функциональность
 
-### 2.1 Read
+**Окончательное решение владельца продукта (2026-11-19): экспорт AdminSecurityAudit вообще не нужен.**
 
-Retain the existing `admin` role as the only role allowed to open the global AdminSecurityAudit feed and inspect event details. Do not create a new general-purpose viewer role or grant access to other operational roles.
+Следовательно, целевая система не должна предоставлять:
+- экспорт/выгрузку ленты или отдельных событий AdminSecurityAudit;
+- export endpoints, UI-действия, разрешения или команды для такого экспорта;
+- генерацию файлов, временные export artifacts, их хранение, скачивание, продление срока или автоматическое истечение;
+- отдельные события запроса, формирования, ошибки или скачивания экспорта самой ленты;
+- отдельный AuditAccessLog только ради экспорта AdminSecurityAudit.
 
-Read access should be implemented through curated, event-specific views:
-- feed list: timestamp, event type, actor, outcome, target reference and concise safe summary;
-- event detail: only fields allowed by that event type's schema;
-- no generic raw JSON viewer;
-- server-side authorization on every list, filter, detail and pagination request;
-- bounded date ranges/page sizes and safe filter allowlists;
-- no direct runtime table SELECT if the protected read boundary can provide the required scope.
+Ранее согласованные требования об экспорте самой ленты, обязательной причине, allowlist экспортных колонок, включении ФИО/номеров карт, actor-bound артефактах и TTL 24 часа **отменены и не являются частью целевого контракта**. Никакой срок жизни audit-feed export artifact устанавливать не требуется, поскольку такого артефакта не существует.
 
-Ordinary feed viewing does not require a free-text reason. The system already attributes the authenticated admin actor and time.
+Это решение касается только экспорта самой AdminSecurityAudit. Оно не отменяет самостоятельные продуктовые процессы экспорта бизнес-данных: успешные выгрузки/скачивания персональных данных пациентов, а также отчётов и манифестов, если они выносят такие данные за пределы обычного просмотра, остаются в области аудита согласно отдельному каталогу событий и своим требованиям.
 
-### 2.2 Export — approved for all admins
+## 3. Запрет рекурсивного журналирования чтения
 
-**Product decision (2026-11-19):** any user with the existing `admin` role may export the AdminSecurityAudit feed, provided a mandatory non-empty reason is supplied. A separate `audit_export` permission and second-admin approval are not required.
+- Не регистрировать открытие общей ленты.
+- Не регистрировать просмотр деталей отдельных событий.
+- Не регистрировать фильтрацию, пагинацию, навигацию, рендер строк, polling и повторный рендер клиента.
+- Не создавать access-log только для обычного чтения AdminSecurityAudit.
+- Не создавать отдельный канал аудита доступа к ленте, если у него нет другого отдельно утверждённого назначения.
 
-Export remains a distinct privileged action, not an automatic consequence of reading the feed. Apply:
-- explicit export action and mandatory non-empty reason;
-- bounded date range, event-type filters and row/size limits;
-- fixed allowlisted export format and columns;
-- server-side authorization and scope enforcement;
-- export event recorded with actor, reason, filters/scope, outcome, row count, opaque artifact reference, creation/expiry timestamps and correlation ID;
-- no event payload duplication, file contents, tokens or public download URL in audit payload.
+## 4. Retention и целостность
 
-This permission does not extend to branch, archive or central-office roles. It concerns exporting the audit feed itself and does not alter the separate catalog of successful business-data exports/downloads of patient-identifying card data and reports/manifests.
+- Сроки хранения AdminSecurityAudit остаются отдельным governance-вопросом. Организация сообщила, что утверждённых сроков пока нет; сроки нельзя назначать предположительно.
+- Правила legal hold, purge, backup expiry/reconciliation и доказательства целостности должны быть определены независимо от наличия/отсутствия экспорта.
+- Retention событий бизнес-экспорта персональных данных определяется отдельно и не смешивается с несуществующим экспортом audit feed.
 
-## 3. Access logging without recursive audit
+## 5. Критерии приёмки (не выполнялись)
 
-Do not append a row to the same AdminSecurityAudit feed for every read of that feed. It creates a self-referential stream, complicates verification and can amplify ordinary pagination into high-volume audit writes.
+- Не-admin роли не могут читать глобальную ленту и детали.
+- Admin может просматривать ленту и детали типизированным безопасным представлением.
+- В UI/API отсутствуют функции и endpoints экспорта AdminSecurityAudit и скачивания audit artifacts.
+- Обычное чтение ленты и деталей не создаёт рекурсивных audit/access-log событий.
+- Успешные бизнес-экспорты/скачивания персональных данных и соответствующие отчёты/манифесты продолжают аудироваться по отдельному event catalog.
+- Retention и integrity policy применяется к самим audit records независимо от экспорта.
 
-Use a logically separate, append-only `AuditAccessLog` (name provisional) or equivalent security access channel for export request/completion/download facts only, with its own retention and integrity policy. It is not a second business event stream and must not contain copies of AdminSecurityAudit payloads.
+## 6. Граница решения
 
-Recommended events:
-- Opening the global audit feed is not logged (product decision, 2026-11-19).
-- Individual event-detail views are not logged (product decision, 2026-11-19).
-- `audit.export_requested`;
-- `audit.export_completed` / `audit.export_failed`;
-- `audit.export_downloaded`;
-- `audit.access_denied`: bounded telemetry, not necessarily a durable row for every denial.
-
-Minimum access-log envelope:
-- immutable event ID and schema version;
-- DB timestamp;
-- authenticated actor and role snapshot;
-- action/outcome;
-- bounded query scope metadata (date range, event-type filter, page count) without copying arbitrary search text;
-- target event ID for detail view, if enabled;
-- export reason, safe filter scope, row count and opaque artifact reference for export;
-- command/correlation/request IDs.
-
-Do not log feed opening, individual event-detail views, page navigation, each row rendered, polling, client-side re-render or each event in a displayed list. Export actions always receive their own explicit records.
-
-Access-log failure policy:
-- export generation/download must fail closed if its mandatory access/export record cannot be committed;
-- opening or reading the audit feed has no feed-open telemetry dependency because the action is not logged;
-- no silent export success without a durable export record.
-
-The access log must be independently protected and monitored. If stored in the same PostgreSQL database, use a distinct table/schema and grants, while recognizing that this is not independent protection from a database superuser. External checkpointing/immutable anchoring should cover both logs or explicitly document the difference.
-
-## 4. Artifact lifecycle
-
-Audit-feed export artifacts are in scope. They must be protected, actor-bound and opaque; authorization must be rechecked at download time. Do not place file contents, bearer tokens or public download URLs in audit payloads. Artifact expiry, storage controls and legal-hold interaction remain open technical/governance decisions. Business-data exports (medical-card data, reports and manifests) follow their own approved workflow and remain separately auditable.
-
-## 5. Acceptance criteria (not executed)
-
-- Non-admin roles cannot access feed, detail, filters, export endpoints or artifact downloads.
-- Admin read access returns only event-specific allowlisted fields.
-- Any admin can request an audit-feed export with a mandatory non-empty reason; the export uses explicit allowlisted columns (which may include approved patient-identifying fields), bounded scope/volume, a protected actor-bound artifact and download-time authorization recheck.
-- Feed pagination and rendering do not create recursive event rows.
-- Opening the global audit feed and viewing individual event details do not generate access-log records.
-- Access-log payload does not copy complete audit event payloads or artifact contents; it records bounded export metadata and an opaque artifact reference. Patient-identifying fields may appear in the exported file only when explicitly allowlisted.
-- Access-log retention and integrity are explicitly defined.
-- Audit read/export access remains unavailable to branch/archive/CO roles.
-
-## 6. Decisions still required
-
-1. **Resolved:** any admin may export the audit feed with a mandatory non-empty reason; no separate export permission or second-admin approval.
-2. **Resolved:** individual event-detail views are not logged.
-3. Approve retention/integrity treatment for export/access evidence together with R1–R4.
-
-## 7. Non-goals
-
-- No new viewer role.
-- No broad access for branch/archive/CO.
-- No automatic audit record for each 401/403.
-- No audit-feed export by non-admin roles; any admin export requires a mandatory non-empty reason and bounded, protected handling. Patient-identifying fields are permitted only in explicitly allowlisted export columns.
-- No access-log record for opening the feed or viewing individual event details; no recursive writes for ordinary audit reads.
-- No assumption that MFA, step-up authentication, KMS, artifact storage or a separate permission framework already exists.
-- No implementation, DDL, migration, API/UI or infrastructure change is authorized by this proposal.
-
-
-## 8. Owner decision — patient-identifying data in audit-feed exports (2026-11-19)
-
-**Approved:** an export of the AdminSecurityAudit feed may include patient-identifying data, including patient full names and medical-card numbers. The earlier blanket prohibition on patient identifiers in the audit-feed export is superseded by this explicit owner decision. This permission applies only to the exported audit artifact; it does not authorize adding patient identifiers to ordinary audit-event payloads or broadening feed access beyond the admin role.
-
-The export contract must still enforce the mandatory non-empty reason, admin authorization, bounded date range and volume, fixed allowlisted format/columns, protected actor-bound artifact and download-time authorization, and mandatory durable records for export request/result/download. The exact patient-identifying columns must be explicitly allowlisted in the export schema; arbitrary payload dumps remain prohibited. Keep the export purpose-limited and minimize fields to those approved for the selected export. Retention/legal-hold and artifact-expiry policy remain unresolved governance gates.
-
-This decision does not authorize implementation, DDL, migrations, API/UI or infrastructure changes.
+Решение меняет только целевые требования. Оно не означает, что существующие элементы кода уже удалены или изменены. Реализация, API/UI, SQL/DDL, миграции, тесты и deployment по-прежнему требуют отдельного разрешения.

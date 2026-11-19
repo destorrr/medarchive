@@ -179,3 +179,8 @@ See `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It retains admin-only fe
 ## 12. Product decision — admin audit-feed export approved (2026-11-19)
 
 Any user with the existing `admin` role may export the AdminSecurityAudit feed with a mandatory non-empty reason. No separate export permission and no second-admin approval are required. Export must remain bounded, field-allowlisted, attributable and protected; the export outcome is recorded. This does not grant export access to branch/archive/CO roles and does not change the audit catalog for business-data exports.
+
+
+## Owner decision clarification — audit-feed export excluded (2026-11-19)
+
+The product owner rejected export of AdminSecurityAudit itself. Any references in this catalog to successful exports/downloads or report/manifest operations concern **business data leaving ordinary object viewing** (for example, patient-identifying card data or qualifying reports/manifests), not export of the AdminSecurityAudit feed. Do not add audit-feed export events, commands, artifacts or access-log records. The existing business-data export event scope remains unchanged.

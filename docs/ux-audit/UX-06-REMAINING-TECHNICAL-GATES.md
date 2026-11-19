@@ -18,7 +18,7 @@
 | External consumers and grants | Подтвердить cron/systemd, ETL/BI, read replicas, ручные SQL consumers, интеграции и effective grants | Нельзя безопасно менять event schema/payload/retention, пока неизвестны читатели и обходные права |
 | Deployment topology | Зафиксировать реальные runtime/migrator/backup/monitoring/maintenance identities, DB URLs и secret distribution | Нельзя окончательно проектировать grants, rotation и operational access на предположительной топологии |
 | Typed command/event catalog | Завершить schemas, versions, event types, guards, outcomes и API mapping для P-04/P-07 и остальных critical workflows | Нужна однозначная DB/API/UI/test boundary до DDL |
-| Admin/security audit policy | Retention/legal hold, IP/identity digest, HMAC key lifecycle, privileged-read scope, export/access logging, tamper evidence, outage behavior | Без политики нельзя проектировать retention, индексы, key handling и безопасный failover |
+| Admin/security audit policy | Retention/legal hold, IP/identity digest, HMAC key lifecycle, privileged-read scope for business-data exports, business-export access logging, tamper evidence, outage behavior | Без политики нельзя проектировать retention, индексы, key handling и безопасный failover |
 | Command ledger retention | Составить retry horizon для browser clients, workers, scheduled jobs и integrations; определить reversible/irreversible command catalog | TTL до этого может разрешить повторное исполнение старого command_id |
 | Migration/reconciliation | Legacy SQLite, viewer, incident, CardPlacement и admin event evidence; mapping/checksums/reconciliation/rollback | Нельзя безопасно планировать destructive retirement или cutover |
 | Evidence matrix | Positive/negative role tests, DB grants, append-only, atomicity, concurrent replay, rollback, migration verification | Нельзя считать технические контракты реализуемыми без проверяемых критериев приёмки |
@@ -53,7 +53,7 @@ Added `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md` as a versioned design proposal. It
 
 **PR-READ-01 resolved (2026-11-19):** the product owner rejected audit records for mass card lookup/search, including large-result and cross-scope searches. Keep successful exports/downloads and report/manifest operations that export patient-identifying data in scope. Ordinary single-card views, routine search, bulk lookup, dashboards and object timelines are excluded.
 
-Retention/legal hold, digest/IP and key lifecycle, export/access logging, tamper evidence, external consumers/grants and deployment topology remain open technical/operational gates. No statutory retention period is assumed.
+Retention/legal hold, digest/IP and key lifecycle, business-data export/access logging, tamper evidence, external consumers/grants and deployment topology remain open technical/operational gates. No statutory retention period is assumed.
 
 
 ## 7. Retention and integrity controls — 2026-11-19
@@ -65,7 +65,7 @@ The product owner confirmed (2026-11-19) that the organization has no approved r
 
 ## 8. Audit access/export policy — 2026-11-19
 
-Added `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It preserves admin-only global audit access; separates viewing from export; proposes mandatory export reason, bounded/minimized export, actor-bound expiring artifacts, and separate append-only logging for export/download facts only. Resolved: neither feed opening nor individual event-detail views are logged. Still open: artifact expiry/limits and whether audit exports may contain patient-identifying data.
+Added `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It preserves admin-only global audit access; separates viewing from export; proposes mandatory export reason, bounded/minimized export, actor-bound expiring artifacts, and separate append-only logging for export/download facts only. Resolved: neither feed opening nor individual event-detail views are logged. Still open: artifact expiry/limits and the product owner rejected AdminSecurityAudit export entirely; this is no longer an open question.
 
 
 ## 9. Audit-feed export decision (2026-11-19)
@@ -76,3 +76,17 @@ The product owner approved audit-feed export for any existing `admin` user with 
 ## Owner decision — patient-identifying data in audit export (2026-11-19)
 
 Resolved: AdminSecurityAudit feed exports may include patient-identifying fields, including patient full names and medical-card numbers. This permission is limited to explicitly allowlisted export columns and does not relax event-payload minimization or admin-only access. The export still requires a non-empty reason, bounded scope and volume, protected artifact handling, authorization recheck on download, and mandatory durable export/download evidence. Retention, legal hold and artifact expiry remain open gates. Documentation only; implementation is not authorized.
+
+
+## 10. Owner decision — no AdminSecurityAudit export (2026-11-19)
+
+The product owner confirmed that exporting the AdminSecurityAudit feed is not needed at all. This supersedes sections 8–9 and the patient-identifier export approval above insofar as they describe audit-feed export.
+
+Consequences:
+- No AdminSecurityAudit export endpoint, UI, permission, command, file, artifact, download, artifact TTL or export-specific access log is required or permitted in the target product.
+- Admin-only read access to the global feed and event details remains.
+- Opening the feed and viewing details remain unlogged.
+- Separate successful business-data exports/downloads of patient-identifying data and qualifying reports/manifests remain auditable under the event catalog; do not confuse them with audit-feed export.
+- Retention/legal hold, HMAC/checkpoint integrity, external consumer/grant inventory and business-data export audit remain separate gates.
+
+The organization has no approved audit retention periods; this remains a blocking pre-production governance gate. No duration is inferred. Documentation only; implementation is not authorized.

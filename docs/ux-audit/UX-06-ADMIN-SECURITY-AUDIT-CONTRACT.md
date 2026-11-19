@@ -209,3 +209,18 @@ Any user with the existing `admin` role may export the AdminSecurityAudit feed w
 ## 8. Owner decision — patient identifiers in AdminSecurityAudit export (2026-11-19)
 
 The owner permits the AdminSecurityAudit export to include patient-identifying data, including full names and medical-card numbers. This is a narrowly scoped exception for the explicitly allowlisted export representation only. It does not change the default prohibition on patient identifiers in ordinary AdminSecurityAudit event payloads, nor does it permit generic raw JSON/payload export. Export columns must be explicitly defined and purpose-limited; authorization remains admin-only with a mandatory non-empty reason, bounded scope/volume, protected artifact handling and mandatory export/download evidence. No implementation is authorized by this decision.
+
+
+## 16. Owner decision — no AdminSecurityAudit export (2026-11-19)
+
+**Final decision:** the product owner explicitly rejected the AdminSecurityAudit export feature entirely. This supersedes sections 14–15 and the later patient-identifier export permission wherever they describe exporting the audit feed.
+
+Target contract:
+- Admin retains read-only global access to the AdminSecurityAudit feed and event details, subject to event-specific field allowlists and normal authorization.
+- No audit-feed export UI, API/command, export permission, file generation, artifact storage, download, expiry lifecycle or export-specific access log is part of the product.
+- Opening the feed, viewing event details, filtering and pagination are not logged.
+- Earlier decisions allowing any admin to export with a reason, allowing patient identifiers in exported audit rows, and proposals for 24-hour artifact TTL are superseded and must not be implemented.
+- This does **not** remove auditing of separate business-data exports/downloads of patient-identifying data or reports/manifests that take such data outside ordinary object viewing. Those remain governed by the event catalog and their own business workflow.
+- Audit retention/legal hold and integrity remain separate governance/technical gates; absence of audit-feed export does not remove or shorten audit retention requirements.
+
+This is a product decision recorded in documentation only. No application/API/DB/DDL/migration/test/deployment change is authorized.

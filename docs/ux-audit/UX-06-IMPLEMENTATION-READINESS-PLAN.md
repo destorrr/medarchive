@@ -548,7 +548,7 @@ The product owner rejected the proposed `Card.phone` clerical correction. The or
 1. **External consumer and grants inventory:** получить подтверждение владельца эксплуатации по cron/systemd jobs, ETL/BI, ручным SQL consumers, read replicas и интеграциям; сверить effective DB roles/grants на реальном deployment до изменения event schema/payload/retention.
 2. **Deployment principal topology:** описать фактические app/migrator/backup/monitoring/maintenance identities, URLs и secret distribution. Базовые principals `medarchive_owner` NOLOGIN, `medarchive_migrator` LOGIN и `medarchive_runtime` LOGIN уже утверждены; дополнительные роли зависят от подтверждённой топологии.
 3. **Typed command/event catalog:** завершить per-command input/result schemas, versioning, state guards, event types, negative outcomes и mapping API errors. P-04/P-07 typed command contracts должны отражать утверждённые правила, не generic override.
-4. **Admin/security audit policy:** outage baseline утверждён: fail closed для privileged mutations и успешного login, если обязательная запись не может быть атомарно сохранена; ordinary reads автоматически не блокируются; все 401/403 не обязаны синхронно писать durable audit. Осталось определить retention/legal hold, digest/IP policy и key rotation, privileged-read scope, export permissions/tamper evidence и отдельную bounded policy для denial events.
+4. **Admin/security audit policy:** outage baseline утверждён: fail closed для privileged mutations и успешного login, если обязательная запись не может быть атомарно сохранена; ordinary reads автоматически не блокируются; все 401/403 не обязаны синхронно писать durable audit. Осталось определить retention/legal hold, digest/IP policy и key rotation, privileged-read scope for business-data exports, tamper evidence и отдельную bounded policy для denial events.
 5. **Command ledger retention:** сохранить tombstone для необратимых команд; для остальных определить максимальные retry horizons всех клиентов/jobs/integrations и только затем установить календарный TTL/purge policy.
 6. **Migration/reconciliation preflight:** инвентаризировать legacy SQLite/viewer/incident/CardPlacement и исторические admin events; определить mapping, проверки полноты и rollback/retention до любых миграций.
 7. **Evidence/test matrix:** для каждой команды/роли зафиксировать позитивные, негативные, concurrent retry, rollback, append-only, grants и migration-preservation сценарии. Тесты пока не запускались.
@@ -562,7 +562,7 @@ The product owner rejected the proposed `Card.phone` clerical correction. The or
 
 A detailed proposal is available in `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md`. It defines candidate mandatory transactional events, bounded security telemetry, privileged-read event candidates, common envelope, payload allowlists/prohibitions, read permissions and required acceptance evidence.
 
-The catalog remains a proposal, not a final approved schema. PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAudit, including large-result and cross-scope searches; successful exports/downloads and report/manifest operations that export patient-identifying data remain in scope. Retention/legal hold, digest/IP and HMAC lifecycle, export/access logging and tamper-evidence policy remain unresolved. No implementation, DDL or tests are authorized by this proposal.
+The catalog remains a proposal, not a final approved schema. PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAudit, including large-result and cross-scope searches; successful business-data exports/downloads and report/manifest operations that export patient-identifying data remain in scope; exporting AdminSecurityAudit itself is prohibited. Retention/legal hold, digest/IP and HMAC lifecycle, export/access logging and tamper-evidence policy remain unresolved. No implementation, DDL or tests are authorized by this proposal.
 
 
 ## 12. Audit retention and integrity proposal (2026-11-19)
@@ -572,7 +572,7 @@ Technical proposal: `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It separates 
 
 ## 13. Audit access and export policy (2026-11-19)
 
-Proposal: `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It specifies admin-only read, separate export authorization with mandatory reason, bounded/minimized fields, actor-bound expiring artifacts, and non-recursive export/download access logging only. Acceptance criteria cover server-side scope enforcement, non-admin denial, durable export evidence and artifact expiry. Product decision: any admin may export audit data with a mandatory non-empty reason; no separate export permission or second-admin approval. Neither feed opening nor individual event-detail views are logged.
+Proposal: `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It specifies admin-only read, admin-only read access with no audit-feed export; ordinary feed/detail reads are not logged. Acceptance criteria cover server-side scope enforcement, non-admin denial, durable export evidence and artifact expiry. Product decision: audit-feed export is not a product feature and must not be implemented. Neither feed opening nor individual event-detail views are logged.
 
 
 ## 37. UX-06 — экспорт AdminSecurityAudit разрешён всем admin с причиной (2026-11-19)
@@ -588,3 +588,18 @@ Proposal: `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It specifies admin
 ## Owner decision recorded — patient identifiers in audit-feed export (2026-11-19)
 
 The owner explicitly permits patient-identifying data (including full names and medical-card numbers) in the exported AdminSecurityAudit feed. Treat this as a narrow export-schema exception, not permission to add these identifiers to ordinary audit event payloads or to export arbitrary JSON. Maintain admin-only access, mandatory reason, bounded export scope/volume, explicit column allowlist, protected actor-bound artifact, download-time authorization recheck and mandatory export/download evidence. Retention/legal hold/artifact expiry remain pre-production gates. No implementation authorization is implied.
+
+
+## Owner decision — AdminSecurityAudit export is not required (2026-11-19)
+
+The product owner explicitly confirmed that export of the AdminSecurityAudit feed is not needed at all. This is the current and controlling decision and supersedes all earlier readiness notes that approved admin audit-feed export, patient-identifying columns in that export, export artifacts, download authorization, export evidence and artifact TTL.
+
+Readiness implications:
+- Keep admin-only read access to the global AdminSecurityAudit feed and event details.
+- Do not implement audit-feed export controls, endpoints, commands, permissions, files, artifacts, downloads or export-specific access logging.
+- Do not create an AuditAccessLog solely to record audit-feed export activity.
+- Keep ordinary feed opening and event-detail viewing unlogged, as already approved.
+- Preserve the distinct audit requirements for successful business-data exports/downloads of patient-identifying data and qualifying reports/manifests. These are not exports of AdminSecurityAudit.
+- Retention/legal hold, integrity evidence, and backup reconciliation for audit records remain independent open gates.
+
+This is documentation-only. No source, schema, migrations, tests, workflows or deployment were changed or authorized.
