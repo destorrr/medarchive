@@ -573,3 +573,8 @@ Technical proposal: `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It separates 
 ## 13. Audit access and export policy (2026-11-19)
 
 Proposal: `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It specifies admin-only read, separate export authorization with mandatory reason, bounded/minimized fields, actor-bound expiring artifacts, and non-recursive access logging. Acceptance criteria cover server-side scope enforcement, non-admin denial, durable export evidence and artifact expiry. Product decisions on export authority, detail-view telemetry and feed-open policy are not yet approved.
+
+
+## 37. UX-06 — экспорт самой ленты AdminSecurityAudit не предусмотрен (2026-11-19)
+
+Владелец продукта подтвердил: экспорт AdminSecurityAudit вообще не предполагается. Исключены экспортная permission, endpoint, формат файла, артефакт и download flow. Это решение касается выгрузки самого журнала и не отменяет аудит успешных бизнес-операций экспорта/скачивания персональных данных медицинских карт, а также отчётов/манифестов с такими данными — эти события остаются в каталоге. Осталось согласовать только гранулярность логирования доступа к ленте и деталей событий и режим feed-open telemetry. Изменена только Markdown-документация; код, БД, миграции, тесты, workflows и deployment не менялись.

@@ -199,3 +199,8 @@ PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAu
 ## 14. Audit access/export gate (2026-11-19)
 
 `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` proposes admin-only feed/detail access, separate controlled export with mandatory reason, bounded field allowlist and actor-bound expiring artifacts. It rejects per-row/per-page recursive logging into AdminSecurityAudit and proposes a separate append-only access-log channel for feed-open and export/download facts. Product decisions remain open: whether every admin may export or a restricted subset/second approval is required; whether individual detail views are logged; and whether feed-open telemetry is mandatory or best-effort. No implementation is claimed.
+
+
+## 15. Product decision — audit-feed export excluded (2026-11-19)
+
+The product owner confirmed that exporting the AdminSecurityAudit feed is not supported or planned. Remove audit-feed export as a capability from the target model: no permission, endpoint, artifact or download. This does not change the approved catalog for logging successful business-data exports/downloads of patient-identifying medical-card data and reports/manifests.

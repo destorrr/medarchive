@@ -174,3 +174,8 @@ See `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` for proposed event retention c
 ## 11. Audit access and export policy proposal
 
 See `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It retains admin-only feed/detail access, separates export from read, proposes mandatory export reason and bounded/minimized artifacts, and uses a separate append-only access-log channel to avoid recursive writes. Export permission split, detail-view telemetry and feed-open failure policy require product-owner decisions.
+
+
+## 12. Product decision — no audit-feed export (2026-11-19)
+
+The product owner confirmed that export of the AdminSecurityAudit feed is not предусмотрено. Do not design or implement an audit-feed export permission, endpoint, file format, artifact or download workflow. This is distinct from business-data exports/downloads of patient-identifying medical-card data and reports/manifests; those successful operations remain auditable events.

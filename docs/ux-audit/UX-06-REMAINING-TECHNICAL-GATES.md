@@ -65,4 +65,9 @@ The product owner confirmed (2026-11-19) that the organization has no approved r
 
 ## 8. Audit access/export policy — 2026-11-19
 
-Added `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It preserves admin-only global audit access; separates viewing from export; proposes mandatory export reason, bounded/minimized export, actor-bound expiring artifacts, and separate append-only access logging instead of recursive writes to AdminSecurityAudit. Product decisions remain: all-admin export versus restricted permission/second approval; whether individual detail views are logged; whether feed-open telemetry is mandatory or best-effort; artifact expiry/limits and whether audit exports may contain patient-identifying data.
+Added `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It preserves admin-only global audit access; separates viewing from export; proposes mandatory export reason, bounded/minimized export, actor-bound expiring artifacts, and separate append-only access logging instead of recursive writes to AdminSecurityAudit. Product decisions remain: whether individual detail views are logged; whether feed-open telemetry is mandatory or best-effort; artifact expiry/limits and whether audit exports may contain patient-identifying data.
+
+
+## 9. Audit-feed export decision (2026-11-19)
+
+The product owner confirmed no audit-feed export is planned. Remove export authorization, artifact and download requirements from the audit-feed design. Continue auditing successful business-data exports/downloads of patient-identifying card data and reports/manifests.

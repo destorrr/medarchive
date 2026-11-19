@@ -157,3 +157,8 @@ No PostgreSQL, SQL/DDL, migration, application tests, CI or production checks we
 ## 9. Audit access and export
 
 The companion proposal `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` recommends admin-only read access; export as a distinct privileged action with a mandatory reason, bounded scope, field minimization and actor-bound expiring artifact; and a separate append-only access-log channel to avoid recursive writes into the audit feed. Export permission split, detail-view logging, feed-open telemetry failure behavior, artifact limits/expiry and access-log retention/integrity remain unresolved.
+
+
+## 10. Audit-feed export is out of scope
+
+Product owner decision (2026-11-19): exporting the AdminSecurityAudit feed is not предусмотрено. No audit-feed export endpoint, artifact or download flow is to be designed. This must not be confused with business-data export events, which remain in scope.

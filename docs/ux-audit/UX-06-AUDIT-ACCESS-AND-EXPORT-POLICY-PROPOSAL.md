@@ -1,6 +1,6 @@
 # UX-06 — AdminSecurityAudit access and export policy proposal
 
-**Status:** product/technical proposal; export authorization and access-logging granularity require owner approval.  
+**Status:** product decision recorded: exporting the AdminSecurityAudit feed is not supported or planned. Remaining access-logging details require owner approval.  
 **Prepared:** 2026-11-19  
 **Baseline:** `docs/ux-audit-project`, HEAD `e8d5e26b02b61e560e0a3a7685c212e26642932f`.
 
@@ -14,7 +14,7 @@
 - Audit access must not expose passwords, tokens, keys, patient payloads, raw request/response bodies or unrestricted JSON.
 - Sensitive data export events remain in scope; mass card lookup/search remains excluded from audit.
 
-## 2. Recommended permission model
+## 2. Approved permission model
 
 ### 2.1 Read
 
@@ -30,41 +30,12 @@ Read access should be implemented through curated, event-specific views:
 
 Ordinary feed viewing does not require a free-text reason. The system already attributes the authenticated admin actor and time.
 
-### 2.2 Export
+### 2.2 Audit-feed export — not supported
 
-Export is a separate privileged capability, not an automatic consequence of having read access.
+**Product decision (2026-11-19): exporting the AdminSecurityAudit feed is not предусмотрено.** There is no audit-feed export capability, no audit-export permission, no export artifact, no download flow and no second-person approval workflow to design. Do not add CSV/PDF/JSON export, bulk download or equivalent extraction endpoint for this feed.
 
-**Recommended first release:** keep export admin-only but require:
-- explicit export action;
-- mandatory non-empty reason;
-- bounded date range and event-type filters;
-- fixed allowlisted export format/columns;
-- row/size limits and asynchronous generation if needed;
-- re-authentication or step-up only if supported by the eventual authentication design; do not assume MFA exists;
-- short-lived, single-purpose download artifact, protected against public/link-only access;
-- export event recorded with actor, reason, filters/scope, outcome, row count, artifact reference, creation/expiry timestamps and correlation ID;
-- no event payload duplication, file contents, tokens or public download URL in audit payload.
+This decision concerns export of the audit feed itself. It does **not** remove the separately approved audit events for successful exports/downloads of patient-identifying medical-card data and reports/manifests that export such data. Those are business-data export actions and remain in the AdminSecurityAudit event catalog.
 
-A separate `audit_export` permission or second-person approval may be considered later if the organization needs separation of duties. It should not be invented as a new role or permission before the product owner decides and the identity/authorization model is confirmed.
-
-### 2.3 Export scope
-
-Export only the minimum fields required for the stated administrative purpose. Prefer:
-- event identifiers and timestamps;
-- event type/schema version;
-- actor/role and outcome;
-- target references;
-- reason and safe, event-specific summary;
-- integrity/checkpoint status where available.
-
-Exclude:
-- raw JSON or unrecognized payload fields;
-- secrets, credentials, token material and key identifiers beyond non-sensitive key-version metadata;
-- patient names, card numbers, DOB, phone and exported business-file contents;
-- raw IP or identity digests unless separately approved;
-- internal SQL, stack traces and unrestricted exception text.
-
-Exporting audit data that itself contains patient-identifying data should be disabled unless a separately approved use case and minimization review establish the need.
 
 ## 3. Access logging without recursive audit
 
@@ -99,26 +70,15 @@ Access-log failure policy:
 
 The access log must be independently protected and monitored. If stored in the same PostgreSQL database, use a distinct table/schema and grants, while recognizing that this is not independent protection from a database superuser. External checkpointing/immutable anchoring should cover both logs or explicitly document the difference.
 
-## 4. Export artifact lifecycle
+## 4. Artifact lifecycle
 
-- Artifact storage must be private and encrypted at rest and in transit using deployment-approved controls.
-- Download authorization must be actor-bound and rechecked at download time; possession of a URL alone must not grant access.
-- Use opaque, unguessable artifact identifiers; never store bearer download tokens in audit records.
-- Expire artifacts automatically according to an approved short-lived artifact policy; the exact lifetime is an operational decision and must not be confused with audit-event retention.
-- Delete expired artifact bytes and metadata under a controlled process, respecting legal hold where applicable.
-- Audit evidence records the export action and outcome; it does not preserve the exported file indefinitely.
-- Repeated download behavior, download count limits and whether one export may be downloaded more than once must be defined before implementation.
+No audit-feed export artifact exists in the target model. The artifact lifecycle requirements in this section do not apply to AdminSecurityAudit. Business-data exports (medical-card data, reports and manifests) follow their own approved workflow and remain auditable as specified in the event catalog.
 
 ## 5. Acceptance criteria (not executed)
 
 - Non-admin roles cannot access feed, detail, filters, export endpoints or artifact downloads.
 - Admin read access returns only event-specific allowlisted fields.
-- Export requires explicit action and non-empty reason.
-- Export scope and row limits are enforced server-side.
-- Export generation and download are attributable and durably recorded.
-- Failure to record mandatory export evidence prevents export completion/download.
-- Artifact URLs are not public bearer credentials; actor authorization is rechecked.
-- Artifact expiry and deletion are deterministic and testable.
+- No audit-feed export, export endpoint, export artifact or download flow is available.
 - Feed pagination and rendering do not create recursive event rows.
 - Feed-open telemetry is emitted at most once per logical feed-open action, not per page/render.
 - Access-log payload does not copy audit event payloads or patient data.
@@ -127,18 +87,16 @@ The access log must be independently protected and monitored. If stored in the s
 
 ## 6. Decisions still required
 
-1. Confirm whether all admins may export audit data with a mandatory reason, or whether export requires a separately authorized subset/second approval.
-2. Decide whether to log only feed-open and export/download actions, or also individual event-detail views.
-3. Decide whether feed-open telemetry is mandatory or best-effort; export evidence remains mandatory.
-4. Define export artifact expiry, allowed formats and maximum range/row count after operational constraints are known.
-5. Approve retention/integrity treatment for the separate access log together with R1–R4.
-6. Confirm whether audit exports may ever include patient-identifying data; recommended default is no.
+1. Decide whether to log only feed-open actions or also individual event-detail views.
+2. Decide whether feed-open telemetry is mandatory or best-effort.
+3. Approve retention/integrity treatment for the separate access log together with R1–R4.
 
 ## 7. Non-goals
 
 - No new viewer role.
 - No broad access for branch/archive/CO.
 - No automatic audit record for each 401/403.
+- No audit-feed export or download capability.
 - No recursive write into AdminSecurityAudit on every feed read.
 - No assumption that MFA, step-up authentication, KMS, artifact storage or a separate permission framework already exists.
 - No implementation, DDL, migration, API/UI or infrastructure change is authorized by this proposal.
