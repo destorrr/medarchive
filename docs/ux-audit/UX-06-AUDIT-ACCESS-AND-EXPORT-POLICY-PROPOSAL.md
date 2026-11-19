@@ -1,6 +1,6 @@
 # UX-06 — AdminSecurityAudit access and export policy proposal
 
-**Status:** product decision recorded: exporting the AdminSecurityAudit feed is not supported or planned. Remaining access-logging details require owner approval.  
+**Status:** audit-feed export is approved for any admin with a mandatory non-empty reason; patient-identifying fields are permitted in explicitly allowlisted export columns. Remaining technical and retention details are open.  
 **Prepared:** 2026-11-19  
 **Baseline:** `docs/ux-audit-project`, HEAD `e8d5e26b02b61e560e0a3a7685c212e26642932f`.
 
@@ -79,16 +79,16 @@ The access log must be independently protected and monitored. If stored in the s
 
 ## 4. Artifact lifecycle
 
-No audit-feed export artifact exists in the target model. The artifact lifecycle requirements in this section do not apply to AdminSecurityAudit. Business-data exports (medical-card data, reports and manifests) follow their own approved workflow and remain auditable as specified in the event catalog.
+Audit-feed export artifacts are in scope. They must be protected, actor-bound and opaque; authorization must be rechecked at download time. Do not place file contents, bearer tokens or public download URLs in audit payloads. Artifact expiry, storage controls and legal-hold interaction remain open technical/governance decisions. Business-data exports (medical-card data, reports and manifests) follow their own approved workflow and remain separately auditable.
 
 ## 5. Acceptance criteria (not executed)
 
 - Non-admin roles cannot access feed, detail, filters, export endpoints or artifact downloads.
 - Admin read access returns only event-specific allowlisted fields.
-- No audit-feed export, export endpoint, export artifact or download flow is available.
+- Any admin can request an audit-feed export with a mandatory non-empty reason; the export uses explicit allowlisted columns (which may include approved patient-identifying fields), bounded scope/volume, a protected actor-bound artifact and download-time authorization recheck.
 - Feed pagination and rendering do not create recursive event rows.
 - Opening the global audit feed and viewing individual event details do not generate access-log records.
-- Access-log payload does not copy audit event payloads or patient data.
+- Access-log payload does not copy complete audit event payloads or artifact contents; it records bounded export metadata and an opaque artifact reference. Patient-identifying fields may appear in the exported file only when explicitly allowlisted.
 - Access-log retention and integrity are explicitly defined.
 - Audit read/export access remains unavailable to branch/archive/CO roles.
 
@@ -103,7 +103,7 @@ No audit-feed export artifact exists in the target model. The artifact lifecycle
 - No new viewer role.
 - No broad access for branch/archive/CO.
 - No automatic audit record for each 401/403.
-- No audit-feed export by non-admin roles; any admin export requires a mandatory non-empty reason and bounded, protected handling.
+- No audit-feed export by non-admin roles; any admin export requires a mandatory non-empty reason and bounded, protected handling. Patient-identifying fields are permitted only in explicitly allowlisted export columns.
 - No access-log record for opening the feed or viewing individual event details; no recursive writes for ordinary audit reads.
 - No assumption that MFA, step-up authentication, KMS, artifact storage or a separate permission framework already exists.
 - No implementation, DDL, migration, API/UI or infrastructure change is authorized by this proposal.
