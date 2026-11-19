@@ -204,3 +204,8 @@ PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAu
 ## 15. Product decision — admin audit-feed export approved (2026-11-19)
 
 Any user with the existing `admin` role may export the AdminSecurityAudit feed with a mandatory non-empty reason. No separate export permission or second-admin approval is required. Export is a distinct privileged operation and must be bounded, field-allowlisted, actor-attributed, protected and durably recorded. No export access is granted to branch/archive/CO roles.
+
+
+## 8. Owner decision — patient identifiers in AdminSecurityAudit export (2026-11-19)
+
+The owner permits the AdminSecurityAudit export to include patient-identifying data, including full names and medical-card numbers. This is a narrowly scoped exception for the explicitly allowlisted export representation only. It does not change the default prohibition on patient identifiers in ordinary AdminSecurityAudit event payloads, nor does it permit generic raw JSON/payload export. Export columns must be explicitly defined and purpose-limited; authorization remains admin-only with a mandatory non-empty reason, bounded scope/volume, protected artifact handling and mandatory export/download evidence. No implementation is authorized by this decision.

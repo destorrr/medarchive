@@ -583,3 +583,8 @@ Proposal: `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It specifies admin
 ## 40. UX-06 — открытие глобальной ленты не журналируется (2026-11-19)
 
 Владелец продукта ответил: нет, сам факт открытия общей ленты AdminSecurityAudit не регистрировать. Вместе с ранее утверждённым отказом регистрировать просмотр деталей отдельных событий это означает, что обычное чтение audit feed не создаёт access-log events. Журналирование остаётся для экспорта самой ленты (любой admin, обязательная причина, фиксация результата) и для успешных бизнес-экспортов/скачиваний персональных данных согласно каталогу. Отдельный AuditAccessLog, если будет реализован, содержит только факты запросов/завершения/скачивания экспорта, не feed-open и не detail-view. Изменена только Markdown-документация.
+
+
+## Owner decision recorded — patient identifiers in audit-feed export (2026-11-19)
+
+The owner explicitly permits patient-identifying data (including full names and medical-card numbers) in the exported AdminSecurityAudit feed. Treat this as a narrow export-schema exception, not permission to add these identifiers to ordinary audit event payloads or to export arbitrary JSON. Maintain admin-only access, mandatory reason, bounded export scope/volume, explicit column allowlist, protected actor-bound artifact, download-time authorization recheck and mandatory export/download evidence. Retention/legal hold/artifact expiry remain pre-production gates. No implementation authorization is implied.

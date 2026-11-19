@@ -107,3 +107,12 @@ No audit-feed export artifact exists in the target model. The artifact lifecycle
 - No access-log record for opening the feed or viewing individual event details; no recursive writes for ordinary audit reads.
 - No assumption that MFA, step-up authentication, KMS, artifact storage or a separate permission framework already exists.
 - No implementation, DDL, migration, API/UI or infrastructure change is authorized by this proposal.
+
+
+## 8. Owner decision — patient-identifying data in audit-feed exports (2026-11-19)
+
+**Approved:** an export of the AdminSecurityAudit feed may include patient-identifying data, including patient full names and medical-card numbers. The earlier blanket prohibition on patient identifiers in the audit-feed export is superseded by this explicit owner decision. This permission applies only to the exported audit artifact; it does not authorize adding patient identifiers to ordinary audit-event payloads or broadening feed access beyond the admin role.
+
+The export contract must still enforce the mandatory non-empty reason, admin authorization, bounded date range and volume, fixed allowlisted format/columns, protected actor-bound artifact and download-time authorization, and mandatory durable records for export request/result/download. The exact patient-identifying columns must be explicitly allowlisted in the export schema; arbitrary payload dumps remain prohibited. Keep the export purpose-limited and minimize fields to those approved for the selected export. Retention/legal-hold and artifact-expiry policy remain unresolved governance gates.
+
+This decision does not authorize implementation, DDL, migrations, API/UI or infrastructure changes.

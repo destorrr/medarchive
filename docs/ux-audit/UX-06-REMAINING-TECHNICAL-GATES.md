@@ -71,3 +71,8 @@ Added `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It preserves admin-onl
 ## 9. Audit-feed export decision (2026-11-19)
 
 The product owner approved audit-feed export for any existing `admin` user with a mandatory non-empty reason. No separate export permission or second-admin approval is required. Export must be bounded, field-allowlisted, protected and durably recorded. Other roles remain excluded.
+
+
+## Owner decision — patient-identifying data in audit export (2026-11-19)
+
+Resolved: AdminSecurityAudit feed exports may include patient-identifying fields, including patient full names and medical-card numbers. This permission is limited to explicitly allowlisted export columns and does not relax event-payload minimization or admin-only access. The export still requires a non-empty reason, bounded scope and volume, protected artifact handling, authorization recheck on download, and mandatory durable export/download evidence. Retention, legal hold and artifact expiry remain open gates. Documentation only; implementation is not authorized.
