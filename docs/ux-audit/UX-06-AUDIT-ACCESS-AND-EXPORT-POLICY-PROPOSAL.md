@@ -52,7 +52,7 @@ Use a logically separate, append-only `AuditAccessLog` (name provisional) or equ
 
 Recommended events:
 - `audit.feed_opened`: once when the admin opens the global feed, not on every page render;
-- `audit.event_detail_viewed`: only if the owner decides individual detail access is necessary; otherwise omit to avoid excessive tracking;
+- Individual event-detail views are not logged (product decision, 2026-11-19).
 - `audit.export_requested`;
 - `audit.export_completed` / `audit.export_failed`;
 - `audit.export_downloaded`;
@@ -95,7 +95,7 @@ No audit-feed export artifact exists in the target model. The artifact lifecycle
 ## 6. Decisions still required
 
 1. **Resolved:** any admin may export the audit feed with a mandatory non-empty reason; no separate export permission or second-admin approval.
-2. Decide whether to log only feed-open actions or also individual event-detail views.
+2. **Resolved:** individual event-detail views are not logged.
 3. Decide whether feed-open telemetry is mandatory or best-effort.
 4. Approve retention/integrity treatment for the separate access log together with R1–R4.
 
