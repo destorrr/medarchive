@@ -28,7 +28,9 @@ A single global TTL is not recommended. Assign each event a retention class thro
 | R3 — bounded security telemetry | Failed/throttled login, rejected session, selected authorization denials, logout | Shorter, purpose-limited schedule; aggregates may be retained instead of raw event rows where operationally sufficient |
 | R4 — integrity checkpoints | Signed checkpoint manifests, verification results and key-version metadata | Retain at least as long as the event ranges they attest to, plus any approved verification/audit period |
 
-No number of days/months/years is selected here. The schedule must be supplied by the organization's records-management/legal/privacy owners after confirming jurisdiction, record category, limitation periods, healthcare-sector rules, investigation needs and applicable contracts. Do not infer a period from a generic security standard.
+**Product-owner confirmation (2026-11-19): the medical organization currently has no approved retention periods** for administrative audit, security events or personal-data export records. No number of days/months/years is selected here. This is an explicit governance gap, not permission to retain records indefinitely or delete them ad hoc. Before production release, the organization's designated legal/privacy and records-management owners must assess jurisdiction, record category, limitation periods, healthcare-sector rules, investigation needs and applicable contracts, then approve a versioned schedule for R1–R4. Do not infer a period from a generic security standard.
+
+Until that schedule is approved, the target policy remains incomplete. If an interim operating period is needed before final approval, it must be a separately approved, documented, time-limited policy with an owner, review/expiry date and hold/purge rules; this proposal does not invent interim durations.
 
 ### 2.1 Lifecycle and legal hold
 
@@ -119,7 +121,7 @@ Checkpoint cadence, storage vendor, retention lock mode, signing algorithm and r
 ## 6. Decisions and evidence still required
 
 Before implementation/DDL:
-1. Obtain approved retention schedules for R1–R4 from legal/records/privacy owners, including hold and purge rules.
+1. **Blocking governance gate:** establish an accountable legal/privacy and records-management owner, complete a jurisdiction/category assessment, and approve a versioned retention schedule for R1–R4, including hold, purge and backup-expiry rules. The product owner confirmed no such periods currently exist.
 2. Confirm whether any IP/identity digest is necessary; default is none.
 3. Confirm KMS/HSM capability, key custody, rotation, backup and destruction process.
 4. Choose independent immutable checkpoint storage and checkpoint cadence after deployment topology is known.
@@ -146,7 +148,7 @@ No PostgreSQL, SQL/DDL, migration, application tests, CI or production checks we
 
 ## 8. Non-goals
 
-- No retention duration is invented or approved here.
+- No retention duration is invented or approved here; the organization currently has no approved schedule, and this remains a pre-production governance gate.
 - No assumption that HMAC alone prevents deletion or privileged DBA tampering.
 - No requirement to store raw IP, usernames, patient data or exported content in AdminSecurityAudit.
 - No implementation or infrastructure change is authorized by this document.
