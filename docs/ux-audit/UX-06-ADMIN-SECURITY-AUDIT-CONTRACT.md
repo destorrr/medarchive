@@ -188,4 +188,4 @@ Key distinctions:
 
 The envelope proposal includes immutable event ID, schema version, closed event type, DB timestamp, actor/role/scope snapshot, outcome/reason, target, command/correlation IDs, source channel and strict event-specific payload. Raw credentials, tokens, hashes, patient identifiers and unrestricted request/error data are prohibited by default.
 
-Still unresolved: owner approval of privileged-read scope; retention/legal hold; digest/IP necessity and HMAC key lifecycle; export/access logging; tamper evidence and operational controls. The detailed catalog records one product decision request (PR-READ-01).
+PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAudit, including large-result and cross-scope searches. Successful exports/downloads and report/manifest operations that export patient-identifying data remain in the proposed audit scope. Still unresolved: retention/legal hold; digest/IP necessity and HMAC key lifecycle; export/access logging; tamper evidence and operational controls.

@@ -1735,3 +1735,10 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 Подготовлен scope privileged reads: успешные экспорты/скачивания персональных данных и thresholded cross-scope bulk lookup. Единственный продуктовый вопрос PR-READ-01: включать ли bulk lookup наряду с экспортами. Retention/legal hold, digest/IP и HMAC key lifecycle, export/access logging и tamper evidence оставлены открытыми; законные сроки хранения не предполагаются.
 
 Изменены только Markdown-документы. Исходники, ORM, SQL/DDL, миграции, тесты, workflows и deployment не менялись. PostgreSQL, pytest и CI не запускались.
+
+
+## 33. UX-06 — PR-READ-01 resolved: mass lookup excluded from audit (2026-11-19)
+
+Владелец продукта отклонил запись факта массового поиска медицинских карт в AdminSecurityAudit. Исключение действует и для больших результатов, и для поиска за пределами обычной области просмотра. Не вводить `data_bulk_lookup.executed` без нового отдельного решения. В scope privileged-read audit остаются успешные экспорты/скачивания персональных данных и генерация/скачивание manifest/report, если они выносят такие данные за пределы обычного просмотра объекта. Обычный просмотр, обычный поиск, массовый поиск, dashboard и object timeline не аудируются по умолчанию.
+
+PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, export/access logging и tamper evidence остаются открытыми техническими/операционными gates. Изменена только Markdown-документация; код, БД, миграции и тесты не менялись.

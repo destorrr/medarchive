@@ -49,19 +49,20 @@ For each telemetry family, the implementation contract must specify: reason-code
 
 ### 2.3 Privileged reads and exports
 
-**Recommended initial scope for owner approval:**
+**Approved initial scope (product decision, 2026-11-19):**
 - Audit successful bulk export/download of patient-identifying or medical-card data.
 - Audit generation/download of a manifest or report when the operation exports data outside the normal object-detail UI.
-- Audit bulk lookup/search only when it returns a large result set or invokes an explicitly privileged cross-scope operation; define a server-side threshold and stable operation code.
-- Do not audit every ordinary single-card view, normal search page, dashboard read or object-history view by default.
-- Failed export/lookup attempts follow the bounded denial policy; do not make routine reads depend on a synchronous audit write.
+- Do **not** audit bulk lookup/search, including large result sets and cross-scope searches, even when the operation covers many cards or extends beyond ordinary viewing.
+- Do not audit ordinary single-card views, normal search pages, dashboard reads or object-history views.
+- Failed export attempts follow the bounded denial policy; do not make routine reads depend on a synchronous audit write.
 
-Candidate event types:
+Event types in scope:
 - `data_export.generated`
 - `data_export.downloaded`
-- `data_bulk_lookup.executed` (only if the owner approves thresholded bulk lookup auditing)
 
-Required context: actor, operation code, data category, scope/filter class, result-count band (not a patient list), export format, outcome, correlation ID and timestamp. Do not store exported rows, patient names, card numbers, raw filters containing identifiers, file contents or download tokens in the audit event. If a generated artifact needs its own lifecycle record, reference an opaque artifact ID and apply separate access controls/retention.
+`data_bulk_lookup.executed` is explicitly out of scope and must not be introduced as an AdminSecurityAudit event without a new product decision.
+
+Required context: actor, operation code, data category, export format, outcome, correlation ID and timestamp. Do not store exported rows, patient names, card numbers, raw filters containing identifiers, file contents or download tokens in the audit event. If a generated artifact needs its own lifecycle record, reference an opaque artifact ID and apply separate access controls/retention.
 
 ## 3. Common event envelope
 
@@ -150,9 +151,9 @@ Append-only protections and least-privilege INSERT/SELECT grants remain required
 
 All are acceptance criteria only; none were run in this documentation step.
 
-## 8. Decisions requested from product owner
+## 8. Product decision recorded
 
-**PR-READ-01 — privileged-read scope (one decision):** approve the recommended initial boundary: audit successful exports/downloads of patient-identifying data and thresholded cross-scope bulk lookup; do not audit ordinary single-card views, normal search pages, dashboards or object timelines. A failed attempt remains under bounded denial telemetry. If bulk lookup should be excluded, the event can be limited to exports/downloads only.
+**PR-READ-01 — resolved (2026-11-19):** the product owner rejected auditing mass card lookup/search. This exclusion applies even to large result sets and cross-scope searches. The initial privileged-read audit scope is limited to successful exports/downloads of patient-identifying or medical-card data and report/manifest generation or download that exports such data outside the normal object-detail UI. Ordinary views, routine search, bulk lookup, dashboards and object timelines are not AdminSecurityAudit events by default. Reconsideration requires a new explicit product decision.
 
 Retention periods, HMAC/IP policy and tamper-evidence controls are not product defaults to guess; they remain technical/operational gates for a later evidence-based decision.
 

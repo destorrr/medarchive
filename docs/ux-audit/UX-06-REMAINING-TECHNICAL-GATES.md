@@ -51,6 +51,6 @@
 
 Added `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md` as a versioned design proposal. It separates mandatory transactional audit records from bounded denial/security telemetry and defines a proposed common envelope, per-event payload allowlists, prohibited data, read permissions and acceptance evidence.
 
-**One product decision remains:** PR-READ-01 — whether successful thresholded cross-scope bulk lookup should be audited alongside exports/downloads of patient-identifying data. Recommendation: yes for explicitly privileged/large bulk operations; no audit for ordinary single-card views, routine search, dashboards or object timelines. Until approved, this is not a final event requirement.
+**PR-READ-01 resolved (2026-11-19):** the product owner rejected audit records for mass card lookup/search, including large-result and cross-scope searches. Keep successful exports/downloads and report/manifest operations that export patient-identifying data in scope. Ordinary single-card views, routine search, bulk lookup, dashboards and object timelines are excluded.
 
 Retention/legal hold, digest/IP and key lifecycle, export/access logging, tamper evidence, external consumers/grants and deployment topology remain open technical/operational gates. No statutory retention period is assumed.
