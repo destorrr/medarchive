@@ -169,3 +169,8 @@ Retention periods, HMAC/IP policy and tamper-evidence controls are not product d
 ## 10. Retention and integrity proposal
 
 See `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` for proposed event retention classes (without guessed durations), legal-hold/purge lifecycle, default exclusion of raw IP/identity digests, per-event HMAC and externally signed checkpoint design. This is a technical/operational proposal only; retention schedules, key custody, checkpoint infrastructure and audit-export access policy remain unapproved.
+
+
+## 11. Audit access and export policy proposal
+
+See `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It retains admin-only feed/detail access, separates export from read, proposes mandatory export reason and bounded/minimized artifacts, and uses a separate append-only access-log channel to avoid recursive writes. Export permission split, detail-view telemetry and feed-open failure policy require product-owner decisions.

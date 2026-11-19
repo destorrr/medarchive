@@ -194,3 +194,8 @@ PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAu
 ## 13. Retention and integrity design gate (2026-11-19)
 
 `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` proposes separate retention classes for privileged action evidence, sensitive export evidence, bounded security telemetry and integrity checkpoints, without assigning statutory durations. It recommends no raw IP/identity digest by default, per-event HMAC with external key custody, and independently stored signed checkpoint manifests rather than a contended global hash chain. Legal hold, purge/backup reconciliation, privileged DBA threat model, audit export/access logging and deployment-specific key/checkpoint controls remain open. No implementation is claimed.
+
+
+## 14. Audit access/export gate (2026-11-19)
+
+`UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` proposes admin-only feed/detail access, separate controlled export with mandatory reason, bounded field allowlist and actor-bound expiring artifacts. It rejects per-row/per-page recursive logging into AdminSecurityAudit and proposes a separate append-only access-log channel for feed-open and export/download facts. Product decisions remain open: whether every admin may export or a restricted subset/second approval is required; whether individual detail views are logged; and whether feed-open telemetry is mandatory or best-effort. No implementation is claimed.

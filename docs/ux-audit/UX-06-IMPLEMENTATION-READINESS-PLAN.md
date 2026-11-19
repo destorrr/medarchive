@@ -568,3 +568,8 @@ The catalog remains a proposal, not a final approved schema. PR-READ-01 is resol
 ## 12. Audit retention and integrity proposal (2026-11-19)
 
 Technical proposal: `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It separates retention classes without inventing periods; defines legal-hold and purge/backup reconciliation requirements; recommends no IP/identity digest by default; proposes per-event HMAC plus externally signed checkpoint manifests; and defines audit export/access and verification acceptance criteria. It does not approve durations, select infrastructure or authorize implementation.
+
+
+## 13. Audit access and export policy (2026-11-19)
+
+Proposal: `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It specifies admin-only read, separate export authorization with mandatory reason, bounded/minimized fields, actor-bound expiring artifacts, and non-recursive access logging. Acceptance criteria cover server-side scope enforcement, non-admin denial, durable export evidence and artifact expiry. Product decisions on export authority, detail-view telemetry and feed-open policy are not yet approved.

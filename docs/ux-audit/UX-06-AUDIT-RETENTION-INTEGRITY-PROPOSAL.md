@@ -152,3 +152,8 @@ No PostgreSQL, SQL/DDL, migration, application tests, CI or production checks we
 - No assumption that HMAC alone prevents deletion or privileged DBA tampering.
 - No requirement to store raw IP, usernames, patient data or exported content in AdminSecurityAudit.
 - No implementation or infrastructure change is authorized by this document.
+
+
+## 9. Audit access and export
+
+The companion proposal `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` recommends admin-only read access; export as a distinct privileged action with a mandatory reason, bounded scope, field minimization and actor-bound expiring artifact; and a separate append-only access-log channel to avoid recursive writes into the audit feed. Export permission split, detail-view logging, feed-open telemetry failure behavior, artifact limits/expiry and access-log retention/integrity remain unresolved.
