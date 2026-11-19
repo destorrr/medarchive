@@ -1742,3 +1742,12 @@ Open gaps: complete security-event coverage, event payload allowlists/PII retent
 Владелец продукта отклонил запись факта массового поиска медицинских карт в AdminSecurityAudit. Исключение действует и для больших результатов, и для поиска за пределами обычной области просмотра. Не вводить `data_bulk_lookup.executed` без нового отдельного решения. В scope privileged-read audit остаются успешные экспорты/скачивания персональных данных и генерация/скачивание manifest/report, если они выносят такие данные за пределы обычного просмотра объекта. Обычный просмотр, обычный поиск, массовый поиск, dashboard и object timeline не аудируются по умолчанию.
 
 PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, export/access logging и tamper evidence остаются открытыми техническими/операционными gates. Изменена только Markdown-документация; код, БД, миграции и тесты не менялись.
+
+
+## 34. UX-06 — AdminSecurityAudit retention and integrity proposal (2026-11-19)
+
+Подготовлен `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. Предложены отдельные классы хранения R1 (привилегированные действия), R2 (экспорт персональных данных), R3 (ограниченная security-телеметрия), R4 (контрольные манифесты целостности). Сроки не назначались и не выводились из предположений о законодательстве; их должны предоставить legal/records/privacy владельцы организации. Описаны legal hold, контролируемое удаление, согласование с backup/restore и минимальный purge manifest.
+
+По умолчанию предложено не собирать raw IP и identity digest. Для защиты целостности — per-event HMAC с ключом вне PostgreSQL и независимо хранимые подписанные checkpoint manifests. Глобальная hash-chain не выбрана как first cut из-за конкурентных транзакций и риска сериализации записи. Зафиксированы ограничения HMAC: он сам по себе не предотвращает удаление и не защищает от привилегированного оператора, имеющего ключ.
+
+Открыты retention schedules, legal hold authority, необходимость digest, KMS/HSM и key lifecycle, независимое checkpoint storage/cadence, threat model привилегированных DBA/операторов, export/access logging и внешние consumers/grants. Изменена только Markdown-документация; исходники, БД, миграции, тесты, workflows и deployment не менялись. PostgreSQL, pytest и CI не запускались.

@@ -54,3 +54,10 @@ Added `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md` as a versioned design proposal. It
 **PR-READ-01 resolved (2026-11-19):** the product owner rejected audit records for mass card lookup/search, including large-result and cross-scope searches. Keep successful exports/downloads and report/manifest operations that export patient-identifying data in scope. Ordinary single-card views, routine search, bulk lookup, dashboards and object timelines are excluded.
 
 Retention/legal hold, digest/IP and key lifecycle, export/access logging, tamper evidence, external consumers/grants and deployment topology remain open technical/operational gates. No statutory retention period is assumed.
+
+
+## 7. Retention and integrity controls — 2026-11-19
+
+Added `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It proposes R1 privileged action, R2 sensitive export, R3 bounded telemetry and R4 integrity-checkpoint retention classes, with no guessed durations; legal hold and controlled purge/backup reconciliation; no raw IP/identity digest by default; per-event HMAC with externally managed keys; and signed checkpoint manifests in independently administered immutable storage. A global linear hash chain is not recommended as first cut because concurrent transactions and serialized chain-head writes create ordering/contention concerns.
+
+Still requires legal/records retention schedules, digest necessity decision, KMS/HSM and key custody confirmation, checkpoint storage/cadence, DBA/operator threat model, audit export/access logging and external consumer/grant inventory.

@@ -184,8 +184,13 @@ A detailed candidate catalog, envelope, payload allowlist, bounded denial teleme
 Key distinctions:
 - mandatory transactional records: successful login, privileged admin/reference-data mutations, credential resets, and approved P-07 corrections;
 - bounded telemetry: failed/throttled login, rejected sessions, selected authorization denials and logout; no mandatory durable write for every 401/403;
-- privileged reads: proposed audit of successful exports/downloads and thresholded cross-scope bulk lookup; ordinary object views, normal search, dashboards and object timelines are not automatically audited.
+- privileged reads: audit of successful exports/downloads and report/manifest operations that export patient-identifying data; mass lookup/search is explicitly excluded, as are ordinary object views, routine search, dashboards and object timelines.
 
 The envelope proposal includes immutable event ID, schema version, closed event type, DB timestamp, actor/role/scope snapshot, outcome/reason, target, command/correlation IDs, source channel and strict event-specific payload. Raw credentials, tokens, hashes, patient identifiers and unrestricted request/error data are prohibited by default.
 
 PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAudit, including large-result and cross-scope searches. Successful exports/downloads and report/manifest operations that export patient-identifying data remain in the proposed audit scope. Still unresolved: retention/legal hold; digest/IP necessity and HMAC key lifecycle; export/access logging; tamper evidence and operational controls.
+
+
+## 13. Retention and integrity design gate (2026-11-19)
+
+`UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` proposes separate retention classes for privileged action evidence, sensitive export evidence, bounded security telemetry and integrity checkpoints, without assigning statutory durations. It recommends no raw IP/identity digest by default, per-event HMAC with external key custody, and independently stored signed checkpoint manifests rather than a contended global hash chain. Legal hold, purge/backup reconciliation, privileged DBA threat model, audit export/access logging and deployment-specific key/checkpoint controls remain open. No implementation is claimed.

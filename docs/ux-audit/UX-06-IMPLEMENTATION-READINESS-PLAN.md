@@ -563,3 +563,8 @@ The product owner rejected the proposed `Card.phone` clerical correction. The or
 A detailed proposal is available in `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md`. It defines candidate mandatory transactional events, bounded security telemetry, privileged-read event candidates, common envelope, payload allowlists/prohibitions, read permissions and required acceptance evidence.
 
 The catalog remains a proposal, not a final approved schema. PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAudit, including large-result and cross-scope searches; successful exports/downloads and report/manifest operations that export patient-identifying data remain in scope. Retention/legal hold, digest/IP and HMAC lifecycle, export/access logging and tamper-evidence policy remain unresolved. No implementation, DDL or tests are authorized by this proposal.
+
+
+## 12. Audit retention and integrity proposal (2026-11-19)
+
+Technical proposal: `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It separates retention classes without inventing periods; defines legal-hold and purge/backup reconciliation requirements; recommends no IP/identity digest by default; proposes per-event HMAC plus externally signed checkpoint manifests; and defines audit export/access and verification acceptance criteria. It does not approve durations, select infrastructure or authorize implementation.

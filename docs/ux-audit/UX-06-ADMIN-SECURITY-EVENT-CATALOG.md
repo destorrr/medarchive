@@ -164,3 +164,8 @@ Retention periods, HMAC/IP policy and tamper-evidence controls are not product d
 - No new incident entity.
 - No durable row for every 401/403.
 - No claim that current runtime behavior already satisfies this target catalog.
+
+
+## 10. Retention and integrity proposal
+
+See `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` for proposed event retention classes (without guessed durations), legal-hold/purge lifecycle, default exclusion of raw IP/identity digests, per-event HMAC and externally signed checkpoint design. This is a technical/operational proposal only; retention schedules, key custody, checkpoint infrastructure and audit-export access policy remain unapproved.
