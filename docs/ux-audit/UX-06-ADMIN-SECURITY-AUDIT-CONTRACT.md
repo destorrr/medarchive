@@ -198,7 +198,7 @@ PR-READ-01 is resolved: mass card lookup/search is excluded from AdminSecurityAu
 
 ## 14. Audit access/export gate (2026-11-19)
 
-`UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` proposes admin-only feed/detail access, separate controlled export with mandatory reason, bounded field allowlist and actor-bound expiring artifacts. It rejects per-row/per-page recursive logging into AdminSecurityAudit and proposes a separate append-only access-log channel for feed-open and export/download facts. Product decisions: any admin may export with a mandatory non-empty reason; no separate permission or second-admin approval. Individual event-detail views are not logged. Feed-open telemetry mandatory/best-effort remains open. No implementation is claimed.
+`UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md` proposes admin-only feed/detail access, separate controlled export with mandatory reason, bounded field allowlist and actor-bound expiring artifacts. It rejects per-row/per-page recursive logging into AdminSecurityAudit and proposes a separate append-only access-log channel for export/download facts only. The product owner confirmed that neither feed opening nor individual event-detail views are logged. Product decisions: any admin may export with a mandatory non-empty reason; no separate permission or second-admin approval. Neither feed opening nor individual event-detail views are logged. No implementation is claimed.
 
 
 ## 15. Product decision — admin audit-feed export approved (2026-11-19)

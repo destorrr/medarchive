@@ -48,10 +48,10 @@ This permission does not extend to branch, archive or central-office roles. It c
 
 Do not append a row to the same AdminSecurityAudit feed for every read of that feed. It creates a self-referential stream, complicates verification and can amplify ordinary pagination into high-volume audit writes.
 
-Use a logically separate, append-only `AuditAccessLog` (name provisional) or equivalent security access channel, with its own retention and integrity policy. It is not a second business event stream and must not contain copies of AdminSecurityAudit payloads.
+Use a logically separate, append-only `AuditAccessLog` (name provisional) or equivalent security access channel for export request/completion/download facts only, with its own retention and integrity policy. It is not a second business event stream and must not contain copies of AdminSecurityAudit payloads.
 
 Recommended events:
-- `audit.feed_opened`: once when the admin opens the global feed, not on every page render;
+- Opening the global audit feed is not logged (product decision, 2026-11-19).
 - Individual event-detail views are not logged (product decision, 2026-11-19).
 - `audit.export_requested`;
 - `audit.export_completed` / `audit.export_failed`;
@@ -68,11 +68,11 @@ Minimum access-log envelope:
 - export reason, safe filter scope, row count and opaque artifact reference for export;
 - command/correlation/request IDs.
 
-Do not log each page navigation, every row rendered, polling, client-side re-render or each event in a displayed list. A single feed-open event may include the initial bounded scope; export actions always receive their own explicit records.
+Do not log feed opening, individual event-detail views, page navigation, each row rendered, polling, client-side re-render or each event in a displayed list. Export actions always receive their own explicit records.
 
 Access-log failure policy:
 - export generation/download must fail closed if its mandatory access/export record cannot be committed;
-- opening or reading the audit feed should not be blocked solely because optional feed-open telemetry is unavailable, unless the owner explicitly elevates it to mandatory;
+- opening or reading the audit feed has no feed-open telemetry dependency because the action is not logged;
 - no silent export success without a durable export record.
 
 The access log must be independently protected and monitored. If stored in the same PostgreSQL database, use a distinct table/schema and grants, while recognizing that this is not independent protection from a database superuser. External checkpointing/immutable anchoring should cover both logs or explicitly document the difference.
@@ -87,7 +87,7 @@ No audit-feed export artifact exists in the target model. The artifact lifecycle
 - Admin read access returns only event-specific allowlisted fields.
 - No audit-feed export, export endpoint, export artifact or download flow is available.
 - Feed pagination and rendering do not create recursive event rows.
-- Feed-open telemetry is emitted at most once per logical feed-open action, not per page/render.
+- Opening the global audit feed and viewing individual event details do not generate access-log records.
 - Access-log payload does not copy audit event payloads or patient data.
 - Access-log retention and integrity are explicitly defined.
 - Audit read/export access remains unavailable to branch/archive/CO roles.
@@ -96,8 +96,7 @@ No audit-feed export artifact exists in the target model. The artifact lifecycle
 
 1. **Resolved:** any admin may export the audit feed with a mandatory non-empty reason; no separate export permission or second-admin approval.
 2. **Resolved:** individual event-detail views are not logged.
-3. Decide whether feed-open telemetry is mandatory or best-effort.
-4. Approve retention/integrity treatment for the separate access log together with R1–R4.
+3. Approve retention/integrity treatment for export/access evidence together with R1–R4.
 
 ## 7. Non-goals
 
@@ -105,6 +104,6 @@ No audit-feed export artifact exists in the target model. The artifact lifecycle
 - No broad access for branch/archive/CO.
 - No automatic audit record for each 401/403.
 - No audit-feed export by non-admin roles; any admin export requires a mandatory non-empty reason and bounded, protected handling.
-- No recursive write into AdminSecurityAudit on every feed read.
+- No access-log record for opening the feed or viewing individual event details; no recursive writes for ordinary audit reads.
 - No assumption that MFA, step-up authentication, KMS, artifact storage or a separate permission framework already exists.
 - No implementation, DDL, migration, API/UI or infrastructure change is authorized by this proposal.
