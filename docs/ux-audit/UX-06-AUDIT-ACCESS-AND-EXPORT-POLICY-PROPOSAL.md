@@ -30,12 +30,19 @@ Read access should be implemented through curated, event-specific views:
 
 Ordinary feed viewing does not require a free-text reason. The system already attributes the authenticated admin actor and time.
 
-### 2.2 Audit-feed export — not supported
+### 2.2 Export — approved for all admins
 
-**Product decision (2026-11-19): exporting the AdminSecurityAudit feed is not предусмотрено.** There is no audit-feed export capability, no audit-export permission, no export artifact, no download flow and no second-person approval workflow to design. Do not add CSV/PDF/JSON export, bulk download or equivalent extraction endpoint for this feed.
+**Product decision (2026-11-19):** any user with the existing `admin` role may export the AdminSecurityAudit feed, provided a mandatory non-empty reason is supplied. A separate `audit_export` permission and second-admin approval are not required.
 
-This decision concerns export of the audit feed itself. It does **not** remove the separately approved audit events for successful exports/downloads of patient-identifying medical-card data and reports/manifests that export such data. Those are business-data export actions and remain in the AdminSecurityAudit event catalog.
+Export remains a distinct privileged action, not an automatic consequence of reading the feed. Apply:
+- explicit export action and mandatory non-empty reason;
+- bounded date range, event-type filters and row/size limits;
+- fixed allowlisted export format and columns;
+- server-side authorization and scope enforcement;
+- export event recorded with actor, reason, filters/scope, outcome, row count, opaque artifact reference, creation/expiry timestamps and correlation ID;
+- no event payload duplication, file contents, tokens or public download URL in audit payload.
 
+This permission does not extend to branch, archive or central-office roles. It concerns exporting the audit feed itself and does not alter the separate catalog of successful business-data exports/downloads of patient-identifying card data and reports/manifests.
 
 ## 3. Access logging without recursive audit
 
@@ -87,16 +94,17 @@ No audit-feed export artifact exists in the target model. The artifact lifecycle
 
 ## 6. Decisions still required
 
-1. Decide whether to log only feed-open actions or also individual event-detail views.
-2. Decide whether feed-open telemetry is mandatory or best-effort.
-3. Approve retention/integrity treatment for the separate access log together with R1–R4.
+1. **Resolved:** any admin may export the audit feed with a mandatory non-empty reason; no separate export permission or second-admin approval.
+2. Decide whether to log only feed-open actions or also individual event-detail views.
+3. Decide whether feed-open telemetry is mandatory or best-effort.
+4. Approve retention/integrity treatment for the separate access log together with R1–R4.
 
 ## 7. Non-goals
 
 - No new viewer role.
 - No broad access for branch/archive/CO.
 - No automatic audit record for each 401/403.
-- No audit-feed export or download capability.
+- No audit-feed export by non-admin roles; any admin export requires a mandatory non-empty reason and bounded, protected handling.
 - No recursive write into AdminSecurityAudit on every feed read.
 - No assumption that MFA, step-up authentication, KMS, artifact storage or a separate permission framework already exists.
 - No implementation, DDL, migration, API/UI or infrastructure change is authorized by this proposal.

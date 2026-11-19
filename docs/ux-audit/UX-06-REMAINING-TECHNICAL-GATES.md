@@ -70,4 +70,4 @@ Added `UX-06-AUDIT-ACCESS-AND-EXPORT-POLICY-PROPOSAL.md`. It preserves admin-onl
 
 ## 9. Audit-feed export decision (2026-11-19)
 
-The product owner confirmed no audit-feed export is planned. Remove export authorization, artifact and download requirements from the audit-feed design. Continue auditing successful business-data exports/downloads of patient-identifying card data and reports/manifests.
+The product owner approved audit-feed export for any existing `admin` user with a mandatory non-empty reason. No separate export permission or second-admin approval is required. Export must be bounded, field-allowlisted, protected and durably recorded. Other roles remain excluded.
