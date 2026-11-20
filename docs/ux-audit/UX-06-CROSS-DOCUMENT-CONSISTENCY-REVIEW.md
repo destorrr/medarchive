@@ -63,7 +63,7 @@
 - **D-17:** parser contract установлен read-only; формат не менять.
 - **D-06:** миграция viewer и legacy ACL.
 - **D-03:** retirement plan legacy incidents без возврата инцидентов в целевой процесс.
-- **DB command idempotency/result:** основной lifecycle/hash/replay/tombstone baseline утверждён; остаются ordinary-command TTL после inventory retry horizons и финальный API error mapping.
+- **DB command idempotency/result:** основной lifecycle/hash/replay/tombstone baseline утверждён; TTL обычных команд утверждён — 90 календарных дней после завершения; остаются проверка retry horizons, cleanup/backup details и финальный API error mapping.
 - **DB audit/event ownership:** семантика authoritative records и correlation определена в этом review; остаются retention/privacy/outage policy и фактические schema/grants.
 - **RLS/actor scope, login throttle, bootstrap, infra principals, consumers, read permissions и rollout compatibility:** сначала инвентаризация репозитория/deployment, затем проектные рекомендации. Не подменять DB-SEC-01 независимой DB-аутентификацией.
 
@@ -449,3 +449,8 @@ UX-04 исправлен: филиал создаёт черновик толь�
 ## D-03 — legacy incidents исключены без миграции (2026-11-21)
 
 Владелец продукта подтвердил, что приложение не введено в эксплуатацию и рабочих данных нет. Старый процесс «Инциденты» полностью исключается: `exception` status/metadata/events, register/resolve commands, receive queues, admin incident UI/routes/API и соответствующие labels/tests не входят в target model. Data preflight, exception reconciliation, migration и special retention старых exception records не нужны. Не вводить заменяющую сущность или отдельный workflow. Общий audit и согласованные правила ошибок/расхождений внутри обычных процессов остаются. Это supersedes прежние D-03 migration/reconciliation recommendations; код и миграции не изменяются без отдельного разрешения.
+
+
+## 2026-11-21 — утверждён 90-дневный срок хранения command idempotency ledger
+
+Владелец продукта утвердил хранение записей идемпотентности обычных команд в течение 90 календарных дней после завершения команды; после этого запись может быть очищена. Бессрочное сохранение command identity/tombstone для необратимых логистических и административных операций остаётся обязательным. Очистка ledger не затрагивает authoritative business records, DomainEvent или отдельные audit records. До реализации требуется подтвердить, что фактические retry horizons клиентов/jobs укладываются в 90 дней, а также определить bounded cleanup и взаимодействие с backup/restore. Это решение не разрешает реализацию/DDL.
