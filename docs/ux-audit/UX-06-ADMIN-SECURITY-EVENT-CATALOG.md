@@ -241,3 +241,7 @@ Owner decision (2026-11-21): do not send separate notifications or alerts to inf
 ## 2026-11-21 — telemetry health is not exposed in the application UI
 
 Owner decision (2026-11-21): do not expose denial-telemetry storage availability, health, write failures, or monitoring diagnostics in the MedArchive application interface, including to users with the application `admin` role. Technical health information remains outside the application UI and is available only through the separately controlled infrastructure/operations monitoring boundary. The application `admin` role does not grant access to that monitoring.
+
+## 2026-11-21 — no separate AdminSecurityAudit integrity-verification feature
+
+Owner decision (2026-11-21): a separate feature for cryptographic integrity verification of `AdminSecurityAudit` is not required for the target product. Do not introduce audit hash chains, MACs, signatures, checkpoints, verification jobs, integrity dashboards, or related UI/API solely for this purpose. Existing append-only/write-permission controls, mandatory atomic audit writes, retention governance, and backup/restore procedures remain separate requirements and are not waived. Key custody/rotation remains deferred and must not be treated as an approved implementation task.
