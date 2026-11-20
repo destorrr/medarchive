@@ -220,3 +220,8 @@ Owner decision (2026-11-21): retain bounded aggregate authorization-denial telem
 ## 2026-11-21 — denial telemetry unavailable-store behavior approved
 
 Owner decision (2026-11-21): if the separate best-effort denial-telemetry store is unavailable or a telemetry write fails, do not retry and do not enqueue the event for later delivery; the telemetry event is dropped. The failure must not block or delay the request, change the authorization/business-operation result, or expose internal technical details to the user. This rule applies only to optional denial telemetry and does not weaken atomic fail-closed requirements for mandatory DomainEvent/AdminSecurityAudit writes.
+
+
+## 2026-11-21 — telemetry-loss monitoring approved
+
+Owner decision (2026-11-21): do not create a separate user-interface notification for dropped or unavailable optional denial telemetry. Operational monitoring must track telemetry-store availability and telemetry write failures using technical health signals only, without collecting or exposing personal data. This monitoring is separate from AdminSecurityAudit and must not become a request-path dependency or block authorization/business operations. The decision does not authorize a new user-facing alert, per-event retry, or deferred delivery queue.
