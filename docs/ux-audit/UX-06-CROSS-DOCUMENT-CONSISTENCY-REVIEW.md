@@ -513,3 +513,8 @@ Bounded aggregate authorization-denial telemetry is retained for 30 calendar day
 ## 2026-11-21 — denial telemetry unavailable-store behavior approved
 
 Optional denial telemetry uses drop-on-failure semantics: no retry and no deferred queue when its store is unavailable or a write fails. The request and its authorization/business-operation result are unaffected; internal technical details are not exposed. This is strictly separate from mandatory DomainEvent/AdminSecurityAudit writes, which retain their approved atomic fail-closed behavior.
+
+
+## 2026-11-21 — telemetry-loss monitoring approved
+
+No separate user-interface notification is created for dropped/unavailable optional denial telemetry. Operational monitoring tracks telemetry-store availability and write failures using technical health signals only, without personal data. It is separate from AdminSecurityAudit and cannot become a request-path dependency or block/change authorization or business-operation outcomes. No retry or deferred queue is introduced. Implementation remains unauthorized.
