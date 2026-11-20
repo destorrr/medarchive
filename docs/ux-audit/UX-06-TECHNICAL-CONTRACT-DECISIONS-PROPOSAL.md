@@ -1,6 +1,6 @@
 # UX-06 — Technical decisions proposal: DB result, schemas, actor scope and supporting principals
 
-**Status:** DB result envelope approved by product owner on 2026-11-20; remaining sections are technical recommendations for review, not an implementation authorization.  
+**Status:** DB result envelope and PostgreSQL application-schema architecture approved by product owner on 2026-11-20; remaining sections are technical recommendations for review, not an implementation authorization.  
 **Inspection baseline:** `docs/ux-audit-project`, HEAD `80f9b87bf7d97eddbc2c304c4bbad3694c0aae65`.
 
 ## 1. DB command result contract
@@ -35,7 +35,9 @@ Reason: PostgreSQL composite types create DDL coupling when result shapes evolve
 
 ## 2. Application schemas
 
-### Recommendation: private `medarchive` schema, with no application objects in `public`
+### Approved target: private `medarchive` schema, with no application objects in `public`
+
+**Owner decision (2026-11-20): approved as the target PostgreSQL schema architecture.**
 
 Target separation:
 - `medarchive`: owner-controlled tables, internal functions and private implementation objects.
@@ -50,7 +52,7 @@ Every SECURITY DEFINER function must:
 - validate actor, role, scope, arguments and state internally;
 - avoid dynamic SQL unless identifiers are fixed/allowlisted and safely quoted.
 
-Schema move is a migration and compatibility concern: inspect all SQL, ORM metadata, Alembic, extensions, backup/restore and operational scripts before deciding exact schema names. This recommendation does not imply that current code already supports it.
+The target architecture is approved, but its implementation remains gated: inspect all SQL, ORM metadata, Alembic, extensions, backup/restore and operational scripts before moving or creating objects. This approval does not imply that current code already supports the target schemas.
 
 ## 3. RLS and actor/scope context
 
@@ -134,7 +136,7 @@ Compatibility requirements:
 | Topic | Recommendation | Remaining gate |
 |---|---|---|
 | DB result | Approved: versioned JSONB envelope with strict command schemas | Define and verify API error mapping before implementation |
-| Schema | Private `medarchive`; optional `medarchive_api` only if needed | Full SQL/ORM/deployment compatibility review |
+| Schema | Approved: private `medarchive`; optional `medarchive_api` only if needed; no application objects in `public` | Full SQL/ORM/deployment compatibility review before implementation |
 | RLS | Not required for first cut; application scope + DB command checks | Threat model if later enabled |
 | Login throttle | Narrow SECURITY DEFINER functions | Key/rotation and concurrency design |
 | Bootstrap | One-shot operator runner, not web startup | Deployment principal and recovery runbook |
