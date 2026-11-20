@@ -488,3 +488,8 @@ Explicit user-initiated logout is recorded as a best-effort security event. A te
 ## 2026-11-21 — denial-telemetry grouping dimensions approved
 
 Selected high-risk authorization-denial telemetry may aggregate repeats only by controlled operation type/code and denial-reason code. It must not correlate by actor, attempted identity, source IP, IP digest or another per-user/network identifier. The dimensions are bounded categories, not free-form input. Product decision closed; window, thresholds, rate/volume caps, retention and unavailable-store behavior remain technical readiness items. Existing best-effort/non-blocking semantics remain mandatory.
+
+
+## 2026-11-21 — denial telemetry aggregation window approved
+
+A fixed 15-minute aggregation window is approved for selected high-risk denial telemetry. Repeated events are aggregated by controlled operation type/code and denial-reason code, storing a count rather than one row per attempt. No actor, attempted identity, source IP, IP digest or other per-user/network correlation key is permitted. Thresholds, rate/volume caps, retention and unavailable-store behavior remain technical parameters; best-effort/non-blocking behavior remains mandatory.
