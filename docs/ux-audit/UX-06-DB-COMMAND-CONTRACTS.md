@@ -523,3 +523,30 @@ The two append-only stores have distinct authority; they are not duplicate copie
 - A P-07 command that changes a business aggregate writes one typed DomainEvent and one linked AdminSecurityAudit record in the same transaction. The audit record does not duplicate the full business before/after payload; it contains only allowlisted security context and references. DomainEvent does not become the global admin/security feed.
 - Pure admin CRUD and authentication/authorization/security events write AdminSecurityAudit only; they do not create a business DomainEvent unless a future explicitly approved domain event is required for a separate aggregate.
 - If either required write fails, the entire privileged mutation rolls back. No success response may be returned for a partially audited correction.
+
+
+### 2.11 `shipment_reassign_draft_author`
+
+**Назначение:** восстановить возможность завершить черновик, если его первоначальный автор деактивирован до фактической передачи. Команда применяется к обычным черновикам branch → archive и central_office → archive, а также к fulfillment-черновику archive → central_office по P-09.
+
+**Actor:** только активный `admin`.
+
+**Вход:** `shipment_id`, `new_author_user_id`, idempotency metadata.
+
+**Предусловия:**
+- shipment находится в `draft`; фактическая передача не подтверждена;
+- текущий автор деактивирован;
+- новый автор активен;
+- новый автор принадлежит той же отправляющей локации, что и shipment (для fulfillment — той же archive location); роль нового автора соответствует отправляющей локации;
+- shipment и его текущий автор доступны для административной операции.
+
+**Атомарные изменения:**
+- заменить только текущий `author_user_id`/поле авторства черновика на нового автора;
+- сохранить исходного создателя неизменяемым в событии создания и не переписывать исторические actor;
+- записать отдельное append-only событие `shipment.draft_author_reassigned` с admin actor, прежним автором, новым автором и временем.
+
+**Не изменяются:** маршрут, состав и manifest snapshot, parent P-09 link, назначение курьера, courier FK/snapshot, состояние карт и ответственность за них.
+
+**Права нового автора:** все права автора черновика для соответствующего маршрута, в том числе редактирование состава, если оно допускается текущей фазой обычного отправления, замена курьера и подтверждение фактической передачи. Право не распространяется на изменение уже зафиксированного P-09 состава.
+
+**Запрет:** переназначение, если исходный автор активен; назначение неактивного сотрудника или сотрудника другой локации/роли; переназначение после handover; повторная передача авторства без нового основания; выполнение handover администратором вместо назначенного автора. Операция не отменяет и не создаёт отправление.
