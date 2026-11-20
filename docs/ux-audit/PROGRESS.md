@@ -2567,3 +2567,7 @@ PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, 
 ## 2026-11-20 — утверждение разделения infrastructure principals
 
 Владелец продукта утвердил отдельные логические идентичности для runtime приложения, migrator, NOLOGIN-владельца объектов БД, backup/restore, monitoring и краткоживущего bootstrap. Maintenance identity — только при необходимости и с ограниченными полномочиями. Runtime не получает DDL и обходной DML; monitoring не имеет доступа к PII и не изменяет рабочие данные. Точные grants/credentials зависят от deployment topology и выбранных инструментов. Обновлены technical contract proposal, implementation readiness plan и cross-document review. Решение не разрешает реализацию/DDL; PostgreSQL, pytest и CI не запускались.
+
+## 2026-11-20 — уточнение scope потребителей DomainEvent
+
+Владелец продукта подтвердил, что внешние потребители событий на текущем этапе не предполагаются. Сейчас проектируются только внутренние readers МедАрхива; внешняя доставка, subscriptions, outbox/consumer offsets и webhook/API integration contracts не требуются. При этом перед изменением event schema/payload/retention нужно проверить deployment jobs/readers и effective DB grants на предмет уже существующих зависимостей. Обновлены consumer inventory, technical contract proposal, implementation readiness и cross-document review. Только документация; реализация не разрешена.
