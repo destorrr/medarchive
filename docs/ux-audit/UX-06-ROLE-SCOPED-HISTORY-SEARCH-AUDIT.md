@@ -63,3 +63,7 @@ postgresql_search_results также явно допускает viewer в requi
 - Location scope поиска ограничен текущим местонахождением и отправлениями in_transit; он не выдаёт историю объекта. Доступ к карточке и её timeline должен отдельно проверяться в object detail route.
 
 Статический вывод не подтверждает фактические HTTP responses или эксплуатационную доступность маршрутов. Проверка шаблонов, object detail visibility и всех query endpoints остаётся частью дальнейшего аудита.
+
+## 8. D-06 decision update — 2026-11-21
+
+The owner confirmed that MedArchive has not entered operation and contains no user or operational data. No viewer-account migration, actor-reference preservation, or legacy ACL compatibility work is required. The `viewer` role is removed entirely from the target model and future implementation across schema/ORM, API, admin UI, guards, templates/navigation, and tests. The target roles are `admin`, `branch`, `central_office`, and `archive`; no viewer permissions are automatically reassigned. Legacy viewer search/history/dashboard paths identified in this audit are prototype remnants to remove during implementation. This supersedes the earlier recommendation to perform account preflight/mapping. Implementation remains separately gated.
