@@ -419,6 +419,25 @@ Actor — central_office. Проверить, что карта на балан�
 - consumers должны быть идемпотентными и поддерживать переходные версии событий;
 - admin/security audit не смешивается с операционной историей DomainEvent.
 
+### 7.1. Каталог событий UX-06 и правила контекстной проекции
+
+| Aggregate | Event type | Содержание / включение в пользовательскую историю |
+|---|---|---|
+| archive_request | archive_request.created | Создание P-09; actor/time; черновик виден только автору |
+| archive_request | archive_request.item_added / archive_request.item_removed_by_central_office | Изменение состава только в draft; без истории редактирования полей |
+| archive_request | archive_request.submitted | Отправка заявки в архив |
+| archive_request | archive_request.processing_started | Начало обработки архивом |
+| archive_request | archive_request.item_extracted | Автоматическое извлечение каждой позиции при старте |
+| archive_request | archive_request.item_marked_not_found, archive_request.item_removed_by_archive | Фиксация результата позиции и обязательного/необязательного комментария по правилам |
+| archive_request | archive_request.item_result_corrected | Исправление с прежним/новым результатом, actor/time |
+| archive_request | archive_request.cancelled | Отмена parent; причина обязательна после отправки |
+| archive_request | archive_request.completed | Завершение parent |
+| shipment с request_id | shipment.draft_created, shipment.handed_over, shipment.received | Включаются в timeline P-09 и историю fulfillment shipment; только создание содержит snapshot состава |
+| shipment | shipment.cancelled, shipment.draft_author_reassigned | История shipment/admin context; не включаются автоматически в timeline P-09 для сотрудников ЦО |
+| shipment | shipment.draft_created, shipment.handed_over, shipment.received (обычные коробочные маршруты) | История отправления для его участников; snapshot коробок на handover и receipt |
+
+Не создавать бизнес-события для обычного открытия/просмотра объекта, смены курьера до handover или редактирования коробочного manifest в draft. Отдельная история admin/security действий остаётся в AdminSecurityAudit по §11.9.
+
 ## 8. Идемпотентность и ошибки
 
 - У каждой изменяющей команды есть `command_id`.
@@ -616,22 +635,3 @@ The two append-only stores have distinct authority; they are not duplicate copie
 - при атомарном переводе родителя в `completed` или `cancelled` — для всех его позиций.
 
 Создание новой P-09 проверяет резервирование и пытается установить его под защитой уникального ограничения по `card_id`. Предварительная проверка без уникального ограничения не считается достаточной. При гонке двух заявок только одна транзакция может получить резервирование; другая откатывается без частично созданной заявки/позиции. Команды отмены/завершения родителя блокируют parent и позиции и снимают резервирование в той же транзакции, что и terminal transition.
-
-### 7.1. Каталог событий UX-06 и правила контекстной проекции
-
-| Aggregate | Event type | Содержание / включение в пользовательскую историю |
-|---|---|---|
-| archive_request | archive_request.created | Создание P-09; actor/time; черновик виден только автору |
-| archive_request | archive_request.item_added / archive_request.item_removed_by_central_office | Изменение состава только в draft; без истории редактирования полей |
-| archive_request | archive_request.submitted | Отправка заявки в архив |
-| archive_request | archive_request.processing_started | Начало обработки архивом |
-| archive_request | archive_request.item_extracted | Автоматическое извлечение каждой позиции при старте |
-| archive_request | archive_request.item_marked_not_found, archive_request.item_removed_by_archive | Фиксация результата позиции и обязательного/необязательного комментария по правилам |
-| archive_request | archive_request.item_result_corrected | Исправление с прежним/новым результатом, actor/time |
-| archive_request | archive_request.cancelled | Отмена parent; причина обязательна после отправки |
-| archive_request | archive_request.completed | Завершение parent |
-| shipment с request_id | shipment.draft_created, shipment.handed_over, shipment.received | Включаются в timeline P-09 и историю fulfillment shipment; только создание содержит snapshot состава |
-| shipment | shipment.cancelled, shipment.draft_author_reassigned | История shipment/admin context; не включаются автоматически в timeline P-09 для сотрудников ЦО |
-| shipment | shipment.draft_created, shipment.handed_over, shipment.received (обычные коробочные маршруты) | История отправления для его участников; snapshot коробок на handover и receipt |
-
-Не создавать бизнес-события для обычного открытия/просмотра объекта, смены курьера до handover или редактирования коробочного manifest в draft. Отдельная история admin/security действий остаётся в AdminSecurityAudit по §11.9.
