@@ -60,6 +60,7 @@ Admin object history is still object-scoped. It is not a substitute for, or a li
 - Card/box detail: only objects in the Central Office's current authorized custody/location scope, not every object that has ever passed through it.
 - Shipment: only shipments for which Central Office is sender or receiver, permanently retaining its own manifest and timeline (P-08/D-09).
 - Archive request: the requesting Central Office role can open its own request and all its items/outcomes. It must not gain access to unrelated requests.
+- Central Office P-09 request queue: each row for the requesting location exposes only the request number, creation date, number of cards and current status. Patient names and card numbers are not displayed in the queue; the complete item list and outcomes are available inside that user's own authorized request detail. The queue does not expose unrelated requests.
 
 ### 3.5 Viewer and other roles
 
