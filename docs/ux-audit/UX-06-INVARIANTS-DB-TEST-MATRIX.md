@@ -234,3 +234,9 @@ Backfill должен быть идемпотентным, пакетным, с 
 | ID | Инвариант | DB enforcement (target) | Транзакционная граница | Проверка |
 |---|---|---|---|---|
 | DB-44 | Активный сотрудник ЦО с полномочиями подтверждает получение всего fulfillment-отправления целиком; сверка каждой карты с манифестом не выполняется. Частичная приёмка запрещена | Route/status/recipient-scope guard, row lock, unique receipt event, deferred consistency между shipment, картами и P-09 items | Shipment `in_transit → received`, все карты переходят в локацию ЦО, все позиции `in_shipment → completed`, receipt actor/time и завершение parent (если условие выполнено) — одна транзакция | Частичная приёмка отклоняется; повторное подтверждение не создаёт событие; receipt не требует item-by-item confirmations, не меняет состав manifest и не создаёт повторный snapshot; сотрудник не из целевой локации/без полномочий получает отказ |
+
+## DB-45 — единый append-only источник событий и привязка истории P-09
+
+| ID | Инвариант | DB enforcement (target) | Транзакционная граница | Проверка |
+|---|---|---|---|---|
+| DB-45 | Все бизнес-факты UX-06 сохраняются в `DomainEvent`; отдельный authoritative `RequestEvent` не создаётся. События P-09 и связанного fulfillment shipment имеют корректный `request_id`; event и изменение агрегата атомарны | Event type/version allowlist, FK/aggregate references, запрет UPDATE/DELETE, защищённые DB commands; проверка допустимости `request_id` для shipment archive → CO | Событие записывается в той же транзакции, что и изменение aggregate; связанные shipment events сохраняют собственный aggregate | Отсутствующее/чужое parent reference, неизвестный event type/version, изменение или удаление события отклоняются; повтор команды не создаёт дубль; проекция P-09 не раскрывает независимую историю карты или admin/security audit |

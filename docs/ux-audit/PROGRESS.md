@@ -2381,3 +2381,9 @@ PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, 
 ## 2026-11-20 — UX-06: приёмка fulfillment P-09 без поштучной сверки
 
 Согласовано: сотрудник ЦО подтверждает получение fulfillment-отправления целиком, без поштучной сверки карт с манифестом. Частичная приёмка запрещена. Зафиксированы полномочия сотрудника ЦО целевой локации, атомарный переход shipment/cards/items/parent, сохранение receipt actor/time и отсутствие повторного snapshot или resolution metadata. Изменена только Markdown-документация; исходники, ORM, SQL/DDL, миграции и тесты не менялись; PostgreSQL/pytest/CI не запускались.
+
+## 2026-11-20 — UX-06: заключительная сверка истории событий и снимков
+
+Уточнена единая модель аудита: DomainEvent — единственный authoritative append-only источник бизнес-событий; RequestEvent не вводится как отдельный источник истины. P-09 timeline формируется по request_id с allowlist parent events и связанных shipment draft/handover/receipt; независимая история карты и admin/security audit не раскрываются. Зафиксирован каталог событий создания, отправки, начала обработки, item outcomes/corrections, отмены, завершения и fulfillment lifecycle. Синхронизированы snapshots: для P-09 один snapshot полного карточного манифеста при создании fulfillment draft; для обычных коробочных отправлений snapshots коробок на handover и receipt. История смены курьера и редактирования draft manifest не ведётся; отмена обычного draft не показывается архиву.
+
+Изменена только Markdown-документация UX-04/UX-06; приложение, ORM, SQL/DDL, миграции и тесты не менялись. PostgreSQL, pytest и CI не запускались.
