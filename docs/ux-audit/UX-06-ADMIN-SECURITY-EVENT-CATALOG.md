@@ -257,3 +257,7 @@ Owner decision (2026-11-21): do not create `AdminSecurityAudit`, `DomainEvent`, 
 ## 2026-11-21 — administrative session termination is not separately audited
 
 Owner decision (2026-11-21): when an account is deactivated or otherwise administratively disabled, audit the account-management action under its existing mandatory `AdminSecurityAudit` contract. Do not create a separate event for each session that is consequently invalidated or terminated. This does not change the approved handling of successful login, explicit user-initiated logout, or ordinary session expiration.
+
+## 2026-11-21 — успешное самостоятельное изменение пароля
+
+Владелец продукта утвердил регистрацию успешного самостоятельного изменения пароля сотрудником как отдельного события безопасности в `AdminSecurityAudit`. В событии допускаются только необходимые безопасные метаданные; пароль, его хеш, reset/recovery secrets, токены и иные секретные данные не сохраняются. Неудачные попытки самостоятельного изменения пароля отдельно не журналируются. Это решение не меняет ранее утверждённое исключение неудачных попыток входа и отказов login throttle. Изменена только Markdown-документация; реализация не разрешена.
