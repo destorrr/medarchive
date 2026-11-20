@@ -692,3 +692,7 @@ The product owner decided that normal session expiration due to timeout/expiry d
 ## 2026-11-21 — no per-session event for administrative invalidation
 
 When an account is deactivated or otherwise administratively disabled, the account-management action is recorded under the existing mandatory `AdminSecurityAudit` contract. No separate audit, domain, or telemetry event is created for each session consequently invalidated/terminated. Existing decisions for successful login, explicit logout, and ordinary session expiration remain unchanged.
+
+## 2026-11-21 — успешное самостоятельное изменение пароля
+
+Владелец продукта утвердил регистрацию успешного самостоятельного изменения пароля сотрудником как отдельного события безопасности в `AdminSecurityAudit`. В событии допускаются только необходимые безопасные метаданные; пароль, его хеш, reset/recovery secrets, токены и иные секретные данные не сохраняются. Неудачные попытки самостоятельного изменения пароля отдельно не журналируются. Это решение не меняет ранее утверждённое исключение неудачных попыток входа и отказов login throttle. Изменена только Markdown-документация; реализация не разрешена.
