@@ -546,3 +546,7 @@ Do not persist individual failed-login attempts or login-throttle denials as `Ad
 ## 2026-11-21 — normal session-expiration events excluded
 
 Do not persist normal session expiration (timeout/ordinary expiry) as `AdminSecurityAudit`, `DomainEvent`, or bounded security telemetry. Do not add a session-expiration event or session registry solely to record it. Successful-login auditing and best-effort explicit logout telemetry remain unchanged.
+
+## 2026-11-21 — administrative session termination
+
+Record account deactivation/administrative disabling through its existing mandatory `AdminSecurityAudit` action. Do not emit a separate event for each session invalidated or terminated as a consequence. This is not a change to successful-login auditing, explicit logout telemetry, or the exclusion of ordinary session-expiration events.
