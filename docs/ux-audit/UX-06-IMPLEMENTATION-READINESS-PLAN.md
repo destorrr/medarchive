@@ -688,3 +688,7 @@ The product owner decided not to persist individual failed login attempts or log
 ## 2026-11-21 — ordinary session expiration is not audited
 
 The product owner decided that normal session expiration due to timeout/expiry does not create an `AdminSecurityAudit`, `DomainEvent`, or bounded security-telemetry record. No session-expiration event or session registry is to be introduced solely for this purpose. Successful login and explicit user-initiated logout retain their previously approved handling. This decision concerns ordinary expiration, not a new policy for rejected requests using expired/invalid sessions.
+
+## 2026-11-21 — no per-session event for administrative invalidation
+
+When an account is deactivated or otherwise administratively disabled, the account-management action is recorded under the existing mandatory `AdminSecurityAudit` contract. No separate audit, domain, or telemetry event is created for each session consequently invalidated/terminated. Existing decisions for successful login, explicit logout, and ordinary session expiration remain unchanged.
