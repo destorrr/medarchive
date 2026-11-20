@@ -680,3 +680,7 @@ The product owner decided that denial-telemetry storage availability, health, wr
 ## 2026-11-21 — separate AdminSecurityAudit integrity verification not required
 
 The product owner decided that the target product does not need a separate feature to verify cryptographic integrity of `AdminSecurityAudit`. Do not design or implement hash chains, MACs, signatures, checkpoints, verification jobs, integrity dashboards, or related UI/API solely for this purpose. Existing append-only controls, restricted write permissions, mandatory atomic audit writes, retention governance, and backup/restore procedures remain independent requirements. This decision does not authorize weakening those controls. Key custody/rotation remains deferred.
+
+## 2026-11-21 — failed-login audit/telemetry excluded
+
+The product owner decided not to persist individual failed login attempts or login-throttle denials in `AdminSecurityAudit`, `DomainEvent`, or bounded security telemetry. Candidate event types `authn.login_failed` and `authn.login_throttled` are excluded from the target catalog. Login throttling itself remains active and may retain only the internal counters/state necessary for its separate control contract; these are not audit/telemetry events, and bucket keys must not be copied into audit records. Successful-login audit and selected high-risk authorization-denial telemetry remain governed by their separate approved rules.
