@@ -131,7 +131,7 @@ Current static inventory identifies in-repository readers:
 
 Writers include card intake/custody, archive workflow, shipment workflow and admin service. The admin writer events must migrate to the separate admin/security audit while preserving historical evidence; business events remain in DomainEvent.
 
-This is not yet proof of a complete consumer inventory: the repository audit has not established production integrations, external scripts, downstream BI, log pipelines, backup consumers or deployment-specific jobs. No outbox/consumer-offset deployment contract has been found in the inspected source slice. Before changing event schema or event names, complete repository-wide branch-aware search plus deployment/operator inventory and owner confirmation of external consumers.
+Owner clarification (2026-11-20): external DomainEvent consumers are not planned at the current stage. Do not design external delivery, subscriptions, outbox/consumer offsets, webhook contracts or downstream compatibility now. This product-scope decision does not prove that no deployment-level reader/job already exists. Before changing event schema, payload semantics or retention, complete the internal reader inventory and verify actual deployment jobs/readers and effective DB grants. No outbox/consumer-offset deployment contract has been found in the inspected source slice.
 
 Compatibility requirements:
 - do not rename/reinterpret existing event_type payloads in place;
@@ -151,6 +151,6 @@ Compatibility requirements:
 | Login throttle | Approved: narrow SECURITY DEFINER functions; runtime EXECUTE only, no direct table SELECT/INSERT/UPDATE/DELETE | HMAC key/rotation, lock contention, atomicity and bounded cleanup design before implementation |
 | Bootstrap | Approved: one-shot operator runner outside web startup; atomic initialization; short-lived credential revoked after success | Deployment principal, exact system-location inventory and break-glass recovery runbook before implementation |
 | Infra principals | Approved: separate owner, migrator, runtime, backup, monitoring and short-lived bootstrap identities; maintenance identity only when required | Hosting/backup/monitoring topology, exact grants and operational runbooks before implementation |
-| Event consumers | Preserve compatibility and historical evidence | Complete external consumer inventory |
+| Event consumers | Approved current scope: internal MedArchive readers only; no external consumers planned | Complete internal reader inventory and verify no existing deployment-level readers/jobs before event-contract changes |
 
 No source, SQL, DDL, ORM, migration, tests, workflow or deployment files were changed. PostgreSQL, Alembic, pytest and CI were not run.
