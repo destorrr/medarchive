@@ -61,8 +61,8 @@ Admin object history is still object-scoped. It is not a substitute for, or a li
 - Card/box detail: only objects in the Central Office's current authorized custody/location scope, not every object that has ever passed through it.
 - Shipment: only shipments for which Central Office is sender or receiver, permanently retaining its own manifest and timeline (P-08/D-09).
 - Central Office shipment queue: each row exposes only the shipment number, route, creation date, sender, box count for outgoing Central Office → archive shipments or card count for incoming archive → Central Office shipments, and current status. Courier, patient names and card numbers are not displayed in the queue. The full manifest and shipment timeline remain available inside the shipment detail to authorized participants under P-08/D-09; queue minimization does not narrow that detail access.
-- Archive request: the requesting Central Office role can open its own request and all its items/outcomes. It must not gain access to unrelated requests.
-- Central Office P-09 request queue: each row for the requesting location exposes only the request number, creation date, number of cards and current status. Patient names and card numbers are not displayed in the queue; the complete item list and outcomes are available inside that user's own authorized request detail. The queue does not expose unrelated requests.
+- Archive request: while a P-09 request is `draft`, only its author in Central Office may open it. After transition to `submitted`, the request and its complete item list/outcomes are readable by all employees of the same Central Office location. This shared read access continues through later states and historical review, subject to the location scope. It does not grant mutation rights: after submission no Central Office employee may edit the item set or cancel the request; the cancellation authority remains with archive under P-09. No employee may open requests belonging to another Central Office location.
+- Central Office P-09 request queue: each row for the requesting location exposes only the request number, creation date, number of cards and current status. Patient names and card numbers are not displayed in the queue. Drafts are visible only to their author; submitted requests and their full details are visible to all employees of that Central Office location. The queue does not expose unrelated requests.
 
 ### 3.5 Viewer and other roles
 
@@ -124,6 +124,9 @@ These findings are static source inspection only. No HTTP requests, PostgreSQL q
 | Branch requests card history after archive handover | Post-handover events excluded, including count and later pages |
 | Branch opens its own shipment after completion | Manifest and shipment timeline allowed |
 | Archive opens request it is handling | Request and permitted item outcomes allowed |
+| Request author opens own P-09 draft | Draft detail and item list allowed; other Central Office employees denied |
+| Any employee of the requesting Central Office location opens submitted/processing/historical P-09 | Full request detail, item list and outcomes allowed; mutation denied |
+| Central Office employee opens P-09 belonging to another location | Denied/not-found |
 | Central Office opens its own request | All items and outcomes for that request allowed |
 | Sender/receiver opens completed own shipment | Full manifest, including card number and patient name, allowed |
 | Non-participant guesses shipment UUID | Denied/not-found without manifest disclosure |
@@ -380,3 +383,10 @@ These require technical design and migration review; none should be guessed duri
 ## 40. Исключение завершённых P-09 из рабочей очереди архива
 
 После перехода P-09 в `completed` заявка исключается из текущей рабочей очереди архива: все требуемые действия завершены. Запись заявки, состав и результаты обработки, сведения о fulfillment-отправлении и история событий сохраняются для последующего просмотра уполномоченными сотрудниками. Завершённая заявка доступна в историческом представлении, а не в рабочей очереди.
+
+
+## 41. Видимость P-09 в Центральном офисе после отправки
+
+До отправки заявки в архив (`draft`) карточку и полный состав P-09 видит только сотрудник ЦО, создавший черновик. После успешного перехода в `submitted` заявка и её полный состав становятся доступными для просмотра всем сотрудникам той же локации ЦО. Это право просмотра сохраняется в состояниях `submitted`, `processing`, `completed` и `cancelled`, включая исторический просмотр в пределах разрешённой области.
+
+Общий доступ к просмотру после отправки не меняет полномочия: только автор управляет собственным черновиком до отправки; после отправки состав неизменяем для всех сотрудников ЦО, а отмена выполняется архивом по правилам P-09. Сотрудники другой локации ЦО не получают доступ к заявке. Просмотр полного состава не означает доступ к дальнейшей истории отдельной карты за пределами правил D-08/D-09.
