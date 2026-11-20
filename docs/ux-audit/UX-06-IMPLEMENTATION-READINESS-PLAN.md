@@ -385,7 +385,7 @@ Production cutover не допускается, пока не выполнены
 
 ### Миграционные и операционные планы — не новые продуктовые решения
 3. **D-06 — viewer:** подготовить стратегию миграции существующих пользователей и legacy ACL; статический аудит подтвердил допуск viewer к /search и нефильтрованному /history. Не закрыто; требуется containment и negative tests.
-4. **D-03 — legacy incidents:** подготовить отдельный план retirement/reconciliation старых exception shipment paths и UI, не возвращая incident в целевой процесс. Не закрыто.
+4. **D-03 — legacy incidents:** продуктово закрыто 2026-11-21; старый exception process и связанные пути исключены без миграции рабочих записей (их нет). Удаление legacy code paths — задача будущей реализации.
 
 ### Технические решения и доказательства — требуют завершения до соответствующих DDL/cutover gates
 5. **DB command idempotency:** четыре положения утверждены владельцем продукта 2026-11-18 как обязательный технический стандарт: client-generated UUID v4 с повторным использованием на retry; server-side schema-specific canonicalization + SHA-256 с версией алгоритма; replay успешных результатов и детерминированных бизнес-отказов после авторизации без фиксации auth failures/transient errors; бессрочное сохранение ключей необратимых операций с tombstone при очистке payload. Общий TTL остальных команд и retry horizons остаются технической детализацией. Решение закрыто; реализация/DDL не разрешены.
@@ -411,7 +411,7 @@ Production cutover не допускается, пока не выполнены
 ## 11. Что не входит в этот план
 
 - Не изменять код, ORM, API, UI, tests, migrations, workflows или deployment до отдельного разрешения на реализацию.
-- Не удалять SQLite, legacy viewer, исторические CardPlacement, incidents или старые ArchiveRequest. Для CardPlacement утверждено сохранение исторических записей без физического удаления; legacy write path выводится из эксплуатации отдельно.
+- Не удалять SQLite и старые ArchiveRequest до отдельных решений. `viewer` и legacy incidents исключены из целевой модели; CardPlacement history сохраняется без физического удаления, legacy write path выводится из эксплуатации отдельно.
 - Не менять формат QR карты.
 - Не создавать новую сущность incident.
 - Не внедрять дополнительные маршруты сверх D-18.
@@ -550,7 +550,7 @@ The product owner rejected the proposed `Card.phone` clerical correction. The or
 3. **Typed command/event catalog:** завершить per-command input/result schemas, versioning, state guards, event types, negative outcomes и mapping API errors. P-04/P-07 typed command contracts должны отражать утверждённые правила, не generic override.
 4. **Admin/security audit policy:** outage baseline утверждён: fail closed для privileged mutations и успешного login, если обязательная запись не может быть атомарно сохранена; ordinary reads автоматически не блокируются; все 401/403 не обязаны синхронно писать durable audit. Осталось определить retention/legal hold, digest/IP policy и key rotation, privileged-read scope for business-data exports, tamper evidence и отдельную bounded policy для denial events.
 5. **Command ledger retention:** сохранить tombstone для необратимых команд; для остальных определить максимальные retry horizons всех клиентов/jobs/integrations и только затем установить календарный TTL/purge policy.
-6. **Migration/reconciliation preflight:** инвентаризировать legacy SQLite/viewer/incident/CardPlacement и исторические admin events; определить mapping, проверки полноты и rollback/retention до любых миграций.
+6. **Migration/reconciliation preflight:** инвентаризировать только те legacy SQLite/CardPlacement/ArchiveRequest и исторические admin events, для которых миграция или retention остаются применимыми. Viewer-account и incident reconciliation не требуются; рабочих данных нет.
 7. **Evidence/test matrix:** для каждой команды/роли зафиксировать позитивные, негативные, concurrent retry, rollback, append-only, grants и migration-preservation сценарии. Тесты пока не запускались.
 
 ### Текущая граница
