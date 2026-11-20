@@ -29,6 +29,27 @@ DB boundary обязан проверять:
 
 Возвращать типизированный результат: `success`, `already_applied`, `not_found`, `forbidden`, `invalid_state`, `conflict`, `validation_error`. Внутренние SQL детали не раскрывать пользователю.
 
+**Обязательный формат результата (утверждён 2026-11-20):** каждая публичная DB-команда возвращает единый versioned JSONB envelope:
+
+```json
+{
+  "result_code": "success",
+  "result_version": 1,
+  "result_payload": {},
+  "command_id": "uuid",
+  "correlation_id": "uuid",
+  "completed_at": "database timestamp"
+}
+```
+
+- `result_code` выбирается из закрытого allowlist конкретной команды/семейства команд.
+- `result_version` версионирует схему `result_payload`.
+- Для каждой команды документируется строгая схема и validator payload; произвольный JSON, ORM-объекты и SQL-диагностика запрещены.
+- В payload возвращаются только минимально необходимые стабильные идентификаторы/состояния; PII — только при необходимости API use case и наличии актуального права чтения.
+- Command ledger сохраняет точный committed envelope; replay возвращает первоначальный семантический результат, а не пересчитывает текущее состояние.
+- HTTP status и публичное тело ответа формирует API adapter по отдельной спецификации. SQLSTATE, имена constraints и тексты исключений не входят в публичный envelope.
+- Внутренние высокочастотные SQL-функции могут использовать фиксированные типизированные scalar returns, но внешний контракт DB-команд остаётся единым envelope.
+
 ### 1.2 Общая транзакционная последовательность
 
 1. Проверить/зарегистрировать idempotency key.
