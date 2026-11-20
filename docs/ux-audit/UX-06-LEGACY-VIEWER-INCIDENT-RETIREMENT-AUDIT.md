@@ -183,3 +183,16 @@ Read-only preflight/инвентаризация должна дополните
 - Исторические события/ссылки на viewer не требуют специального preservation mechanism, поскольку данных эксплуатации нет. Это не отменяет общие требования к авторству событий, которые будут создаваться в целевой системе.
 
 Это решение закрывает D-06 как продуктовый и миграционный вопрос. Статический аудит текущего прототипа остаётся справочным свидетельством legacy paths. Код, ORM, API/UI, migrations и tests не менялись; реализация требует отдельного разрешения.
+
+## 9. Решение владельца продукта по legacy incidents — 2026-11-21
+
+Это решение supersedes предложения разделов 3 и 5 о data preflight, exception reconciliation, переносе exception metadata и сохранении resolution events:
+
+- МедАрхив ещё не введён в эксплуатацию; рабочих пользовательских и операционных данных нет.
+- Старый процесс «Инциденты» полностью исключается из целевой системы.
+- Legacy `Shipment.status='exception'`, `exception_by/exception_at/exception_note`, `shipment.exception_registered` / `shipment.exception_resolved`, `register_exception` / `resolve_exception`, exception receive queues, `/admin/incidents`, incident detail UI/API и связанные labels/guards/tests не переносятся в целевую модель.
+- Не требуется миграция, сверка или ручное разрешение старых exception shipments; рабочих записей для этого нет. Legacy exception records/events не входят в целевой data migration.
+- Не создавать отдельную сущность incident или новый exception workflow.
+- Общий append-only audit и предусмотренные бизнес-процессами ошибки/расхождения сохраняются; они не должны подменяться старым exception process. Ошибки при приёмке обрабатываются по утверждённым правилам соответствующего процесса, без частичной приёмки и молчаливой смены custody/location.
+
+Статические сведения о текущем прототипе остаются историческими findings и помогают найти legacy code paths для удаления. Это решение не разрешает изменение исходников, ORM, API/UI, миграций или тестов.
