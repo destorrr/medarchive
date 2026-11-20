@@ -44,24 +44,16 @@ Until that schedule is approved, the target policy remains incomplete. If an int
 
 ## 3. Data minimization and digest policy
 
-**Default recommendation: do not collect source IP or identity digests in the general AdminSecurityAudit payload at first release.**
+**Approved product decision (2026-11-21): do not collect or retain source-IP or attempted-identity digests for AdminSecurityAudit or bounded security telemetry in the initial product.**
 
-Add a digest only after a documented abuse-detection or investigation use case identifies:
-- exact field to normalize and digest;
-- purpose, authorized readers and retention class;
-- whether correlation is necessary across events;
-- risk of dictionary attacks and linkability;
-- key custody, rotation and expiry.
+- Do not store raw source IP addresses, IP hashes/digests, attempted usernames, login hashes/digests or other stable identifiers derived from these values in security-event payloads.
+- Do not correlate security events across attempts by source IP or attempted identity.
+- Use the separately approved login-throttle counters for their narrow rate-limiting purpose; throttle state is not an audit/event history and must not be exposed as an event-correlation facility. Its internal bucket-key design remains governed by the separate login-throttle contract and must not be copied into AdminSecurityAudit.
+- Do not duplicate network/identity identifiers from infrastructure logs into the MedArchive audit records. Any independently operated infrastructure logging is outside this application audit decision and remains subject to its own ownership and retention policy.
+- Reconsider collecting a specific identifier only after a concrete abuse-detection need, privacy/legal assessment and a new explicit product decision.
 
-If approved:
-- use keyed HMAC-SHA-256 over a canonical normalized value; never an unkeyed hash of usernames, emails or IPs;
-- use purpose-separated keys for source network and attempted identity; do not reuse password, session-signing, encryption or export-signing keys;
-- store only the digest and a non-secret key-version identifier; never the key;
-- restrict digest lookup and prohibit general-purpose search/filtering by digest;
-- rotate with a controlled overlap window, retaining old verification keys only as long as the associated records require;
-- do not claim pseudonymized digests are anonymous personal data.
+This decision removes source/identity digest collection from the initial audit scope. It does not remove the separate HMAC key requirements for protecting audit-record integrity.
 
-Raw IP/attempted username should not be stored in the general event payload by default. If operational infrastructure already retains source IP in separate security logs, define that system's ownership and retention rather than duplicating it here.
 
 ## 4. Integrity and tamper-evidence design
 
