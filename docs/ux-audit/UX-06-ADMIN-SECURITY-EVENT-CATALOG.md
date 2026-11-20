@@ -225,3 +225,7 @@ Owner decision (2026-11-21): if the separate best-effort denial-telemetry store 
 ## 2026-11-21 — telemetry-loss monitoring approved
 
 Owner decision (2026-11-21): do not create a separate user-interface notification for dropped or unavailable optional denial telemetry. Operational monitoring must track telemetry-store availability and telemetry write failures using technical health signals only, without collecting or exposing personal data. This monitoring is separate from AdminSecurityAudit and must not become a request-path dependency or block authorization/business operations. The decision does not authorize a new user-facing alert, per-event retry, or deferred delivery queue.
+
+## 2026-11-21 — operational telemetry monitoring access approved
+
+Owner decision (2026-11-21): technical monitoring metrics and telemetry-store/write-failure diagnostics are available only to infrastructure administrators and personnel explicitly responsible for system operations. Ordinary MedArchive users, including application-role `admin`, must not see internal infrastructure metrics or telemetry storage diagnostics through the application. This is an infrastructure/operations access boundary, separate from application authorization and AdminSecurityAudit. Exact infrastructure identities and grants depend on deployment topology; implementation remains unauthorized.
