@@ -660,3 +660,7 @@ The product owner approved drop-on-failure behavior for optional denial telemetr
 ## 2026-11-21 — telemetry-loss monitoring approved
 
 The product owner approved no separate user-interface notification when optional denial telemetry is dropped or its store is unavailable. Operational monitoring must track store availability and telemetry write failures through technical health signals only, without personal data. It must remain separate from AdminSecurityAudit and must not create a request-path dependency or block/change authorization or business-operation outcomes. No retry or deferred queue is introduced. Implementation remains unauthorized.
+
+## 2026-11-21 — operational telemetry monitoring access approved
+
+The product owner approved restricting technical monitoring metrics and telemetry-store/write-failure diagnostics to infrastructure administrators and personnel explicitly responsible for system operations. Ordinary MedArchive users, including application-role `admin`, do not receive access to internal infrastructure metrics or telemetry diagnostics through the application. This is separate from application-role permissions and AdminSecurityAudit. Exact infrastructure identities/grants remain deployment-specific. Implementation remains unauthorized.
