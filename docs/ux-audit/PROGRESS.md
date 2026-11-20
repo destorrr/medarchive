@@ -2532,3 +2532,8 @@ PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, 
 ## 2026-11-20 — P-05: область списания пустой коробки для admin
 
 Уточнено согласованное полномочие: `branch`, `central_office` и `archive` списывают коробки только в своей операционной области/локации; активный `admin` вправе списать пустую коробку в любой локации по отдельному прямому полномочию P-05. Это узкое исключение не предоставляет admin другие операционные права. В UX-03 role/permission matrix, UX-06 DB command contract, object detail contract и cross-document review синхронизированы actor/scope и state guards `box_write_off`. Только Markdown; исходники, ORM, SQL/DDL, миграции, API/UI, тесты и workflows не менялись; PostgreSQL, pytest и CI не запускались.
+
+
+## 2026-11-20 — перегруппировка коробки с активным размещением
+
+Согласовано: архивный сотрудник может извлекать карты из коробки, уже стоящей на полке, включая последнюю карту. При закрытии последнего membership `BoxCycle` автоматически завершается, но `BoxPlacement` сохраняется; пустая коробка остаётся на полке и может быть повторно заполнена без снятия либо отдельно снята через `box_unplace`. При P-09 extraction последней карты прежнее правило сохраняется: placement закрывается автоматически. Обновлены UX-03, DB command contracts, technical data model, object detail contract, invariants/test matrix (добавлен DB-61) и cross-document consistency review. Изменена только Markdown-документация; исходники, ORM, SQL/DDL, миграции, API/UI, тесты и workflows не менялись; PostgreSQL, pytest и CI не запускались.
