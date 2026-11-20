@@ -583,3 +583,12 @@ The two append-only stores have distinct authority; they are not duplicate copie
 
 ### Отмена и повторные команды
 Только текущий автор может отменить `draft` без причины. Отмена не допускается после `in_transit`. Изменение manifest/courier после handover запрещено. Handover и receipt сериализуются блокировкой shipment; после успешной первой команды повтор с новым command_id отклоняется как `invalid_state`/`already_applied` без повторного бизнес-события. Retry с тем же command_id возвращает сохранённый результат по общему idempotency contract. Любая ошибка до commit откатывает все связанные изменения и события.
+
+
+### 2.13. Сквозные переходы коробочного отправления и карты в составе коробки
+
+Для обычных маршрутов branch → archive и central_office → archive manifest shipment состоит из коробок (`ShipmentBox`), а не из отдельных карт. На handover shipment `draft → in_transit`; custody коробок и всех карт, входящих в их текущие BoxCycle, переходит назначенному курьеру. Состав BoxCycle и активные memberships не закрываются и не пересоздаются: передача коробки не является распаковкой/перегруппировкой. Для этих карт не создаются `ShipmentCard`, P-09 item или индивидуальный `current_shipment_id`.
+
+На полной приёмке shipment `in_transit → received` custody и учётная локация коробок и всех карт внутри них атомарно переходят архиву. Активные memberships и BoxCycle сохраняются. Receipt не назначает полочное место: `BoxPlacement` создаётся отдельной операцией размещения. Нельзя считать отдельную карту принятой независимо от коробки.
+
+Это отличается от P-09 archive → central_office: там manifest состоит из отдельных `ShipmentCard`, а позиции P-09 и `current_shipment_id` переходят `extracted → in_shipment` только при handover.
