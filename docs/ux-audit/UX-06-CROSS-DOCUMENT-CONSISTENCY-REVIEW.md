@@ -503,3 +503,8 @@ A threshold of five matching denials per fixed 15-minute window is approved. Mat
 ## 2026-11-21 — denial telemetry hourly cap approved
 
 An application-wide cap of 100 persisted aggregate denial-telemetry events per hour is approved. Once reached, additional aggregate events are dropped until the next hour. This cap applies only to best-effort denial telemetry and cannot affect business operations or authorization outcomes. It coexists with the 15-minute window, five-denial threshold, operation/reason grouping and prohibition on per-user/network correlation. Concurrency-safe enforcement remains an implementation detail.
+
+
+## 2026-11-21 — denial telemetry retention approved
+
+Bounded aggregate authorization-denial telemetry is retained for 30 calendar days and then automatically deleted. This rule applies only to this best-effort telemetry stream; it does not change AdminSecurityAudit, DomainEvent or authoritative business-record retention. Cleanup is bounded and non-blocking. Together with prior approvals: 15-minute aggregation window, threshold of five matching denials, and application-wide cap of 100 aggregate events per hour.
