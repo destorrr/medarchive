@@ -106,7 +106,10 @@ Regroup без заявки: cards → boxes → cycles → memberships/placemen
 - две упаковки одной карты: одно membership;
 - параллельный regroup одной карты в разные коробки: одно итоговое membership;
 - повторная приёмка: второй вызов отклонён;
-- размещение одной коробки на двух полках: один успех.
+- размещение одной коробки на двух полках: один успех;
+- деактивация/отзыв role-location membership против P-09 item command, редактирования draft и обычного/fulfillment handover: исход определяется блокировкой principal/membership, устаревшие полномочия не используются;
+- деактивация текущего автора против shipment_reassign_draft_author: переназначение возможно только после commit деактивации; если handover завершился первым, переназначение запрещено по состоянию shipment;
+- конкурентный replay успешной команды после деактивации: мутация не повторяется, чувствительный результат не раскрывается без актуального read permission.
 
 ## 5. Каталог негативных тестов
 
@@ -158,6 +161,10 @@ Regroup без заявки: cards → boxes → cycles → memberships/placemen
 - Admin correction без причины/audit event.
 - Изменение/удаление старого DomainEvent, membership или placement.
 - Переназначение автора активного черновика, не admin, неактивному/чужому сотруднику или после handover; проверка append-only события и неизменности manifest/courier snapshot.
+- Бизнес-команда после уже завершившейся деактивации actor или отзыва его role/location membership.
+- Конкурентная деактивация/отзыв membership против item outcome, cancel, draft edit, courier change и handover; проверка единого порядка principal/membership locks.
+- Команда handover от автора, деактивация которого завершилась до получения блокировки; отказ без изменения shipment.
+- Admin reassignment до commit деактивации текущего автора; отказ, без изменения author pointer.
 
 Для deferred triggers отдельно проверить ошибку на COMMIT, а не только на flush. Тесты обхода должны выполнять прямой SQL под реальной прикладной DB role.
 
@@ -240,3 +247,10 @@ Backfill должен быть идемпотентным, пакетным, с 
 | ID | Инвариант | DB enforcement (target) | Транзакционная граница | Проверка |
 |---|---|---|---|---|
 | DB-45 | Все бизнес-факты UX-06 сохраняются в `DomainEvent`; отдельный authoritative `RequestEvent` не создаётся. События P-09 и связанного fulfillment shipment имеют корректный `request_id`; event и изменение агрегата атомарны | Event type/version allowlist, FK/aggregate references, запрет UPDATE/DELETE, защищённые DB commands; проверка допустимости `request_id` для shipment archive → CO | Событие записывается в той же транзакции, что и изменение aggregate; связанные shipment events сохраняют собственный aggregate | Отсутствующее/чужое parent reference, неизвестный event type/version, изменение или удаление события отклоняются; повтор команды не создаёт дубль; проекция P-09 не раскрывает независимую историю карты или admin/security audit |
+
+
+## DB-46 — сериализация полномочий с деактивацией и отзывом membership
+
+| ID | Инвариант | DB enforcement (target) | Транзакционная граница | Проверка |
+|---|---|---|---|---|
+| DB-46 | Ни одна бизнес-команда не использует устаревшие active/role/location полномочия. Проверка actor, текущего автора черновика и целевого membership сериализуется с admin deactivation и изменением membership | Защищённая команда блокирует principal и используемые role/location membership строки FOR UPDATE в стабильном порядке UUID, затем повторно проверяет active/role/location; admin deactivation/revoke использует те же блокировки | Блокировки полномочий, агрегатные изменения, DomainEvent/admin audit и command ledger входят в одну транзакцию | Если бизнес-команда получила блокировку первой, она может завершиться до деактивации; если деактивация/отзыв commit-ились первыми, команда получает forbidden. Admin reassignment допустим только после фактической деактивации автора. |
