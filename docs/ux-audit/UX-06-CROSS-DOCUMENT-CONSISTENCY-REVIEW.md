@@ -530,3 +530,7 @@ Viewing technical monitoring metrics is excluded from MedArchive `AdminSecurityA
 ## 2026-11-21 — no telemetry-outage notifications approved
 
 No separate notifications or alerts are generated for denial-telemetry store unavailability, even when prolonged. Passive health metrics/diagnostics remain available to authorized infrastructure personnel under the existing access boundary, but no alerting workflow is introduced. Existing drop-on-failure and non-blocking semantics remain unchanged.
+
+## 2026-11-21 — telemetry health UI exposure prohibited
+
+Denial-telemetry storage availability, health, write failures, and diagnostics are not exposed in the MedArchive application UI, including to application administrators. Any passive technical health information remains outside the application UI and under the separate infrastructure/operations access boundary. The application `admin` role does not grant monitoring access.
