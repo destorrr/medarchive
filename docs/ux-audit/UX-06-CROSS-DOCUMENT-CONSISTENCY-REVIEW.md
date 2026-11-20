@@ -493,3 +493,8 @@ Selected high-risk authorization-denial telemetry may aggregate repeats only by 
 ## 2026-11-21 — denial telemetry aggregation window approved
 
 A fixed 15-minute aggregation window is approved for selected high-risk denial telemetry. Repeated events are aggregated by controlled operation type/code and denial-reason code, storing a count rather than one row per attempt. No actor, attempted identity, source IP, IP digest or other per-user/network correlation key is permitted. Thresholds, rate/volume caps, retention and unavailable-store behavior remain technical parameters; best-effort/non-blocking behavior remains mandatory.
+
+
+## 2026-11-21 — denial telemetry threshold approved
+
+A threshold of five matching denials per fixed 15-minute window is approved. Matching is limited to controlled operation type/code and denial-reason code. On the fifth denial, record one aggregate event for that group/window rather than an event per attempt. Per-user/network correlation dimensions remain prohibited. Counter update/finalization mechanics and maximum rate/volume remain technical parameters; best-effort/non-blocking behavior is unchanged.
