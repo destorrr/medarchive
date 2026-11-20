@@ -115,7 +115,7 @@ All payloads require maximum size/depth and schema validation. Unknown keys and 
 
 ## 5. Read permissions and presentation
 
-- Global audit remains admin-only under D-07/D-16; branch, archive and Central Office roles receive no global feed or audit payload endpoint.
+- **Approved read-access decision (2026-11-21):** only an active `admin` may read the global `AdminSecurityAudit` feed and event details. `branch`, `central_office` and `archive` receive neither the global feed nor any audit-payload endpoint. The same server-side restriction applies to direct URLs/API requests; UI hiding is not an authorization boundary.
 - The event list renders event-specific labels and allowlisted fields; no generic raw-JSON viewer.
 - Audit detail access should be narrower than general admin object access where payload contains security context. Admin's global object/history access does not justify exposing secrets or unnecessary PII in audit.
 - Audit read operations remain admin-only. Opening the feed and viewing event details are not logged; no audit-feed export or export-specific access log exists in the target product. Separate business-data export operations remain audited under their own event types.
