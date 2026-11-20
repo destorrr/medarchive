@@ -625,3 +625,8 @@ This is documentation-only. No source, schema, migrations, tests, workflows or d
 ## 2026-11-21 — logout telemetry approved
 
 The product owner approved recording explicit user-initiated logout as a best-effort security event. Telemetry failure/unavailability must not delay or prevent logout or credential clearing; it is not a mandatory transactional audit write. No guarantee is made for browser close, connectivity loss, or other exits that do not invoke logout. No new session registry is implied. The product decision is closed; technical implementation must fit the bounded telemetry limits and must not create an availability dependency.
+
+
+## 2026-11-21 — denial-telemetry grouping dimensions approved
+
+For selected high-risk denials/threshold crossings, repeated events are grouped only by controlled operation type/code and denial-reason code. No actor, attempted-identity, source-IP, IP-digest or other per-user/network correlation key may be used. These dimensions are categorical and must not contain free-form request data. Product-level grouping dimensions are closed; implementation readiness still requires explicit windows, thresholds, maximum rate/volume, retention and unavailable-store behavior, while preserving best-effort non-blocking semantics.
