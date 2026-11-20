@@ -72,7 +72,7 @@ DB boundary обязан проверять:
 
 ### 2.2 `request_submit`
 
-**Actor:** `central_office`, инициатор или пользователь ЦО с разрешённым scope.
+**Actor:** только автор черновика `central_office`.
 
 **Вход:** `request_id`, idempotency metadata.
 
@@ -84,29 +84,28 @@ DB boundary обязан проверять:
 
 **Событие:** `archive_request.submitted`.
 
-### 2.3 `request_edit_submitted`
+### 2.3 `request_edit_draft`
 
-**Actor:** `central_office`.
+**Actor:** только автор черновика `central_office`.
 
-**Вход:** `request_id`, списки add/remove card IDs, reason/comment при необходимости по продуктовой политике.
+**Вход:** `request_id`, списки add/remove card IDs, idempotency metadata.
 
 **Предусловия:**
-- parent находится в `draft` или `submitted`;
-- processing ещё не начался;
+- parent находится строго в `draft`;
+- actor совпадает с `requested_by`;
 - удаляемые позиции принадлежат этому parent;
 - добавляемые карты доступны ЦО, не дублируются и не конфликтуют с другими активными заявками.
 
 **Изменения:**
 - добавить позиции `pending`;
-- удалённые ЦО позиции исключить из текущего тела заявки;
-- факт удаления сохранить в audit/event trail с actor/time;
-- после изменения состава перепроверить непустоту и актуальность parent state.
+- удалённые из черновика позиции исключить из актуального состава; при необходимости сохранить audit tombstone;
+- физически удалять строки и историю запрещено.
 
 **Физическое состояние:** не менять коробки, membership и placements.
 
-**Гонка:** сериализовать по parent request. Если параллельно archive пытается начать processing, только одна операция должна пройти; edit после успешного перехода в processing возвращает `invalid_state`.
+**Гонка:** сериализовать по parent request. После успешной отправки любая команда редактирования возвращает `invalid_state`; никакая роль не может менять состав submitted-заявки.
 
-**События:** `archive_request.item_added`, `archive_request.item_removed_by_central_office`, при необходимости `archive_request.updated`.
+**События:** `archive_request.item_added`, `archive_request.item_removed_by_central_office` (только draft).
 
 ### 2.4 `request_start_processing`
 
@@ -168,24 +167,27 @@ DB boundary обязан проверять:
 
 ### 2.7 `request_cancel`
 
-**Actor:** до processing — `central_office`; после processing, но до handover — `archive`.
+**Actor и причина зависят от состояния:**
+- `draft`: только автор черновика ЦО; причина не требуется.
+- `submitted`: только уполномоченный сотрудник архива; причина обязательна.
+- `processing`: только уполномоченный сотрудник архива до фактической передачи fulfillment-отправления; причина обязательна.
 
-**Вход:** `request_id`, обязательная причина, idempotency metadata.
+**Вход:** `request_id`, причина только для состояний `submitted/processing`, idempotency metadata.
 
-**Предусловия:**
-- parent `draft/submitted` для отмены ЦО; либо `processing` для отмены архивом;
-- shipment handover ещё не состоялся;
-- нет позиции в `in_shipment/completed`.
+**Предусловия:** parent находится в одном из перечисленных состояний; фактическая передача fulfillment-отправления ещё не состоялась.
 
-**До processing:** parent → `cancelled`; все незавершённые items → `cancelled`; физическое состояние не меняется.
+**Отмена draft:** parent → `cancelled`; все draft-позиции/аудиторские tombstones сохраняются; физическое состояние карт не меняется.
 
-**После processing:** в одной транзакции:
+**Отмена submitted:** parent → `cancelled`; незавершённые позиции → `cancelled`; физическое состояние карт не меняется, поскольку обработка и извлечение не начинались.
+
+**Отмена processing:** в одной транзакции:
 - заблокировать parent, все extracted cards и связанные коробки/cycles;
-- вернуть все карты, остающиеся в ответственности архива и ещё не переданные, в коробки;
-- перевести незавершённые items в `cancelled`;
+- вернуть в коробки все извлечённые карты, остающиеся под ответственностью архива и ещё не переданные;
+- перевести незавершённые позиции в `cancelled`;
 - сохранить окончательные `not_found` и `removed_by_archive`;
+- если fulfillment-черновик существует, отменить его в той же транзакции;
 - parent → `cancelled`;
-- записать причину, actor и события.
+- записать actor/time и обязательную причину.
 
 Если хотя бы одна карта не может быть возвращена, вся отмена откатывается.
 
