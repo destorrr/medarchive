@@ -538,3 +538,7 @@ Denial-telemetry storage availability, health, write failures, and diagnostics a
 ## 2026-11-21 — separate audit-integrity verification feature excluded
 
 A separate cryptographic integrity-verification feature for `AdminSecurityAudit` is not required. Hash chains, MACs, signatures, checkpoints, scheduled verification, integrity dashboards, and related UI/API are out of scope. This does not remove existing requirements for append-only behavior, restricted writes, atomic mandatory audit writes, retention governance, or backup/restore reconciliation. Key management remains deferred and is not an implementation prerequisite for an excluded feature.
+
+## 2026-11-21 — failed login attempts excluded from persisted events
+
+Do not persist individual failed-login attempts or login-throttle denials as `AdminSecurityAudit`, `DomainEvent`, or bounded security-telemetry events. Remove `authn.login_failed` and `authn.login_throttled` from the target event catalog. Preserve the login-throttle mechanism and its separately controlled internal counters/state only as needed to enforce rate limits; do not treat or expose those counters as audit events. Successful-login auditing and selected high-risk authorization-denial telemetry are unaffected.
