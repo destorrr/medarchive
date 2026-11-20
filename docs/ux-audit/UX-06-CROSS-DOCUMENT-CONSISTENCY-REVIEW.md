@@ -534,3 +534,7 @@ No separate notifications or alerts are generated for denial-telemetry store una
 ## 2026-11-21 — telemetry health UI exposure prohibited
 
 Denial-telemetry storage availability, health, write failures, and diagnostics are not exposed in the MedArchive application UI, including to application administrators. Any passive technical health information remains outside the application UI and under the separate infrastructure/operations access boundary. The application `admin` role does not grant monitoring access.
+
+## 2026-11-21 — separate audit-integrity verification feature excluded
+
+A separate cryptographic integrity-verification feature for `AdminSecurityAudit` is not required. Hash chains, MACs, signatures, checkpoints, scheduled verification, integrity dashboards, and related UI/API are out of scope. This does not remove existing requirements for append-only behavior, restricted writes, atomic mandatory audit writes, retention governance, or backup/restore reconciliation. Key management remains deferred and is not an implementation prerequisite for an excluded feature.
