@@ -2551,3 +2551,7 @@ PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, 
 ## 2026-11-20 — утверждение целевой архитектуры схем PostgreSQL
 
 Владелец продукта утвердил целевую архитектуру: закрытая схема `medarchive` для таблиц и внутренних функций; `medarchive_api` — только при необходимости отдельной безопасной API boundary; `public` не содержит объектов приложения. В technical contract proposal рекомендация переведена в утверждённое решение, в readiness plan пункт о выборе схем закрыт с сохранением обязательного compatibility review, cross-document review дополнен записью решения. До отдельного разрешения не меняются код, ORM, SQL/DDL, миграции, API/UI, тесты, workflows или deployment. PostgreSQL, pytest и CI не запускались.
+
+## 2026-11-20 — утверждение стратегии RLS и actor/scope для PostgreSQL
+
+Владелец продукта утвердил: RLS не обязательна как первая линия защиты. Защищённые DB-команды получают явный UUID авторизованного сотрудника и проверяют активность, роль и scope по авторитетным данным БД; claims приложения и mutable GUC не являются доказательством личности. Прямой runtime DML в обход DB-команд запрещён; read-side scope пока остаётся на стороне приложения. RLS возможна позднее только как дополнительная защита после доказуемой привязки session identity к доверенному механизму. Обновлены technical contract proposal, readiness plan и cross-document review. Изменена только Markdown-документация; код, SQL/DDL, ORM, миграции, API/UI, тесты, workflows и deployment не менялись; PostgreSQL, pytest и CI не запускались.
