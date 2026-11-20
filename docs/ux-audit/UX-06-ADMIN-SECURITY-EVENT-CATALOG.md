@@ -190,3 +190,8 @@ The product owner rejected export of AdminSecurityAudit itself. Any references i
 ## 2026-11-21 — logout telemetry approved
 
 Logout event decision (owner approval, 2026-11-21): record an explicit user-initiated logout as a best-effort security event. Failure or unavailability of telemetry must not delay or prevent local/session credential clearing and must not change the logout outcome. This is not a mandatory transactional audit write and must not become an availability dependency. The event is not guaranteed when a user closes a browser, loses connectivity, or otherwise leaves without invoking logout. It does not imply a new session registry. This decision closes the product question; implementation details remain subject to the bounded telemetry contract.
+
+
+## 2026-11-21 — approved denial-telemetry aggregation dimensions
+
+Owner decision (2026-11-21): for selected high-risk authorization denials and threshold crossings, bounded security telemetry may aggregate repeated events using only the operation type/code and denial-reason code. The aggregation must not use or retain actor identity, attempted identity, source IP, IP digest, or other per-user/network correlation key. Operation and denial reason are controlled categories, not free-form request data. This defines the approved grouping dimensions; aggregation windows, thresholds, maximum rate/volume, retention and unavailable-store behavior remain technical implementation parameters to be specified within the existing best-effort policy.
