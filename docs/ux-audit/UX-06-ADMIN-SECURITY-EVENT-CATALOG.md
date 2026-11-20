@@ -195,3 +195,8 @@ Logout event decision (owner approval, 2026-11-21): record an explicit user-init
 ## 2026-11-21 — approved denial-telemetry aggregation dimensions
 
 Owner decision (2026-11-21): for selected high-risk authorization denials and threshold crossings, bounded security telemetry may aggregate repeated events using only the operation type/code and denial-reason code. The aggregation must not use or retain actor identity, attempted identity, source IP, IP digest, or other per-user/network correlation key. Operation and denial reason are controlled categories, not free-form request data. This defines the approved grouping dimensions; aggregation windows, thresholds, maximum rate/volume, retention and unavailable-store behavior remain technical implementation parameters to be specified within the existing best-effort policy.
+
+
+## 2026-11-21 — denial telemetry aggregation window approved
+
+Owner decision (2026-11-21): use fixed 15-minute aggregation windows for selected high-risk authorization-denial telemetry. Within each window, aggregate by the already approved controlled operation type/code and denial-reason code. Store an aggregate count rather than one row per repeated denial. Do not add actor, attempted-identity, source-IP, IP-digest or other per-user/network correlation dimensions. Window boundaries and implementation must avoid unbounded storage or request-path blocking. Other limits (thresholds, maximum rate/volume and retention) remain to be specified as technical parameters under the best-effort telemetry policy.
