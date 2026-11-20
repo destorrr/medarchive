@@ -210,3 +210,8 @@ Owner decision (2026-11-21): the threshold for selected high-risk authorization-
 ## 2026-11-21 — denial telemetry hourly cap approved
 
 Owner decision (2026-11-21): cap selected high-risk authorization-denial aggregate telemetry at 100 aggregate events per application-wide hour. Once the cap is reached, additional telemetry aggregates are not persisted for the remainder of that hour. This cap applies only to best-effort denial telemetry; it must not block, delay or change business operations or authorization outcomes. The cap does not relax the approved 15-minute aggregation window, five-matching-denial threshold, operation/reason grouping dimensions, or prohibition on per-user/network correlation. Exact concurrency-safe enforcement and hour-boundary mechanics remain implementation details.
+
+
+## 2026-11-21 — denial telemetry retention approved
+
+Owner decision (2026-11-21): retain bounded aggregate authorization-denial telemetry for 30 calendar days, then automatically delete it. This retention applies only to the separate best-effort denial telemetry, not to AdminSecurityAudit, DomainEvent or authoritative business records. Cleanup must be bounded and must not block or alter request processing. The previously approved 15-minute aggregation window, threshold of five matching denials and application-wide cap of 100 aggregate events per hour remain in force.
