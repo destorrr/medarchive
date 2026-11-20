@@ -233,3 +233,7 @@ Owner decision (2026-11-21): technical monitoring metrics and telemetry-store/wr
 ## 2026-11-21 — technical monitoring access-view audit boundary approved
 
 Owner decision (2026-11-21): viewing technical monitoring metrics is not recorded in MedArchive `AdminSecurityAudit`. Access to monitoring is governed by infrastructure controls. If the infrastructure requires an access log for monitoring views, it is a separate infrastructure/operations log, outside MedArchive business/security audit. This does not expand application audit events or grant application users access to monitoring. Implementation remains unauthorized.
+
+## 2026-11-21 — no telemetry-outage notifications approved
+
+Owner decision (2026-11-21): do not send separate notifications or alerts to infrastructure/operations personnel for denial-telemetry store unavailability or prolonged telemetry loss. Technical monitoring may retain passive health metrics/diagnostics under the approved access boundary, but it must not generate an alerting/notification workflow for this condition. This does not change drop-on-failure behavior, the absence of retries/queues, or the non-blocking nature of optional telemetry.
