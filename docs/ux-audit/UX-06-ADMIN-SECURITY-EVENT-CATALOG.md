@@ -205,3 +205,8 @@ Owner decision (2026-11-21): use fixed 15-minute aggregation windows for selecte
 ## 2026-11-21 — denial telemetry threshold approved
 
 Owner decision (2026-11-21): the threshold for selected high-risk authorization-denial telemetry is five matching denials within one fixed 15-minute aggregation window. A matching group is defined by the approved controlled operation type/code and denial-reason code. The threshold is reached at the fifth matching denial; record one aggregate event for that group/window rather than one event per attempt. Do not add actor, attempted-identity, source-IP, IP-digest or other per-user/network correlation dimensions. Exact counter update/finalization mechanics and maximum rate/volume remain implementation parameters; telemetry remains best-effort and must not block or change the authorization result.
+
+
+## 2026-11-21 — denial telemetry hourly cap approved
+
+Owner decision (2026-11-21): cap selected high-risk authorization-denial aggregate telemetry at 100 aggregate events per application-wide hour. Once the cap is reached, additional telemetry aggregates are not persisted for the remainder of that hour. This cap applies only to best-effort denial telemetry; it must not block, delay or change business operations or authorization outcomes. The cap does not relax the approved 15-minute aggregation window, five-matching-denial threshold, operation/reason grouping dimensions, or prohibition on per-user/network correlation. Exact concurrency-safe enforcement and hour-boundary mechanics remain implementation details.
