@@ -181,3 +181,8 @@
 ## 10. Согласование с уточнённым command idempotency baseline (2026-11-18)
 
 Подробное проектное предложение по command_id generation, canonical input hashing, correlation, concurrent replay, negative outcomes, result envelope и retention добавлено в раздел 11 UX-06-DB-COMMAND-CONTRACTS.md. Оно намеренно помечено как предложение, а не утверждённое решение. До SQL API остаются четыре вопроса владельца продукта: UUID v4/client lifecycle; canonicalization v1/SHA-256; сохранение детерминированных бизнес-отказов; tombstone/retention для необратимых команд.
+
+
+## 11. Утверждённый срок хранения command ledger (2026-11-21)
+
+Владелец продукта утвердил срок хранения записей идемпотентности обычных команд — 90 календарных дней после завершения команды; по истечении срока запись может быть очищена. Для необратимых логистических и административных операций command identity/tombstone сохраняется бессрочно. Очистка обычных ledger records не удаляет authoritative business records, DomainEvent или отдельные audit records. До реализации остаются проверка максимальных retry horizons фактических клиентов/jobs, проектирование ограниченной безопасной cleanup-процедуры и проверка взаимодействия с backup/restore. Решение о сроке принято; реализация/DDL не разрешены.
