@@ -88,7 +88,9 @@ Before implementation, verify current HMAC key source, rotation plan, lock conte
 
 ## 5. First-admin and system-location bootstrap
 
-### Recommendation: one-shot operator/infra runner, outside web startup
+### Approved target: one-shot operator/infra runner, outside web startup
+
+**Owner decision (2026-11-20): approved.**
 
 - Remove first-admin creation and system-location provisioning from web-worker startup/runtime path.
 - Run a documented operator command/job using a short-lived, explicitly provisioned bootstrap credential; it is not the runtime URL and not the migrator credential.
@@ -97,7 +99,7 @@ Before implementation, verify current HMAC key source, rotation plan, lock conte
 - No permanent generic bootstrap password or HTTP endpoint.
 - Recovery of a lost first admin must be a separate break-glass operator runbook, not a hidden reusable bootstrap endpoint.
 
-The exact principal may be a temporary operator role or controlled owner-context runner, selected with deployment design. Do not give the web process owner or migrator credentials.
+The exact principal may be a temporary operator role or controlled owner-context runner, selected with deployment design. Do not give the web process owner or migrator credentials. The architecture choice is closed; implementation details, deployment identity and recovery runbook remain pre-implementation work. This approval does not authorize implementation.
 
 ## 6. Infrastructure principals
 
@@ -143,7 +145,7 @@ Compatibility requirements:
 | Schema | Approved: private `medarchive`; optional `medarchive_api` only if needed; no application objects in `public` | Full SQL/ORM/deployment compatibility review before implementation |
 | RLS | Approved: not required for first cut; explicit actor parameter + DB-side role/scope checks for protected commands; application read-side scope; no direct runtime DML bypass | Threat model and trustworthy identity binding before any later RLS adoption |
 | Login throttle | Approved: narrow SECURITY DEFINER functions; runtime EXECUTE only, no direct table SELECT/INSERT/UPDATE/DELETE | HMAC key/rotation, lock contention, atomicity and bounded cleanup design before implementation |
-| Bootstrap | One-shot operator runner, not web startup | Deployment principal and recovery runbook |
+| Bootstrap | Approved: one-shot operator runner outside web startup; atomic initialization; short-lived credential revoked after success | Deployment principal, exact system-location inventory and break-glass recovery runbook before implementation |
 | Infra principals | Separate logical identities | Hosting/backup/monitoring topology |
 | Event consumers | Preserve compatibility and historical evidence | Complete external consumer inventory |
 
