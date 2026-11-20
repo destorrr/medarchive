@@ -603,3 +603,7 @@ Readiness implications:
 - Retention/legal hold, integrity evidence, and backup reconciliation for audit records remain independent open gates.
 
 This is documentation-only. No source, schema, migrations, tests, workflows or deployment were changed or authorized.
+
+### D-06 — окончательное решение по viewer (2026-11-21)
+
+МедАрхив ещё не введён в эксплуатацию; пользовательских и операционных данных нет. Миграция существующих viewer accounts, сохранение legacy actor references, account mapping/disablement и legacy ACL compatibility не требуются. Роль `viewer` полностью исключается из целевой модели и будущей реализации во всех слоях: schema/enum/CHECK, ORM, API, admin service/forms, route guards, navigation, templates, background paths и tests. Целевые роли: `admin`, `branch`, `central_office`, `archive`. Не назначать права viewer другим ролям автоматически; применяются только отдельно утверждённые полномочия. Статически выявленные viewer search/history/dashboard пути — legacy remnants прототипа, подлежащие удалению при реализации; в частности, глобальный `/history` не должен остаться доступным ни одной роли как общий operational feed. D-06 закрыто как продуктовый/миграционный вопрос; удаление кода и обновление тестов остаются частью будущей реализации после отдельного разрешения. Никакие исходники, ORM, API/UI, миграции или тесты этим решением не изменяются.
