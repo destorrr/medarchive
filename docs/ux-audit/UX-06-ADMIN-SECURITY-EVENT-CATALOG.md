@@ -253,3 +253,7 @@ Owner decision (2026-11-21): do not persist individual failed-login attempts or 
 ## 2026-11-21 — ordinary session expiration is not persisted as an event
 
 Owner decision (2026-11-21): do not create `AdminSecurityAudit`, `DomainEvent`, or bounded security-telemetry records when a user session expires normally due to timeout or ordinary expiry. Do not introduce a session-expiration event or session registry solely for this purpose. Successful-login auditing and the approved best-effort event for explicit user-initiated logout remain unchanged. Rejected requests using expired/invalid sessions continue to follow the separately approved rule: no per-request session-rejection telemetry is introduced unless a new explicit product decision is made.
+
+## 2026-11-21 — administrative session termination is not separately audited
+
+Owner decision (2026-11-21): when an account is deactivated or otherwise administratively disabled, audit the account-management action under its existing mandatory `AdminSecurityAudit` contract. Do not create a separate event for each session that is consequently invalidated or terminated. This does not change the approved handling of successful login, explicit user-initiated logout, or ordinary session expiration.
