@@ -2583,3 +2583,7 @@ PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, 
 ## 2026-11-21 — D-06: роль viewer исключена, миграция не требуется
 
 Владелец продукта уточнил, что приложение ещё не введено в эксплуатацию и пользовательских/операционных данных нет. Роль `viewer` полностью исключается из целевой модели и будущей реализации; целевые роли — `admin`, `branch`, `central_office`, `archive`. Миграция viewer accounts, actor references и legacy ACL не требуется. При реализации удалить viewer из schema/constraints, ORM, admin UI/forms, API/guards, templates/navigation и тестов; старые viewer dashboard/search/history paths не сохранять. Права не перераспределять автоматически. Это проектное решение, исходники и тесты не изменялись.
+
+## 2026-11-21 — D-03: legacy процесс «Инциденты» исключён без миграции
+
+Владелец продукта подтвердил, что МедАрхив ещё не введён в эксплуатацию и рабочих данных нет. Старый процесс инцидентов полностью исключён из целевой системы: `exception` status/metadata/events, register/resolve commands, receive queues, admin incident UI/routes/API, labels и тестовые ожидания не переносятся. Data preflight, reconciliation, migration и special retention старых exception records не требуются. Не создавать новую сущность incident или отдельный workflow. Общий append-only audit и утверждённые правила обработки ошибок/расхождений в обычных процессах сохраняются. Статические findings прототипа остаются ориентиром для удаления legacy paths. Код и миграции не менялись; реализация не разрешена.
