@@ -85,6 +85,8 @@ For a submitted P-09 request, the parent request timeline is readable by every e
 
 For a P-09 request timeline, display events in reverse chronological order: newest event first, oldest last. Use the organization-local event timestamp as the primary sort key and a stable unique event identifier as the deterministic tie-breaker when timestamps are equal. The ordering changes presentation only; it does not alter event timestamps, append-only history, authorization scope or event retention.
 
+Ordinary opening or viewing of a P-09 request or its timeline is not recorded as a business-history event. The request timeline contains business events that reflect lifecycle transitions or processing actions; passive reads do not append DomainEvents or change the request history. This rule does not specify or replace any separate administrative/security access-audit mechanism.
+
 For card timelines, include only card-relevant events and references. For box timelines, include cycle, membership, placement and shipment transitions without conflating physical box identity with cycle identity. For shipment timelines, include handover, receipt and allowed resolution facts, with manifest snapshot semantics.
 
 A timeline query must apply authorization and event visibility in SQL/query construction before pagination and count calculation. It is not sufficient to fetch global events and hide rows in the template. The same predicate must govern:
