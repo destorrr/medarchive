@@ -429,3 +429,7 @@ UX-04 исправлен: филиал создаёт черновик толь�
 ## 2026-11-20 — утверждение разделения infrastructure principals
 
 Владелец продукта утвердил логическое разделение технических идентичностей: runtime приложения, migrator, NOLOGIN-владелец объектов БД, backup/restore, monitoring и краткоживущий bootstrap. Runtime не получает DDL и обходной DML; migrator используется только для миграций; monitoring ограничен техническими показателями без PII и изменения рабочих данных; bootstrap identity отзывается после инициализации. Maintenance identity допускается только при наличии конкретной задачи и ограниченного набора команд. Точные grants и credentials определяются после выбора deployment topology и фактических backup/monitoring инструментов. Архитектурное решение закрыто, но не разрешает реализацию/DDL. Изменена только документация; PostgreSQL, pytest и CI не запускались.
+
+## 2026-11-20 — внешние потребители событий не планируются
+
+Владелец продукта уточнил, что внешние потребители DomainEvent на текущем этапе не предполагаются. Текущий проектный scope ограничен внутренними потребителями МедАрхива; внешняя доставка, подписки, outbox/consumer offsets, webhook/API integration contracts и downstream compatibility не проектируются. Это не подтверждает отсутствие уже существующих deployment-level readers/jobs. Перед изменением event schema, payload semantics или retention требуется завершить inventory внутренних readers и проверить фактические deployment jobs/readers и effective DB grants. Изменение scope не разрешает реализацию.
