@@ -655,3 +655,8 @@ The product owner approved 30 calendar days of retention for bounded aggregate a
 ## 2026-11-21 — denial telemetry unavailable-store behavior approved
 
 The product owner approved drop-on-failure behavior for optional denial telemetry: when the telemetry store is unavailable or a write fails, do not retry and do not create a deferred queue; drop the event. Request processing continues without delay, authorization/business-operation outcomes remain unchanged, and internal technical details are not exposed to users. This applies only to best-effort denial telemetry and does not alter mandatory atomic DomainEvent/AdminSecurityAudit write requirements.
+
+
+## 2026-11-21 — telemetry-loss monitoring approved
+
+The product owner approved no separate user-interface notification when optional denial telemetry is dropped or its store is unavailable. Operational monitoring must track store availability and telemetry write failures through technical health signals only, without personal data. It must remain separate from AdminSecurityAudit and must not create a request-path dependency or block/change authorization or business-operation outcomes. No retry or deferred queue is introduced. Implementation remains unauthorized.
