@@ -79,3 +79,7 @@ Producer families: card intake/custody, archive workflow, shipment workflow, adm
 Внутренние PostgreSQL readers в просмотренных router paths перечислены выше. Внешние потребители не предполагаются по текущему решению владельца продукта; deployment-level проверка фактических jobs/readers остаётся обязательной перед изменением event contract. Backup не является event consumer; app-level queue/worker/outbox/webhook dispatcher в просмотренном source tree не обнаружен.
 
 UX-06 остаётся открытым. Следующие read-only участки: завершить P-04/P-07 decision brief и согласовать admin/security audit retention/outage; затем cross-document consistency pass. Effective ACL, production-like data preflight и внешние integration confirmations остаются readiness gates.
+
+## D-03 — исключение legacy exception events (2026-11-21)
+
+Старый процесс «Инциденты» исключён из целевой системы, рабочих данных нет. Поэтому `shipment.exception_registered` и `shipment.exception_resolved` не входят в целевой event catalog; exception-resolution detail reader не переносится. Не требуется миграция или retention plan для legacy exception events. Это не отменяет общего append-only DomainEvent для утверждённых бизнес-операций и отдельного admin/security audit. До изменения event schema в реальном deployment по-прежнему требуется проверить фактические jobs/readers и effective grants; это общий operational safeguard, а не основание сохранять исключённые event types.
