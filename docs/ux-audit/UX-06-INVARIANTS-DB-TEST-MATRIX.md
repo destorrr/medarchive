@@ -23,7 +23,7 @@
 | DB-03 | У коробки максимум одно активное BoxPlacement | Существующий partial UNIQUE по box_id при removed_at IS NULL | Размещение/снятие | Второе активное размещение отклоняется |
 | DB-04 | Активное membership ссылается на открытый цикл той же коробки; карта согласована с локацией/отправлением | Существующий deferred consistency trigger, расширить целевыми условиями | Изменение карты, коробки, цикла и membership — один commit | Membership в закрытый/чужой цикл или несовместимую локацию отклоняется на commit |
 | DB-05 | Карта в обычном физическом хранении архива без shipment/external custody имеет membership либо активную `extracted` позицию у processing P-09; терминальный `not_found` допустим только как сохранённый outcome завершённой/отменённой P-09 без membership/shipment и не считается активной позицией | Deferred trigger на cards, memberships, items и shipment pointers | Любая операция, меняющая эти связи | Карта без допустимого состояния либо с несовместимыми состояниями отклоняется |
-| DB-06 | Карта не находится в двух активных заявках | Partial UNIQUE по item.card_id для активных статусов pending/extracted/in_shipment | Добавление/терминация позиции | Вторая активная заявка на карту отклоняется |
+| DB-06 | Карта зарезервирована максимум за одной незавершённой P-09 независимо от результата позиции; `removed_by_archive` и `not_found` не освобождают резервирование, пока parent не `completed`/`cancelled` | Partial UNIQUE по `item.card_id WHERE reservation_active = true`; защищённые команды поддерживают признак, deferred trigger сверяет его с parent status и draft tombstone | Создание/редактирование draft, фиксация item outcome, отмена/завершение parent | Вторая P-09 на ту же карту отклоняется даже при `removed_by_archive`/`not_found`; резервирование снимается атомарно только при draft tombstone или terminal parent |
 | DB-07 | Идентичность позиции и родителя неизменяема; история не удаляется | FK RESTRICT, UNIQUE по согласованной политике повторного добавления, no-delete trigger | Создание позиции/корректирующее событие | DELETE позиции или изменение request_id/card_id отклоняется |
 | DB-08 | Статусы родителя и переходы ограничены | CHECK + BEFORE trigger переходов и terminal-state guard | Смена статуса | completed/cancelled нельзя вернуть в processing |
 | DB-09 | Состав меняет только уполномоченная роль на соответствующей фазе | Trigger или закрытая DB procedure проверяет роль, старый статус и тип операции | Родитель и позиции заблокированы одной транзакцией | ЦО меняет состав после processing; archive редактирует submitted вместо старта; отказ |
@@ -123,7 +123,10 @@ Regroup без заявки: cards → boxes → cycles → memberships/placemen
 - Списание коробки с картами, placement или shipment.
 
 ### Заявки
-- Одна карта в двух активных заявках.
+- Одна карта в двух активных заявках, включая гонку двух параллельных созданий.
+- Создание новой P-09 на карту с `removed_by_archive` при ещё `processing` родителе.
+- Создание новой P-09 на карту с `not_found` при ещё `processing` родителе.
+- Снятие резервирования до `completed`/`cancelled` либо сохранение резервирования после terminal parent.
 - ЦО меняет состав после processing.
 - Archive меняет submitted без начала обработки.
 - Начало обработки не ролью archive.
@@ -219,3 +222,9 @@ Backfill должен быть идемпотентным, пакетным, с 
 | DB-40 | В пути custody коробки и её содержимого принадлежит назначенному курьеру; фактическое местоположение не отслеживается; destination location фиксируется только при полной приёмке | Shipment status, courier FK/snapshot и защищённые location/custody guards | Handover или receipt — один commit | Прямое присвоение destination до receipt, изменение курьера после handover или самостоятельное изменение custody карты внутри коробки отклоняется |
 | DB-41 | При receipt обычного коробочного shipment BoxCycle/memberships сохраняются; полочное размещение не создаётся автоматически | Deferred consistency trigger + отдельная команда box placement | Receipt не включает независимую операцию shelf placement | Receipt не должен закрывать цикл, менять членства или создавать placement без отдельного shelf assignment |
 | DB-42 | Терминальный `not_found` item может сохраняться у завершённой/отменённой P-09 без membership и shipment; это не активная позиция и не физическое размещение карты | Request/item history + deferred card-state guard; активность заявки определяется отдельно от терминального результата item | Завершение/отмена P-09 сохраняет item outcome и карточный учётный статус согласованно | Удаление `not_found` истории, создание фиктивного membership или трактовка результата как активной обработки отклоняются |
+
+## DB-43 — резервирование карты на весь срок незавершённой P-09
+
+| ID | Инвариант | DB enforcement (target) | Транзакционная граница | Негативная/позитивная проверка |
+|---|---|---|---|---|
+| DB-43 | Каждая карта из актуального состава удерживается ровно одной P-09 до `completed`/`cancelled` родителя. Item outcome `removed_by_archive` или `not_found` не освобождает карту, пока родитель `processing` | `reservation_active` на item; partial UNIQUE по `card_id WHERE reservation_active`; закрытые процедуры и deferred trigger согласованности с parent/tombstone | Создание/редактирование draft и terminal transition parent выполняются с блокировкой parent/card/item; reservation flag и события меняются в одной транзакции | Вторая заявка на карту с любым item outcome незавершённой P-09 отклоняется; параллельное создание даёт ровно одного победителя; draft tombstone и terminal parent освобождают резервирование атомарно; рассогласованный flag отклоняется |
