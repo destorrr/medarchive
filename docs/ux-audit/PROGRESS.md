@@ -2571,3 +2571,7 @@ PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, 
 ## 2026-11-20 — уточнение scope потребителей DomainEvent
 
 Владелец продукта подтвердил, что внешние потребители событий на текущем этапе не предполагаются. Сейчас проектируются только внутренние readers МедАрхива; внешняя доставка, subscriptions, outbox/consumer offsets и webhook/API integration contracts не требуются. При этом перед изменением event schema/payload/retention нужно проверить deployment jobs/readers и effective DB grants на предмет уже существующих зависимостей. Обновлены consumer inventory, technical contract proposal, implementation readiness и cross-document review. Только документация; реализация не разрешена.
+
+## 2026-11-20 — утверждение подхода к read permissions
+
+Владелец продукта утвердил серверную проверку прав чтения по actor/role/scope/custody/process participation и отдельным правам на чувствительные поля. Правила обязательны для UI, прямых URL/API, search/autocomplete, filters, sorting, pagination, counts, dashboard aggregates, notifications и будущих отдельно разрешённых exports; проверка выполняется до сериализации PII и агрегации. DOB/phone — только в самостоятельной карточке с отдельным правом; адрес пациента не передаётся в систему. Обновлены UX-03 role permission matrix, UX-06 DB grants matrix, implementation readiness и cross-document review. Полный read inventory, negative tests и фактическая проверка grants остаются открытыми. Только документация; реализация/DDL не разрешены.
