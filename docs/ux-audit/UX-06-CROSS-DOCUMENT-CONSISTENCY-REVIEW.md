@@ -518,3 +518,7 @@ Optional denial telemetry uses drop-on-failure semantics: no retry and no deferr
 ## 2026-11-21 — telemetry-loss monitoring approved
 
 No separate user-interface notification is created for dropped/unavailable optional denial telemetry. Operational monitoring tracks telemetry-store availability and write failures using technical health signals only, without personal data. It is separate from AdminSecurityAudit and cannot become a request-path dependency or block/change authorization or business-operation outcomes. No retry or deferred queue is introduced. Implementation remains unauthorized.
+
+## 2026-11-21 — operational telemetry monitoring access approved
+
+Technical monitoring metrics and telemetry-store/write-failure diagnostics are restricted to infrastructure administrators and personnel explicitly responsible for system operations. Ordinary MedArchive users, including application-role `admin`, must not see internal infrastructure metrics or telemetry diagnostics through the application. This is a separate infrastructure/operations access boundary, not an application permission or AdminSecurityAudit feature. Exact identities/grants remain deployment-specific; implementation remains unauthorized.
