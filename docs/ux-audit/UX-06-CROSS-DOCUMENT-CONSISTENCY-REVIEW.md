@@ -469,3 +469,8 @@ UX-04 исправлен: филиал создаёт черновик толь�
 ## 2026-11-21 — исключены IP/identity identifiers из security events
 
 Владелец продукта утвердил для первой версии: не сохранять raw source IP, IP hashes/digests, attempted usernames или identity hashes/digests в `AdminSecurityAudit` и bounded security telemetry; не связывать события между собой по IP или attempted identity. Для ограничения частоты входа используются отдельно утверждённые login-throttle counters. Их внутренние bucket keys относятся только к throttle state, не являются audit/event history, не копируются в security events и не предоставляют функцию корреляции событий. HMAC-ключи, необходимые для целостности самих audit records, остаются отдельным техническим вопросом. Возврат к сбору IP/identity identifiers возможен только после конкретного обоснования, privacy/legal assessment и нового решения владельца продукта.
+
+
+## 2026-11-21 — утверждён scope чтения AdminSecurityAudit
+
+Только активный `admin` может читать глобальную ленту `AdminSecurityAudit` и детали событий. `branch`, `central_office` и `archive` не имеют доступа ни через UI, ни через прямые URL/API. Серверная авторизация обязательна на каждом read surface; сокрытие интерфейсных элементов не является контролем доступа. Даже для admin выдаются только allowlisted поля: секреты, пароли, токены и избыточные PII исключены. Открытие ленты/деталей не аудируется, экспорт самого журнала запрещён. Требуется сверить catalog, DB/API read contracts, guards и негативные тесты всех четырёх ролей.
