@@ -193,3 +193,5 @@ Backfill должен быть идемпотентным, пакетным, с 
 ## 9. Границы достоверности
 
 Матрица сопоставлена со статически прочитанными ORM и миграциями: partial unique indexes, shipment composite FKs, deferred shipment consistency guards, archive request guard, box membership mutation guard, placement guard, append-only DomainEvent и object movement guards. Это целевой контракт, а не утверждение, что он уже реализован. PostgreSQL, pytest, Alembic и CI не запускались.
+
+| DB-29 | Результат каждой позиции P-09 фиксируется независимо и сразу; пауза/ошибка другой позиции не переписывает сохранённые результаты | Закрытые item-level procedures для `request_remove_item` и `request_mark_not_found`, row locks и append-only DomainEvent | Одна позиция, её карта/размещение при необходимости и событие — одна транзакция; parent остаётся `processing` до выполнения условий завершения | После успешной фиксации одной позиции результат виден при повторном чтении; сбой другой позиции не откатывает ранее committed result; отсутствует пакетное сохранение результатов |

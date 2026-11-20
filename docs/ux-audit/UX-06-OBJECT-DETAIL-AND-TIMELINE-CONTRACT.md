@@ -75,13 +75,13 @@ No role obtains access solely from knowing a UUID, card number, box number, ship
 Use the existing append-only, typed DomainEvent stream for business facts. Do not add a separate RequestEvent stream. The request aggregate and its items need explicit, typed event linkage so a parent timeline can reconstruct:
 - request creation and submission;
 - transition into processing and atomic card extraction;
-- item removal with required archive comment;
+- each item outcome committed independently as it is processed, including item removal with required archive comment;
 - terminal not-found outcome (comment optional);
 - cancellation with required reason;
 - shipment creation and single full handover;
 - full receipt and request completion.
 
-For a submitted P-09 request, the parent request timeline is readable by every employee of the requesting Central Office location, including after completion or cancellation. It presents the complete request lifecycle and all request/item-linked business events: creation, submission, processing start, each item outcome (including any required archive comment), cancellation and its mandatory reason, fulfillment-shipment draft creation, actual handover, full receipt and completion where those events occur. Each event displays its actor and organization-local timestamp. This is request-scoped visibility only: it does not grant access to the independent card timeline or unrelated card events. The author-only rule continues to apply to a `draft` request.
+For a submitted P-09 request, the parent request timeline is readable by every employee of the requesting Central Office location, including after completion or cancellation. It presents the complete request lifecycle and all request/item-linked business events: creation, submission, processing start, each item outcome (including any required archive comment), cancellation and its mandatory reason, fulfillment-shipment draft creation, actual handover, full receipt and completion where those events occur. Each event displays its actor and organization-local timestamp. An item outcome appears in the timeline as soon as its individual command commits; there is no batch-results confirmation step. The request remains in `processing` while unresolved items or subsequent fulfillment/receipt steps remain, and already committed item outcomes survive an interruption and are not repeated. This is request-scoped visibility only: it does not grant access to the independent card timeline or unrelated card events. The author-only rule continues to apply to a `draft` request.
 
 For a P-09 request timeline, display events in reverse chronological order: newest event first, oldest last. Use the organization-local event timestamp as the primary sort key and a stable unique event identifier as the deterministic tie-breaker when timestamps are equal. The ordering changes presentation only; it does not alter event timestamps, append-only history, authorization scope or event retention.
 
