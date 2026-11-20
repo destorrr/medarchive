@@ -483,3 +483,8 @@ UX-04 исправлен: филиал создаёт черновик толь�
 ## 2026-11-21 — logout telemetry approved
 
 Explicit user-initiated logout is recorded as a best-effort security event. A telemetry write failure or unavailable store must not delay/prevent logout or credential clearing and must not affect the logout result. This is not a mandatory transactional audit record. Browser closure, network loss and other exits without an explicit logout action are not guaranteed to be recorded. No new session registry is implied. Product decision closed; implementation remains unauthorized.
+
+
+## 2026-11-21 — denial-telemetry grouping dimensions approved
+
+Selected high-risk authorization-denial telemetry may aggregate repeats only by controlled operation type/code and denial-reason code. It must not correlate by actor, attempted identity, source IP, IP digest or another per-user/network identifier. The dimensions are bounded categories, not free-form input. Product decision closed; window, thresholds, rate/volume caps, retention and unavailable-store behavior remain technical readiness items. Existing best-effort/non-blocking semantics remain mandatory.
