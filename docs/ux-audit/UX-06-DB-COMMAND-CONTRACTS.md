@@ -369,6 +369,7 @@ Actor — central_office. Проверить, что карта на балан�
 - `admin_create/update/deactivate_user`;
 - `admin_create/update/deactivate_courier`;
 - `admin_create/update/deactivate_shelf`;
+- `shipment_reassign_draft_author` — отдельная административная команда переназначения автора деактивированного черновика по контракту §2.11;
 - `admin_correct` — только отдельный allowlist корректирующих операций с обязательным reason.
 
 Для всех команд:
@@ -377,7 +378,7 @@ Actor — central_office. Проверить, что карта на балан�
 - deactivate вместо физического удаления;
 - сохранение ссылок и истории;
 - блокировка конкурирующих изменений;
-- before/after, reason, actor, time и correlation записываются в отдельный admin/security audit;
+- before/after, actor, time и correlation записываются в отдельный admin/security audit; reason обязателен для корректирующих операций и отмен, но не вводится для `shipment_reassign_draft_author`, где фиксируются прежний и новый авторы;
 - не позволять произвольные table/column names или произвольный SQL через generic correction API.
 
 Текущая запись `admin.*` в DomainEvent не является достаточной целевой реализацией отдельного security/admin audit.
