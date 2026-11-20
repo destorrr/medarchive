@@ -12,11 +12,11 @@
 - The command ledger remains authoritative only for idempotency/result replay.
 - The global admin/security feed contains no ordinary card, box, shipment or archive-request lifecycle events.
 - DB-SEC-01 remains the accepted actor trust baseline: application-authenticated actor, validated by protected DB command. Audit attribution is not independent cryptographic proof.
-- The approved outage behavior remains binding: mandatory privileged mutation and successful-login audit writes fail closed; ordinary reads are not automatically blocked; every 401/403 is not synchronously required to produce a durable event.
+- **Approved fail-closed rule (owner decision, 2026-11-21):** every state-changing command whose contract requires a `DomainEvent` and/or `AdminSecurityAudit` record must commit the business mutation, its required event record(s), and the command-ledger result atomically. If any mandatory record cannot be written, the entire transaction rolls back and no business state change is committed. This applies to significant business operations (cards, boxes, shipments, archive requests) as well as privileged administrative mutations. A privileged correction that requires both event classes commits both in the same transaction. Successful-login audit must commit before session issuance; otherwise no session is issued. Ordinary reads are not automatically blocked by audit-store unavailability. Not every 401/403 requires a synchronous durable event; bounded denial telemetry remains non-blocking.
 
 ## 2. Event classes and proposed catalog
 
-The catalog distinguishes **mandatory transactional records** from **bounded security telemetry**. A telemetry event must never become an implicit availability dependency for an ordinary request.
+The catalog distinguishes **mandatory transactional records** from **bounded security telemetry**. A telemetry event must never become an implicit availability dependency for an ordinary request. This exception does not weaken the atomic-write requirement for mandatory business or security records explicitly required by a command contract.
 
 ### 2.1 Mandatory transactional events
 
