@@ -229,3 +229,7 @@ Owner decision (2026-11-21): do not create a separate user-interface notificatio
 ## 2026-11-21 — operational telemetry monitoring access approved
 
 Owner decision (2026-11-21): technical monitoring metrics and telemetry-store/write-failure diagnostics are available only to infrastructure administrators and personnel explicitly responsible for system operations. Ordinary MedArchive users, including application-role `admin`, must not see internal infrastructure metrics or telemetry storage diagnostics through the application. This is an infrastructure/operations access boundary, separate from application authorization and AdminSecurityAudit. Exact infrastructure identities and grants depend on deployment topology; implementation remains unauthorized.
+
+## 2026-11-21 — technical monitoring access-view audit boundary approved
+
+Owner decision (2026-11-21): viewing technical monitoring metrics is not recorded in MedArchive `AdminSecurityAudit`. Access to monitoring is governed by infrastructure controls. If the infrastructure requires an access log for monitoring views, it is a separate infrastructure/operations log, outside MedArchive business/security audit. This does not expand application audit events or grant application users access to monitoring. Implementation remains unauthorized.
