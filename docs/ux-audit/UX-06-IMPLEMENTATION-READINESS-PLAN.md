@@ -672,3 +672,7 @@ The product owner approved that views of technical monitoring metrics are not wr
 ## 2026-11-21 — no telemetry-outage notifications approved
 
 The product owner decided not to notify infrastructure/operations personnel about denial-telemetry store unavailability, including prolonged outages. Passive technical health metrics/diagnostics may still be available to authorized infrastructure operators, but no alert/notification workflow is required for this condition. Drop-on-failure, no retry/deferred queue, and non-blocking request behavior remain unchanged.
+
+## 2026-11-21 — telemetry health is not exposed in the application UI
+
+The product owner decided that denial-telemetry storage availability, health, write failures, and diagnostics must not be displayed anywhere in the MedArchive application UI, including administrative screens. Any passive technical health information remains outside the application and within the separately controlled infrastructure/operations monitoring boundary. The application `admin` role does not grant access to it.
