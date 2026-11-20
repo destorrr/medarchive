@@ -54,7 +54,7 @@ Admin object history is still object-scoped. It is not a substitute for, or a li
 - Shipment: only when archive is sender or receiver; retain its manifest and timeline after completion.
 - Archive shipment queue: each row exposes only the shipment number, route, creation date, sender, box count for incoming branch/CO → archive routes or card count for archive → CO, assigned courier when present, and current status. Patient names and card numbers are not displayed in the queue. The full manifest and shipment timeline remain available inside the shipment detail to authorized sender/receiver participants under P-08/D-09; queue minimization does not narrow that detail access.
 - Archive request: archive staff may open requests assigned to/handled by the archive and see all request items and their allowed outcomes. Request actions remain governed by P-06/P-09; read permission does not imply mutation permission.
-- Archive P-09 working queue: includes requests submitted to the archive and not cancelled/completed. Each row exposes only the request number, creation date, Central Office initiator, number of cards in the request and current status. Patient names and card numbers are not displayed in the queue; the complete item list is available only after opening an authorized request detail. Drafts are not visible to the archive. A cancelled submitted request is removed from the working queue, but its record, cancellation reason, actor, timestamp and event history remain retained for authorized historical review. Queue visibility does not broaden the archive staff member's request-detail or item permissions.
+- Archive P-09 working queue: includes only submitted requests that still require archive action; cancelled and completed requests are excluded. Each row exposes only the request number, creation date, Central Office initiator, number of cards in the request and current status. Patient names and card numbers are not displayed in the queue; the complete item list is available only after opening an authorized request detail. Drafts are not visible to the archive. Cancelled and completed submitted requests are removed from the working queue, but their records and event histories remain retained for authorized historical review. For cancelled requests, the cancellation reason, actor and timestamp are retained. Historical availability does not broaden the archive staff member's request-detail or item permissions.
 
 ### 3.4 Central Office
 
@@ -375,3 +375,8 @@ These require technical design and migration review; none should be guessed duri
 ## 39. Исключение отменённых P-09 из рабочей очереди архива
 
 Отправленная в архив заявка P-09 после отмены исключается из текущей рабочей очереди архива: она больше не требует операционных действий. Запись заявки не удаляется. Причина отмены, сотрудник, дата/время и история событий сохраняются для аудита и последующего просмотра уполномоченными сотрудниками. Это правило относится к отменённым отправленным заявкам; черновики ЦО и ранее не отображались в очереди архива. Завершённые заявки также не относятся к рабочей очереди.
+
+
+## 40. Исключение завершённых P-09 из рабочей очереди архива
+
+После перехода P-09 в `completed` заявка исключается из текущей рабочей очереди архива: все требуемые действия завершены. Запись заявки, состав и результаты обработки, сведения о fulfillment-отправлении и история событий сохраняются для последующего просмотра уполномоченными сотрудниками. Завершённая заявка доступна в историческом представлении, а не в рабочей очереди.
