@@ -87,12 +87,7 @@ Proposed required fields:
 | `source_channel` | Closed enum such as `web_ui`, `api`, `operator_tool`, `scheduled_job` |
 | `payload` | Strict per-event allowlisted object, validated against event type and schema version |
 
-Optional network context:
-- Prefer a keyed digest of normalized source IP only if an approved abuse-detection use case requires it.
-- Never store raw IP by default in the general audit payload.
-- If identity correlation is required for unauthenticated login attempts, use a separate keyed digest of a normalized identifier; never store the attempted raw username in the event payload.
-- Source and identity digest keys must be purpose-separated from application signing keys, access-controlled, versioned and rotatable. Include a non-secret key-version identifier, never key material.
-- Do not claim that a digest is anonymous; it remains linkable personal data while the key/correlation capability exists.
+**Approved data-minimization decision (2026-11-21):** the initial product does not collect or retain raw source IP, IP digests, attempted usernames or identity digests in AdminSecurityAudit or bounded security telemetry, and does not correlate security events by source IP or attempted identity. Login-throttle counters remain a separate, narrowly scoped mechanism under their own contract; their internal bucket keys must not be copied into audit events or exposed as event-correlation identifiers. Reconsideration requires a concrete abuse-detection use case, privacy/legal assessment and a new explicit product decision.
 
 ## 4. Per-event payload and prohibited data
 
@@ -113,7 +108,7 @@ Payload schemas are allowlists, not generic model dumps. Prefer stable codes and
 - full HTTP request/response bodies, unrestricted ORM objects or arbitrary JSON patches;
 - SQL text, stack traces and unbounded exception messages;
 - patient names, card numbers, dates of birth, phone numbers or exported row contents unless a separate approved, strictly necessary field is documented (none is proposed here);
-- raw attempted usernames or raw source IP in the general audit payload by default;
+- raw attempted usernames, raw source IP, IP digests or attempted-identity digests in security-event payloads;
 - file contents, download URLs containing secrets, and unbounded search filters.
 
 All payloads require maximum size/depth and schema validation. Unknown keys and unsupported schema versions must be rejected rather than silently persisted/rendered.
@@ -131,7 +126,7 @@ All payloads require maximum size/depth and schema validation. Unknown keys and 
 No statutory or universal retention period is inferred. Before schema/DDL, the owner and operational/legal stakeholders must define:
 1. retention by event family (mandatory admin/authentication, bounded denial telemetry, and business-data export events);
 2. legal hold, preservation, deletion/archival and backup/restore behavior;
-3. whether source/identity digests are needed, their purpose and expiry;
+3. confirm implementation conformance with the approved exclusion of source/identity identifiers and event correlation;
 4. HMAC key custody, separation, rotation, version overlap and destruction;
 5. business-data export permissions, access logging and artifact lifecycle;
 6. tamper-evidence requirements, privileged DBA threat model, backup immutability and independent monitoring;
@@ -170,7 +165,7 @@ Retention periods, HMAC/IP policy and tamper-evidence controls are not product d
 
 ## 10. Retention and integrity proposal
 
-See `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` for proposed event retention classes (without guessed durations), legal-hold/purge lifecycle, default exclusion of raw IP/identity digests, per-event HMAC and externally signed checkpoint design. This is a technical/operational proposal only; retention schedules, key custody, checkpoint infrastructure and business-data export audit controls remain unapproved.
+See `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md` for proposed event retention classes (without guessed durations), legal-hold/purge lifecycle, approved exclusion of raw IP/identity digests, per-event HMAC and externally signed checkpoint design. This is a technical/operational proposal only; retention schedules, key custody, checkpoint infrastructure and business-data export audit controls remain unapproved.
 
 
 ## 11. Audit access and export policy proposal
