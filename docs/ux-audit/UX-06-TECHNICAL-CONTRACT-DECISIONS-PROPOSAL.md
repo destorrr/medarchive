@@ -73,7 +73,9 @@ RLS may be added later as defense in depth only after a threat model proves the 
 
 ## 4. Login throttle
 
-### Recommendation: narrow SECURITY DEFINER command surface
+### Approved target: narrow SECURITY DEFINER command surface
+
+**Owner decision (2026-11-20): approved.**
 
 Use a small set of fixed functions for throttle operations, for example:
 - evaluate/increment the relevant keyed buckets atomically;
@@ -82,7 +84,7 @@ Use a small set of fixed functions for throttle operations, for example:
 
 Runtime receives EXECUTE only on those functions, not table-level SELECT/INSERT/UPDATE/DELETE. Functions use fixed search_path, bounded input sizes, safe keyed digests and concurrency-safe updates. Do not let the caller choose arbitrary bucket keys, timestamps or retention windows.
 
-Before implementation, verify current HMAC key source, rotation plan, lock contention, cleanup semantics and whether IP/identity bucket writes can be combined in one transaction. Throttle state remains separate from durable security audit.
+Before implementation, verify current HMAC key source, rotation plan, lock contention, cleanup semantics and whether IP/identity bucket writes can be combined in one transaction. Throttle state remains separate from durable security audit. The architecture choice is closed; this approval does not authorize implementation.
 
 ## 5. First-admin and system-location bootstrap
 
@@ -140,7 +142,7 @@ Compatibility requirements:
 | DB result | Approved: versioned JSONB envelope with strict command schemas | Define and verify API error mapping before implementation |
 | Schema | Approved: private `medarchive`; optional `medarchive_api` only if needed; no application objects in `public` | Full SQL/ORM/deployment compatibility review before implementation |
 | RLS | Approved: not required for first cut; explicit actor parameter + DB-side role/scope checks for protected commands; application read-side scope; no direct runtime DML bypass | Threat model and trustworthy identity binding before any later RLS adoption |
-| Login throttle | Narrow SECURITY DEFINER functions | Key/rotation and concurrency design |
+| Login throttle | Approved: narrow SECURITY DEFINER functions; runtime EXECUTE only, no direct table SELECT/INSERT/UPDATE/DELETE | HMAC key/rotation, lock contention, atomicity and bounded cleanup design before implementation |
 | Bootstrap | One-shot operator runner, not web startup | Deployment principal and recovery runbook |
 | Infra principals | Separate logical identities | Hosting/backup/monitoring topology |
 | Event consumers | Preserve compatibility and historical evidence | Complete external consumer inventory |
