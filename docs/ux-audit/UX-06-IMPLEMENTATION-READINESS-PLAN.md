@@ -630,3 +630,8 @@ The product owner approved recording explicit user-initiated logout as a best-ef
 ## 2026-11-21 — denial-telemetry grouping dimensions approved
 
 For selected high-risk denials/threshold crossings, repeated events are grouped only by controlled operation type/code and denial-reason code. No actor, attempted-identity, source-IP, IP-digest or other per-user/network correlation key may be used. These dimensions are categorical and must not contain free-form request data. Product-level grouping dimensions are closed; implementation readiness still requires explicit windows, thresholds, maximum rate/volume, retention and unavailable-store behavior, while preserving best-effort non-blocking semantics.
+
+
+## 2026-11-21 — denial telemetry aggregation window approved
+
+The product owner approved a fixed 15-minute aggregation window for selected high-risk authorization-denial telemetry. Events are grouped within the window by controlled operation type/code plus denial-reason code, with an aggregate count instead of one durable row per repeated denial. Actor/attempted-identity/source-IP/IP-digest and other per-user/network correlation dimensions remain prohibited. Technical readiness still requires thresholds, maximum rate/volume, retention and unavailable-store behavior; telemetry remains best-effort and non-blocking.
