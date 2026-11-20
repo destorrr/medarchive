@@ -105,3 +105,8 @@ Search handler также явно разрешает viewer; полный searc
 - Command idempotency lifecycle/hash/replay/tombstone утверждён как технический стандарт; остаются ordinary-command TTL, итоговый result envelope/API mapping и эксплуатационные горизонты retry.
 
 Это обновление статуса не означает выполнения миграций, DDL, тестов или implementation readiness sign-off.
+
+
+## 10. D-06 — viewer исключён без миграции (2026-11-21)
+
+МедАрхив ещё не введён в эксплуатацию; пользовательских/операционных данных нет. Миграция viewer accounts, actor references и legacy ACL не требуется. Роль `viewer` полностью исключается из целевой модели и будущей реализации во всех слоях; целевые роли — `admin`, `branch`, `central_office`, `archive`. Удалить legacy viewer routes, UI/options, schema/ORM allowances и тестовые ожидания при реализации. Не перераспределять права автоматически. Исторические статические findings остаются основанием для удаления потенциально глобальных viewer paths, но account preflight/migration plan больше не требуются. Реализация не разрешена.
