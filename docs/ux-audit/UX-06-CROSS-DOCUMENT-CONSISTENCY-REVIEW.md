@@ -526,3 +526,7 @@ Technical monitoring metrics and telemetry-store/write-failure diagnostics are r
 ## 2026-11-21 — technical monitoring access-view audit boundary approved
 
 Viewing technical monitoring metrics is excluded from MedArchive `AdminSecurityAudit`. Access is controlled through infrastructure mechanisms; if required, monitoring-view access is recorded only in a separate infrastructure/operations log outside MedArchive business/security audit. This neither expands application audit events nor changes who may access monitoring. Implementation remains unauthorized.
+
+## 2026-11-21 — no telemetry-outage notifications approved
+
+No separate notifications or alerts are generated for denial-telemetry store unavailability, even when prolonged. Passive health metrics/diagnostics remain available to authorized infrastructure personnel under the existing access boundary, but no alerting workflow is introduced. Existing drop-on-failure and non-blocking semantics remain unchanged.
