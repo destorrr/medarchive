@@ -103,6 +103,10 @@ The exact principal may be a temporary operator role or controlled owner-context
 
 ## 6. Infrastructure principals
 
+### Approved target: separate logical identities and least-privilege access
+
+**Owner decision (2026-11-20): approved.**
+
 The repo audit confirms the current deployment reuses one database URL for app, Alembic, bootstrap and backup. The target split is not implemented. Exact infra grants cannot be finalized from repository source alone because the actual PostgreSQL hosting, backup mode, monitoring stack and restore topology are not established here.
 
 Required logical separation:
@@ -114,7 +118,7 @@ Required logical separation:
 - maintenance identity: only if an actual maintenance job requires it; command-scoped and separately credentialed.
 - bootstrap identity: short-lived operator path, not a permanent runtime principal.
 
-Do not create backup/monitoring/maintenance roles speculatively before selecting deployment topology and commands they must execute.
+Do not create backup/monitoring/maintenance roles speculatively before selecting deployment topology and commands they must execute. The logical separation decision is closed; exact grants, credentials, and operational runbooks remain pre-implementation work. This approval does not authorize implementation.
 
 ## 7. DomainEvent consumer inventory and compatibility
 
@@ -146,7 +150,7 @@ Compatibility requirements:
 | RLS | Approved: not required for first cut; explicit actor parameter + DB-side role/scope checks for protected commands; application read-side scope; no direct runtime DML bypass | Threat model and trustworthy identity binding before any later RLS adoption |
 | Login throttle | Approved: narrow SECURITY DEFINER functions; runtime EXECUTE only, no direct table SELECT/INSERT/UPDATE/DELETE | HMAC key/rotation, lock contention, atomicity and bounded cleanup design before implementation |
 | Bootstrap | Approved: one-shot operator runner outside web startup; atomic initialization; short-lived credential revoked after success | Deployment principal, exact system-location inventory and break-glass recovery runbook before implementation |
-| Infra principals | Separate logical identities | Hosting/backup/monitoring topology |
+| Infra principals | Approved: separate owner, migrator, runtime, backup, monitoring and short-lived bootstrap identities; maintenance identity only when required | Hosting/backup/monitoring topology, exact grants and operational runbooks before implementation |
 | Event consumers | Preserve compatibility and historical evidence | Complete external consumer inventory |
 
 No source, SQL, DDL, ORM, migration, tests, workflow or deployment files were changed. PostgreSQL, Alembic, pytest and CI were not run.
