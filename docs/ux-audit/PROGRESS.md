@@ -2563,3 +2563,7 @@ PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, 
 ## 2026-11-20 — утверждение одноразового bootstrap
 
 Владелец продукта утвердил отдельную одноразовую operator/infra-операцию для создания первого администратора и обязательных системных локаций вне web startup/runtime. Требуются проверка неинициализированного состояния, защита от параллельного запуска, атомарное создание, audit-запись без секретов и краткоживущий bootstrap credential с отзывом после успеха. Постоянный пароль и HTTP endpoint запрещены; восстановление первого администратора — отдельная break-glass процедура. Открытыми остаются выбор deployment principal, перечень системных локаций и recovery runbook. Обновлены technical contract proposal, implementation readiness plan и cross-document review. Реализация/DDL не разрешены; PostgreSQL, pytest и CI не запускались.
+
+## 2026-11-20 — утверждение разделения infrastructure principals
+
+Владелец продукта утвердил отдельные логические идентичности для runtime приложения, migrator, NOLOGIN-владельца объектов БД, backup/restore, monitoring и краткоживущего bootstrap. Maintenance identity — только при необходимости и с ограниченными полномочиями. Runtime не получает DDL и обходной DML; monitoring не имеет доступа к PII и не изменяет рабочие данные. Точные grants/credentials зависят от deployment topology и выбранных инструментов. Обновлены technical contract proposal, implementation readiness plan и cross-document review. Решение не разрешает реализацию/DDL; PostgreSQL, pytest и CI не запускались.
