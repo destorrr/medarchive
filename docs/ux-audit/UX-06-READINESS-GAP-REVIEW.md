@@ -44,7 +44,7 @@
 
 ### 3.3 Миграция и rollout
 - Утвердить поддерживаемые версии приложения и dual-path window.
-- Определить CardPlacement read-only retention и deletion criteria.
+- CardPlacement retention закрыт решением владельца продукта: исторические записи сохраняются read-only без физического удаления и TTL/purge; активные legacy placements требуют ручной сверки.
 - Получить read-only preflight report на production-like копии: карты/коробки/cycles/memberships/placements, активные заявки, shipments, handovers, receipts, viewer references, legacy exception records.
 - Подтвердить backup/restore rehearsal, migration rehearsal и rollback/forward-fix plan.
 - Не исправлять автоматически неоднозначные карты или логистические связи.
