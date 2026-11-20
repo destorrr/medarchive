@@ -1,9 +1,13 @@
 # UX-06 — DomainEvent consumer inventory: repository and operational surfaces
 
-Дата: 2026-11-18  
+Дата: 2026-11-18; owner clarification: 2026-11-20  
 Статус: read-only статический аудит; не реализация  
 Проверенная ветка: `docs/ux-audit-project`  
 Проверенный HEAD до фиксации: `3f72efcd147745c8e3052a37d68c7fb570d7ef52`
+
+## Owner clarification — внешние потребители не планируются (2026-11-20)
+
+Владелец продукта подтвердил, что внешние потребители DomainEvent на текущем этапе не предполагаются. Поэтому проектировать сейчас внешнюю доставку/подписки, outbox/consumer offsets, webhook/API integration contract или совместимость с внешними системами не требуется. Это продуктовое решение о текущем scope, а не доказательство отсутствия уже существующих deployment-level readers/jobs: перед изменением event schema, payload semantics или retention следует проверить фактические production jobs, integrations и effective DB grants. Внутренние потребители МедАрхива подлежат инвентаризации и сохраняют требования совместимости.
 
 ## 1. Границы проверки
 
@@ -52,7 +56,7 @@ Backup включает DomainEvent как часть всей БД, но не �
 
 В просмотренных DomainEvent readers отдельный export endpoint или фоновая доставка событий не обнаружены. Backup — полный DB dump, не event export. Доступные материалы не позволяют подтвердить или опровергнуть внешнее чтение `domain_events`.
 
-До изменения event schema необходимо получить у владельца эксплуатации список integrations/jobs и подтвердить effective DB grants/credentials. Нельзя переименовывать event types, менять payload semantics или включать retention purge до такого подтверждения.
+Внешние интеграции и потребители сейчас не входят в утверждённый продуктовый scope. Перед изменением event schema всё равно необходимо проверить deployment jobs и effective DB grants/credentials, чтобы исключить фактически существующее чтение. Нельзя переименовывать event types, менять payload semantics или включать retention purge до такой проверки.
 
 ## 5. Consequences для целевого контракта
 
@@ -66,12 +70,12 @@ Producer families: card intake/custody, archive workflow, shipment workflow, adm
 3. сохранить shipment sender/receiver access по P-08;
 4. убрать global operational feed с admin dashboard;
 5. заменить legacy `card_movements` global history согласованными object-scoped surfaces, сохранив историю;
-6. подтвердить внешних consumers/jobs у владельца deployment;
-7. обеспечить дедупликацию новых подписчиков по event_id;
+6. проверить отсутствие фактически действующих внешних consumers/jobs на deployment; новые внешние подписчики сейчас не проектируются;
+7. не вводить механизмы дедупликации/offset для несуществующих внешних подписчиков;
 8. согласовать retention отдельно для DomainEvent, admin/security audit, command ledger, backup и application logs.
 
 ## 6. Итог и readiness
 
-Внутренние PostgreSQL readers в просмотренных router paths перечислены выше. Внешняя и deployment-level часть inventory остаётся открытой. Backup не является event consumer; app-level queue/worker/outbox/webhook dispatcher в просмотренном source tree не обнаружен.
+Внутренние PostgreSQL readers в просмотренных router paths перечислены выше. Внешние потребители не предполагаются по текущему решению владельца продукта; deployment-level проверка фактических jobs/readers остаётся обязательной перед изменением event contract. Backup не является event consumer; app-level queue/worker/outbox/webhook dispatcher в просмотренном source tree не обнаружен.
 
 UX-06 остаётся открытым. Следующие read-only участки: завершить P-04/P-07 decision brief и согласовать admin/security audit retention/outage; затем cross-document consistency pass. Effective ACL, production-like data preflight и внешние integration confirmations остаются readiness gates.
