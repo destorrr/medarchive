@@ -53,6 +53,7 @@ Admin object history is still object-scoped. It is not a substitute for, or a li
 - Card and box detail/timeline: objects in archive custody/scope, including the temporarily extracted state required by P-06/P-09.
 - Shipment: only when archive is sender or receiver; retain its manifest and timeline after completion.
 - Archive request: archive staff may open requests assigned to/handled by the archive and see all request items and their allowed outcomes. Request actions remain governed by P-06/P-09; read permission does not imply mutation permission.
+- Archive P-09 request queue: each row exposes only the request number, creation date, Central Office initiator, number of cards in the request and current status. Patient names and card numbers are not displayed in the queue; the complete item list is available only after opening an authorized request detail. Queue visibility does not broaden the archive staff member's request-detail or item permissions.
 
 ### 3.4 Central Office
 
