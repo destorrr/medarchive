@@ -542,3 +542,7 @@ A separate cryptographic integrity-verification feature for `AdminSecurityAudit`
 ## 2026-11-21 — failed login attempts excluded from persisted events
 
 Do not persist individual failed-login attempts or login-throttle denials as `AdminSecurityAudit`, `DomainEvent`, or bounded security-telemetry events. Remove `authn.login_failed` and `authn.login_throttled` from the target event catalog. Preserve the login-throttle mechanism and its separately controlled internal counters/state only as needed to enforce rate limits; do not treat or expose those counters as audit events. Successful-login auditing and selected high-risk authorization-denial telemetry are unaffected.
+
+## 2026-11-21 — normal session-expiration events excluded
+
+Do not persist normal session expiration (timeout/ordinary expiry) as `AdminSecurityAudit`, `DomainEvent`, or bounded security telemetry. Do not add a session-expiration event or session registry solely to record it. Successful-login auditing and best-effort explicit logout telemetry remain unchanged.
