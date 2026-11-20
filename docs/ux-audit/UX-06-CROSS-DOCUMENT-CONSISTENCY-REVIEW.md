@@ -550,3 +550,7 @@ Do not persist normal session expiration (timeout/ordinary expiry) as `AdminSecu
 ## 2026-11-21 — administrative session termination
 
 Record account deactivation/administrative disabling through its existing mandatory `AdminSecurityAudit` action. Do not emit a separate event for each session invalidated or terminated as a consequence. This is not a change to successful-login auditing, explicit logout telemetry, or the exclusion of ordinary session-expiration events.
+
+## 2026-11-21 — успешное самостоятельное изменение пароля
+
+Владелец продукта утвердил регистрацию успешного самостоятельного изменения пароля сотрудником как отдельного события безопасности в `AdminSecurityAudit`. В событии допускаются только необходимые безопасные метаданные; пароль, его хеш, reset/recovery secrets, токены и иные секретные данные не сохраняются. Неудачные попытки самостоятельного изменения пароля отдельно не журналируются. Это решение не меняет ранее утверждённое исключение неудачных попыток входа и отказов login throttle. Изменена только Markdown-документация; реализация не разрешена.
