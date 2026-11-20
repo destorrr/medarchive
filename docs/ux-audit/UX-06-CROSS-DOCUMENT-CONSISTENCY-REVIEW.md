@@ -498,3 +498,8 @@ A fixed 15-minute aggregation window is approved for selected high-risk denial t
 ## 2026-11-21 — denial telemetry threshold approved
 
 A threshold of five matching denials per fixed 15-minute window is approved. Matching is limited to controlled operation type/code and denial-reason code. On the fifth denial, record one aggregate event for that group/window rather than an event per attempt. Per-user/network correlation dimensions remain prohibited. Counter update/finalization mechanics and maximum rate/volume remain technical parameters; best-effort/non-blocking behavior is unchanged.
+
+
+## 2026-11-21 — denial telemetry hourly cap approved
+
+An application-wide cap of 100 persisted aggregate denial-telemetry events per hour is approved. Once reached, additional aggregate events are dropped until the next hour. This cap applies only to best-effort denial telemetry and cannot affect business operations or authorization outcomes. It coexists with the 15-minute window, five-denial threshold, operation/reason grouping and prohibition on per-user/network correlation. Concurrency-safe enforcement remains an implementation detail.
