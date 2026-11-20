@@ -1,11 +1,13 @@
 # UX-06 — Technical decisions proposal: DB result, schemas, actor scope and supporting principals
 
-**Status:** technical recommendation for owner review; not an implementation authorization.  
+**Status:** DB result envelope approved by product owner on 2026-11-20; remaining sections are technical recommendations for review, not an implementation authorization.  
 **Inspection baseline:** `docs/ux-audit-project`, HEAD `80f9b87bf7d97eddbc2c304c4bbad3694c0aae65`.
 
 ## 1. DB command result contract
 
-### Recommendation: versioned JSONB envelope, validated by each command
+### Approved target: versioned JSONB envelope, validated by each command
+
+**Owner decision (2026-11-20): approved as the mandatory public result contract for all DB commands.**
 
 Prefer a stable envelope over one PostgreSQL composite type per command:
 
@@ -131,7 +133,7 @@ Compatibility requirements:
 
 | Topic | Recommendation | Remaining gate |
 |---|---|---|
-| DB result | Versioned JSONB envelope with strict command schemas | Owner approval; API error mapping |
+| DB result | Approved: versioned JSONB envelope with strict command schemas | Define and verify API error mapping before implementation |
 | Schema | Private `medarchive`; optional `medarchive_api` only if needed | Full SQL/ORM/deployment compatibility review |
 | RLS | Not required for first cut; application scope + DB command checks | Threat model if later enabled |
 | Login throttle | Narrow SECURITY DEFINER functions | Key/rotation and concurrency design |
