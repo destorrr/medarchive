@@ -82,7 +82,7 @@ Workflow выполняет блокировки строк и проверки 
 | Целевая команда | Текущие точки реализации | Основные таблицы | Разрыв / что уточнить |
 |---|---|---|---|
 | `request_create_draft` / `request_submit` | `PostgreSQLArchiveWorkflow.create_requests`; POST central archive requests | cards, archive_requests, domain_events | Сейчас создание сразу создаёт отдельные заявки per-card; draft/submitted parent aggregate отсутствует |
-| `request_edit_submitted` | Не обнаружена | archive_requests | Нет родительского состава, истории add/remove до processing и операции редактирования |
+| `request_edit_draft` | Не обнаружена | archive_requests | Нет родительского состава и операции редактирования; целевая команда разрешена только автору и только в `draft`, после `submitted` состав неизменяем |
 | `request_start_processing` | Отдельного use case не обнаружено; текущий unpack-card и fulfilment разнесены | archive_requests, cards, box_cycles, box_card_memberships, box_placements, card_placements | Требуется атомарная операция P-06: lock parent, проверить весь состав, извлечь все карты, закрыть memberships и при необходимости placements, сменить parent status |
 | `request_remove_item` | Прямого эквивалента целевой позиции нет; текущие действия per-card/box | archive_requests, cards, memberships, cycles, placements, domain_events | Нужен результат позиции, обязательный комментарий и атомарный возврат исключённой карты |
 | `request_mark_not_found` | `PostgreSQLArchiveWorkflow.mark_not_found`; POST /requests/not-found | archive_requests, cards, domain_events | Сейчас финализируется одиночная заявка; нужно позиционное событие внутри родителя |
