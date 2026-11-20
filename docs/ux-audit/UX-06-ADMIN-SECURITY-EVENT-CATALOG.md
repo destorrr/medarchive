@@ -200,3 +200,8 @@ Owner decision (2026-11-21): for selected high-risk authorization denials and th
 ## 2026-11-21 — denial telemetry aggregation window approved
 
 Owner decision (2026-11-21): use fixed 15-minute aggregation windows for selected high-risk authorization-denial telemetry. Within each window, aggregate by the already approved controlled operation type/code and denial-reason code. Store an aggregate count rather than one row per repeated denial. Do not add actor, attempted-identity, source-IP, IP-digest or other per-user/network correlation dimensions. Window boundaries and implementation must avoid unbounded storage or request-path blocking. Other limits (thresholds, maximum rate/volume and retention) remain to be specified as technical parameters under the best-effort telemetry policy.
+
+
+## 2026-11-21 — denial telemetry threshold approved
+
+Owner decision (2026-11-21): the threshold for selected high-risk authorization-denial telemetry is five matching denials within one fixed 15-minute aggregation window. A matching group is defined by the approved controlled operation type/code and denial-reason code. The threshold is reached at the fifth matching denial; record one aggregate event for that group/window rather than one event per attempt. Do not add actor, attempted-identity, source-IP, IP-digest or other per-user/network correlation dimensions. Exact counter update/finalization mechanics and maximum rate/volume remain implementation parameters; telemetry remains best-effort and must not block or change the authorization result.
