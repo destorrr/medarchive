@@ -56,7 +56,9 @@ The target architecture is approved, but its implementation remains gated: inspe
 
 ## 3. RLS and actor/scope context
 
-### Recommendation: do not make RLS a required first-cut security boundary
+### Approved target: RLS is not a required first-cut security boundary
+
+**Owner decision (2026-11-20): approved.**
 
 DB-SEC-01 explicitly accepts application-authenticated actor as the baseline. Runtime can set a GUC and, under the same database role, can generally change it; therefore a GUC carrying actor UUID or location is not independent proof of identity.
 
@@ -67,7 +69,7 @@ For initial protected-command cutover:
 - no direct runtime DML is granted to bypass command checks;
 - read endpoints continue enforcing role/object scope in the application until a separately designed read API or stronger DB identity boundary exists.
 
-RLS may be added later as defense in depth only after a threat model proves the policy cannot be bypassed by runtime and the session context is bound to a trustworthy identity mechanism. Do not turn on RLS with permissive fallback policies or trust a mutable GUC as an anti-forgery control.
+RLS may be added later as defense in depth only after a threat model proves the policy cannot be bypassed by runtime and the session context is bound to a trustworthy identity mechanism. Do not turn on RLS with permissive fallback policies or trust a mutable GUC as an anti-forgery control. The approval closes the first-cut architecture choice; it does not authorize implementation and does not remove the need for read-side authorization tests.
 
 ## 4. Login throttle
 
@@ -137,7 +139,7 @@ Compatibility requirements:
 |---|---|---|
 | DB result | Approved: versioned JSONB envelope with strict command schemas | Define and verify API error mapping before implementation |
 | Schema | Approved: private `medarchive`; optional `medarchive_api` only if needed; no application objects in `public` | Full SQL/ORM/deployment compatibility review before implementation |
-| RLS | Not required for first cut; application scope + DB command checks | Threat model if later enabled |
+| RLS | Approved: not required for first cut; explicit actor parameter + DB-side role/scope checks for protected commands; application read-side scope; no direct runtime DML bypass | Threat model and trustworthy identity binding before any later RLS adoption |
 | Login throttle | Narrow SECURITY DEFINER functions | Key/rotation and concurrency design |
 | Bootstrap | One-shot operator runner, not web startup | Deployment principal and recovery runbook |
 | Infra principals | Separate logical identities | Hosting/backup/monitoring topology |
