@@ -478,3 +478,8 @@ UX-04 исправлен: филиал создаёт черновик толь�
 ## 2026-11-21 — утверждена governance-политика сроков хранения AdminSecurityAudit
 
 Владелец продукта утвердил следующий подход к срокам хранения `AdminSecurityAudit`: конкретные периоды сейчас не устанавливаются, поскольку у организации пока нет утверждённого графика хранения. До ввода системы в эксплуатацию организация должна назначить ответственного за юридические требования, персональные данные и архивное хранение. Этот ответственный организует оценку и утверждает отдельную версионированную политику для каждого класса событий R1–R4. Политика должна определять сроки и начальные точки их исчисления, порядок контролируемого удаления, приостановку удаления при legal hold, периодический пересмотр/снятие hold, а также согласование удаления с резервными копиями и восстановлением. До утверждения такой политики автоматическое удаление записей аудита запрещено; произвольное бессрочное хранение и ad hoc удаление также не допускаются. Конкретные сроки и юридические основания остаются открытым организационным вопросом. Решение не разрешает реализацию или изменение БД.
+
+
+## 2026-11-21 — logout telemetry approved
+
+Explicit user-initiated logout is recorded as a best-effort security event. A telemetry write failure or unavailable store must not delay/prevent logout or credential clearing and must not affect the logout result. This is not a mandatory transactional audit record. Browser closure, network loss and other exits without an explicit logout action are not guaranteed to be recorded. No new session registry is implied. Product decision closed; implementation remains unauthorized.
