@@ -676,3 +676,7 @@ The product owner decided not to notify infrastructure/operations personnel abou
 ## 2026-11-21 — telemetry health is not exposed in the application UI
 
 The product owner decided that denial-telemetry storage availability, health, write failures, and diagnostics must not be displayed anywhere in the MedArchive application UI, including administrative screens. Any passive technical health information remains outside the application and within the separately controlled infrastructure/operations monitoring boundary. The application `admin` role does not grant access to it.
+
+## 2026-11-21 — separate AdminSecurityAudit integrity verification not required
+
+The product owner decided that the target product does not need a separate feature to verify cryptographic integrity of `AdminSecurityAudit`. Do not design or implement hash chains, MACs, signatures, checkpoints, verification jobs, integrity dashboards, or related UI/API solely for this purpose. Existing append-only controls, restricted write permissions, mandatory atomic audit writes, retention governance, and backup/restore procedures remain independent requirements. This decision does not authorize weakening those controls. Key custody/rotation remains deferred.
