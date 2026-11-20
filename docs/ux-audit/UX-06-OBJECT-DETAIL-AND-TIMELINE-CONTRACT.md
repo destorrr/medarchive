@@ -100,7 +100,12 @@ D-08 requires a branch-specific cutoff at the committed handover boundary. The e
 
 ## 5. Manifest and PII contract
 
-P-08/D-09 grant sender and receiver access to the complete manifest, including card number and patient name, at all shipment stages and after completion. They do not grant access to a different shipment or to unrelated card history.
+P-08/D-09 grant sender and receiver access to the complete manifest of their own shipment at all shipment stages and after completion. The fields in that manifest depend on the route and shipment type:
+
+- For ordinary box shipments branch → archive and Central Office → archive, the manifest consists only of boxes (`ShipmentBox`). Individual cards are not manifest rows; the ordinary shipment detail must not expand box contents into card numbers or patient names for archive staff. Shipment participation does not by itself grant access to an independent card detail or card timeline; those reads use the separate object authorization rules.
+- For the P-09 fulfillment shipment archive → Central Office, the manifest consists of individual cards (`ShipmentCard`). The sender and receiving Central Office may view the complete card manifest, including card number and patient name, throughout the shipment and after full receipt.
+
+Manifest access does not grant access to a different shipment or to unrelated card history.
 
 Other object detail pages should expose only fields necessary for the workflow and the role's task. Admin retains the globally identifying object view under D-07. Search previews must not reveal more than the corresponding detail authorization allows.
 
