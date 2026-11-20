@@ -2537,3 +2537,8 @@ PR-READ-01 закрыт. Retention/legal hold, digest/IP и HMAC key lifecycle, 
 ## 2026-11-20 — перегруппировка коробки с активным размещением
 
 Согласовано: архивный сотрудник может извлекать карты из коробки, уже стоящей на полке, включая последнюю карту. При закрытии последнего membership `BoxCycle` автоматически завершается, но `BoxPlacement` сохраняется; пустая коробка остаётся на полке и может быть повторно заполнена без снятия либо отдельно снята через `box_unplace`. При P-09 extraction последней карты прежнее правило сохраняется: placement закрывается автоматически. Обновлены UX-03, DB command contracts, technical data model, object detail contract, invariants/test matrix (добавлен DB-61) и cross-document consistency review. Изменена только Markdown-документация; исходники, ORM, SQL/DDL, миграции, API/UI, тесты и workflows не менялись; PostgreSQL, pytest и CI не запускались.
+
+
+## 2026-11-20 — исправление устаревших формулировок readiness plan
+
+В `UX-06-IMPLEMENTATION-READINESS-PLAN.md` устранено противоречие с утверждённым правилом P-09: состав редактируется только автором в `draft`, после `submitted` неизменяем; архив меняет только результаты существующих позиций, а для изменения состава отменяет заявку с обязательной причиной, после чего ЦО создаёт новую. Обновлены Phase 5B и concurrency test matrix. Также readiness plan больше не называет P-04/D-13 и P-07 открытыми продуктовыми решениями: их утверждённые границы отражены как baseline. Cross-document review дополнен записью о сверке. Только Markdown-документация; исходники, ORM, SQL/DDL, миграции, API/UI, тесты, workflows и deployment не менялись; PostgreSQL, pytest и CI не запускались.
