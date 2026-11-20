@@ -684,3 +684,7 @@ The product owner decided that the target product does not need a separate featu
 ## 2026-11-21 — failed-login audit/telemetry excluded
 
 The product owner decided not to persist individual failed login attempts or login-throttle denials in `AdminSecurityAudit`, `DomainEvent`, or bounded security telemetry. Candidate event types `authn.login_failed` and `authn.login_throttled` are excluded from the target catalog. Login throttling itself remains active and may retain only the internal counters/state necessary for its separate control contract; these are not audit/telemetry events, and bucket keys must not be copied into audit records. Successful-login audit and selected high-risk authorization-denial telemetry remain governed by their separate approved rules.
+
+## 2026-11-21 — ordinary session expiration is not audited
+
+The product owner decided that normal session expiration due to timeout/expiry does not create an `AdminSecurityAudit`, `DomainEvent`, or bounded security-telemetry record. No session-expiration event or session registry is to be introduced solely for this purpose. Successful login and explicit user-initiated logout retain their previously approved handling. This decision concerns ordinary expiration, not a new policy for rejected requests using expired/invalid sessions.
