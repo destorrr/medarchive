@@ -650,3 +650,8 @@ The product owner approved an application-wide cap of 100 persisted aggregate de
 ## 2026-11-21 — denial telemetry retention approved
 
 The product owner approved 30 calendar days of retention for bounded aggregate authorization-denial telemetry, followed by automatic deletion. This is distinct from AdminSecurityAudit, DomainEvent and authoritative business-record retention policies. Implementation must use bounded cleanup that does not block or change request processing. Approved parameters now include: 15-minute aggregation window, five matching denials per group/window, maximum 100 aggregate events application-wide per hour, and 30-calendar-day retention.
+
+
+## 2026-11-21 — denial telemetry unavailable-store behavior approved
+
+The product owner approved drop-on-failure behavior for optional denial telemetry: when the telemetry store is unavailable or a write fails, do not retry and do not create a deferred queue; drop the event. Request processing continues without delay, authorization/business-operation outcomes remain unchanged, and internal technical details are not exposed to users. This applies only to best-effort denial telemetry and does not alter mandatory atomic DomainEvent/AdminSecurityAudit write requirements.
