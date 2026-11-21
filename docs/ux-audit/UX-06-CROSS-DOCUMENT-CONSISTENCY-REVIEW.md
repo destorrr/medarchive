@@ -1344,3 +1344,11 @@ The controlling P-09 rule is now explicit: partial archive issue is permitted; i
 The ordinary box shipment lifecycle is separate from P-09. Box receipt does not count cards or inspect seals/packaging. Bulk box placement and movement are atomic; multi-box card extraction is prohibited.
 
 **Residual consistency work:** consolidate duplicate historical statements in the main body of each long document (not merely supersede them in addenda); define exact state enums and transitions; reconcile event catalogue and queue/read-model counters; and run a final cross-document search for contradictory active instructions. No implementation or database verification has been performed.
+
+## 2026-11-22 — correction: ordinary box shipment receipt is per box
+
+A later approved product decision dated 2026-11-21 requires individual receipt of each box in ordinary branch → archive and central_office → archive shipments. This supersedes prior wording in earlier sections and addenda that said the archive receives the entire box shipment as one indivisible operation.
+
+Each box receipt independently records actor/time and transfers that box's custody to archive. The shipment remains open until all manifest boxes and discrepancies are resolved. A received box may be placed on a shelf immediately in a separate operation, without waiting for the rest of the shipment. Late boxes are received individually within the same shipment; unexpected boxes are recorded as discrepancies and are not auto-added. No card count, seal or packaging inspection is required.
+
+This is distinct from P-09 archive → CO, which transports individual medical cards and requires item-level actual receipt by CO. Both workflows are granular at their own manifest item level, but they have different objects, custody semantics and commands.
