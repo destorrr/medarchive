@@ -840,7 +840,7 @@ Owner decision (2026-11-21): when an account is deactivated or otherwise adminis
 
 ## 2026-11-22 — event contract clarification: item-level P-09 and box-level receipt
 
-The existing event catalogue's single shipment-wide P-09 completion wording must not be interpreted as requiring a full-manifest receipt. The target business event model must preserve independent facts and actor/time for each request item.
+P-09 has a one-to-many parent → fulfillment batch model. Each batch has its own immutable subset manifest, courier assignment, draft/handover events and status projection. A parent may have multiple batches; a batch does not imply that every request item has been issued. The target business event model must preserve independent facts and actor/time for each request item.
 
 Candidate event family (final event type strings and payload schemas remain a technical contract task):
 - archive request item issued/physically dispatched;
