@@ -151,6 +151,8 @@ The mapping below supersedes the older single-shipment/full-receipt proposal in 
 
 | Target command | Required target semantics | Transaction boundary |
 |---|---|---|
+| request_create_fulfillment_batch | Create one transport batch for selected ready-to-issue items of one P-09 parent; courier required; one-to-many parent link | Batch + subset manifest + item links + courier snapshot + DomainEvent — one commit |
+| request_confirm_batch_handover | Current batch author confirms physical issue; selected items become issued_pending_receipt; archive custody remains unchanged | Batch + selected items + DomainEvent — one commit |
 | request_issue_item | Archive records physical issue of one card position; unissued positions remain pending and can be issued later in the same parent request | One item + custody/DomainEvent update |
 | request_mark_not_found | One item receives not_found with mandatory closed-list reason and optional comment; no write-off or fictitious location update | One item + DomainEvent |
 | request_cancel_remaining | Before any issue, cancel the request; after partial issue, cancel only the remaining unissued items; issued items remain unchanged | Parent + selected remaining items, one commit |
