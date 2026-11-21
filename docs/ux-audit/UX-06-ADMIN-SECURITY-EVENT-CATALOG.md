@@ -837,3 +837,20 @@ Owner decision (2026-11-21): when an account is deactivated or otherwise adminis
 ## 2026-11-21 — массовое перемещение коробок на одну архивную полку
 
 Утверждено владельцем продукта: активному сотруднику архива с полномочием `box_place` разрешено за одну операцию перемещать несколько выбранных коробок на одну выбранную целевую архивную полку в пределах своей операционной области. Для каждой коробки сервер отдельно проверяет полномочия и scope сотрудника, наличие и актуальность действующего размещения, допустимое состояние коробки, отсутствие несовместимых активных процессов и доступность целевой активной полки в той же архивной области. Массовая операция выполняется атомарно: если хотя бы одна выбранная коробка не проходит проверку, ни одна коробка не перемещается. При успехе для каждой коробки отдельно закрывается прежнее `BoxPlacement`, создаётся новое `BoxPlacement` и записывается собственное событие перемещения с прежней и новой полкой, датой/временем и исполнителем. История размещений каждой коробки сохраняется; состав карт, `BoxCycle`, memberships, custody и учётная локация не меняются. Реализация и тестирование не выполнялись и не разрешены.
+
+## 2026-11-22 — event contract clarification: item-level P-09 and box-level receipt
+
+The existing event catalogue's single shipment-wide P-09 completion wording must not be interpreted as requiring a full-manifest receipt. The target business event model must preserve independent facts and actor/time for each request item.
+
+Candidate event family (final event type strings and payload schemas remain a technical contract task):
+- archive request item issued/physically dispatched;
+- archive request item actual receipt confirmed by CO;
+- archive request item marked not_found with mandatory reason code;
+- archive request remaining unissued items cancelled;
+- archive request parent completed when all items are terminal.
+
+An atomic bulk CO receipt may emit one command-level correlation and an item-level receipt event for each card, all in the same transaction. Each event identifies the request item/card, actor and timestamp; do not duplicate patient PII in payload where aggregate IDs and minimal outcome metadata suffice. Custody transfer to CO occurs only on the item actual-receipt event. Courier possession or dispatch alone does not transfer accountable custody.
+
+Ordinary incoming box shipments use a distinct box-level event per individually received box. Each event records shipment, box, actor and actual receipt time; that box's custody transfers to archive in the same transaction. The shipment-level state/counters are projections over the original manifest and individual receipt/discrepancy outcomes. Box placement is a separate event and may occur before the rest of the shipment is fully received.
+
+No card count, seal inspection or packaging inspection event is required at ordinary box receipt. Do not conflate box-level receipt events with P-09 card-level receipt events.
