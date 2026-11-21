@@ -83,3 +83,12 @@ UX-06 остаётся открытым. Следующие read-only участ
 ## D-03 — исключение legacy exception events (2026-11-21)
 
 Старый процесс «Инциденты» исключён из целевой системы, рабочих данных нет. Поэтому `shipment.exception_registered` и `shipment.exception_resolved` не входят в целевой event catalog; exception-resolution detail reader не переносится. Не требуется миграция или retention plan для legacy exception events. Это не отменяет общего append-only DomainEvent для утверждённых бизнес-операций и отдельного admin/security audit. До изменения event schema в реальном deployment по-прежнему требуется проверить фактические jobs/readers и effective grants; это общий operational safeguard, а не основание сохранять исключённые event types.
+
+## 2026-11-22 — consumer/read-model impact of item-level receipt
+
+The current consumer inventory must be extended before implementation to project two distinct granular workflows:
+
+1. Ordinary incoming box shipments: one receipt fact per manifest box; per-box custody transition; shipment remains open until all boxes and discrepancies are resolved; received boxes can independently enter the ready-to-place surface. Shipment counters derive from the immutable original box manifest and individual receipts.
+2. P-09 archive → CO: one request item per medical card; partial archive issue; item-level actual CO receipt; archive custody until that receipt; atomic bulk receipt of selected arrived cards; parent request remains in processing while any item is nonterminal.
+
+Object timelines must show item-level actor/time without exposing unrelated card history. Queue/dashboard projections must not infer parent completion from a shipment draft, courier dispatch or partial item receipt. Candidate event type names and versioned payload schemas require a separate final catalog pass; existing consumers and effective grants must be inventoried before event schema changes.
