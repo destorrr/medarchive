@@ -1327,3 +1327,20 @@ Record account deactivation/administrative disabling through its existing mandat
 Это дополнение выявляет конкретное документальное расхождение: shipment route audit, DB command contracts, technical data model, invariants и readiness plan ранее описывали P-09 как полную приёмку одним действием. Их необходимо синхронизировать с item-level выдачей/получением и частичным исполнением. Сами бизнес-решения закрыты; это работа по обновлению документации и технических контрактов, а не новые вопросы владельцу продукта.
 
 Правила массовых операций с коробками уже добавлены в DB command contracts и DB invariants; item-level выдача/получение отражена также в technical data model и object-detail contract. Остаток — сверить точные typed command signatures, persisted state names, очереди/счётчики и полную связность этих контрактов с event catalog и security scope.
+
+## 2026-11-22 — second-pass technical reconciliation
+
+The previous addenda were not sufficient by themselves because the foundational storage model and DB transaction architecture still contained operative single-handover/full-receipt instructions. Superseding addenda have now been added to:
+- storage model design;
+- DB security/transaction architecture;
+- DB command mapping;
+- DB command contracts and invariants;
+- object detail/timeline contract;
+- shipment route/state audit;
+- technical data model and readiness plan.
+
+The controlling P-09 rule is now explicit: partial archive issue is permitted; item-level actual CO receipt is separate; custody remains archive-owned until each card's actual receipt is confirmed; selected arrived cards may be confirmed atomically in bulk; after partial issue, only the unissued remainder may be cancelled. Courier physical possession is not a CO receipt and does not itself transfer accountable custody to CO.
+
+The ordinary box shipment lifecycle is separate from P-09. Box receipt does not count cards or inspect seals/packaging. Bulk box placement and movement are atomic; multi-box card extraction is prohibited.
+
+**Residual consistency work:** consolidate duplicate historical statements in the main body of each long document (not merely supersede them in addenda); define exact state enums and transitions; reconcile event catalogue and queue/read-model counters; and run a final cross-document search for contradictory active instructions. No implementation or database verification has been performed.
