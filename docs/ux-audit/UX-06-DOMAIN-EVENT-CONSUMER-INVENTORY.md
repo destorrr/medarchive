@@ -86,7 +86,7 @@ UX-06 остаётся открытым. Следующие read-only участ
 
 ## 2026-11-22 — consumer/read-model impact of item-level receipt
 
-The current consumer inventory must be extended before implementation to project two distinct granular workflows:
+The current consumer inventory must be extended before implementation to project two distinct granular workflows. For P-09, one parent projects one-to-many fulfillment batches; each batch has a subset manifest and independent draft/handover/partial-receipt projection. A batch is not the parent request and its receipt does not complete the parent unless every request item is terminal.
 
 1. Ordinary incoming box shipments: one receipt fact per manifest box; per-box custody transition; shipment remains open until all boxes and discrepancies are resolved; received boxes can independently enter the ready-to-place surface. Shipment counters derive from the immutable original box manifest and individual receipts.
 2. P-09 archive → CO: one request item per medical card; partial archive issue; item-level actual CO receipt; archive custody until that receipt; atomic bulk receipt of selected arrived cards; parent request remains in processing while any item is nonterminal.
