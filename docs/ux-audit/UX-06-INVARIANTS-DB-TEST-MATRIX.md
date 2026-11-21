@@ -138,7 +138,7 @@ Regroup без заявки: cards → boxes → cycles → memberships/placemen
 - not_found без actor/time и попытка повторного открытия.
 - Отмена без причины.
 - Отмена processing без возврата всех extracted.
-- Отмена после handover.
+- Попытка отменить уже выданную позицию P-09; отмена выданной позиции должна быть отклонена. Проверять отмену невыданного остатка отдельно.
 - completed при незавершённой позиции.
 - Удаление позиции или изменение её card_id/request_id.
 
@@ -222,7 +222,7 @@ Backfill должен быть идемпотентным, пакетным, с 
 | DB-35 | Manifest и courier можно менять только текущему автору и только в `draft` | Trigger/command allowlist проверяет actor, status и scope | Manifest/courier mutation и событие/результат — атомарно | Изменение другим сотрудником или после handover отклоняется; snapshot курьера соответствует FK |
 | DB-36 | Handover обычного shipment выполняет только текущий активный автор; один раз | Закрытая procedure, row lock, active/role/location guard, unique handover event | Shipment, коробки/карты custody, snapshot manifest и handover event — один commit | Чужой/deactivated actor, второй handover, невалидный manifest или отсутствие courier отклоняются |
 | DB-37 | Receipt обычного входящего shipment выполняет активный сотрудник archive по одной коробке | Route/scope/status guard, row lock, unique box receipt event, deferred custody consistency | Одна коробка, её custody, actor/time и DomainEvent — один commit; shipment остаётся открытым до всех receipts и расхождений | Повторная приёмка одной коробки, чужая коробка, неверная локация или shipment не `in_transit` отклоняются |
-| DB-38 | После handover manifest/courier immutable; после receipt custody принадлежит archive; отмена только в draft автором | State transition trigger + custody guard + author guard | Cancel/handover/receipt сериализуются на shipment row | Изменение после передачи, отмена после передачи или повторная смена custody отклоняются |
+| DB-38 | Для обычного box shipment после handover manifest/courier immutable; receipt каждой коробки переводит её custody архиву; отмена shipment допускается только в draft автором | State transition trigger + box custody guard + author guard | Cancel/handover и каждый box receipt сериализуются на shipment/box rows | Изменение manifest/courier после передачи, отмена после передачи, повторная приёмка коробки или повторная смена custody отклоняются. Не применять этот запрет к отмене невыданного остатка P-09 |
 
 
 | DB-39 | В обычном коробочном shipment карты перемещаются только как содержимое коробок; manifest состоит из `ShipmentBox`, memberships/BoxCycle сохраняются, `ShipmentCard` и P-09 item для них не создаются | Закрытые процедуры shipment handover/box receipt + deferred consistency trigger по составу BoxCycle | Handover всех коробок — один commit; receipt каждой коробки и custody её содержимого — отдельный commit | Добавление отдельной карты в обычный manifest, изменение membership при handover либо частичная приёмка содержимого одной коробки отклоняются |
