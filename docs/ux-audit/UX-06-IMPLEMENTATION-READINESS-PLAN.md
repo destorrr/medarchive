@@ -283,10 +283,10 @@
 - archive card membership/extracted invariant;
 - no membership + extracted overlap;
 - no duplicate active request items across parents;
-- exactly one fulfillment shipment per parent;
-- manifest equals all and only outbound extracted items;
+- transport records support partial issue without forcing a full-parent manifest; exact grouping/storage model remains a technical design gate;
+- each transport batch contains only cards physically issued in that batch; parent item states remain independently tracked;
 - parent cannot complete before all terminal results and receipt;
-- parent cannot cancel after handover;
+- after partial issue only the unissued remainder may be cancelled; issued items remain active until actual CO receipt;
 - terminal results and audit metadata immutable;
 - no direct location mutation outside workflow.
 
