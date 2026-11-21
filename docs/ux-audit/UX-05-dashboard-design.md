@@ -401,3 +401,26 @@ UX-05 можно закрыть после:
 ## D-03 — решение по legacy incidents (2026-11-21)
 
 Старый процесс «Инциденты» полностью исключён из целевой системы. Не проектировать `/admin/incidents`, incident dashboard module, exception queues/counters, `exception` label/status или отдельные incident details. Поскольку приложение ещё не введено в эксплуатацию и рабочих данных нет, legacy exception records не мигрируются и не требуют отдельной обработки. Общие audit mechanisms и предусмотренные правила ошибок/расхождений обычных процессов сохраняются. Этот раздел supersedes прежние замечания о необходимости технического решения по судьбе legacy exception records.
+
+## 2026-11-22 — superseding dashboard and queue semantics for partial P-09 and box receipt
+
+This addendum supersedes earlier UX-05 statements that P-09 remains open only until full receipt of one fulfillment shipment, or that ordinary incoming box shipments are received as one indivisible unit.
+
+### Archive P-09 queue
+
+- The archive work queue includes parent requests in submitted and processing states while any actionable or nonterminal item remains.
+- A request remains in processing when some cards are already issued but their actual receipt by CO is not yet confirmed, when some cards remain pending issue, or when other items are still being processed.
+- The request leaves the work queue only when all items have terminal outcomes (received by CO, not_found, or cancelled as part of the unissued remainder) and the parent request is completed/cancelled according to the state machine.
+- The general new-request counter continues to count only submitted requests. Opening a request does not decrement it; transition to processing does.
+- The archive queue row shows request number, creation date, CO initiator, card count and parent status; patient names/card numbers remain excluded from queue rows.
+- The physical outgoing transport/dispatch view is separate from the parent P-09 work queue and must not imply custody has transferred to CO before actual item receipt.
+
+### CO P-09 view
+
+CO can see its submitted requests and the item-level results. The request remains visible while some items are pending, issued but not yet received, or otherwise nonterminal. Item-level actual receipt confirmation is available only for cards that have physically arrived. Bulk confirmation is one atomic action over the selected arrived cards; per-card actor/time remains available in the item timeline.
+
+### Ordinary incoming box shipments
+
+Incoming branch → archive and central_office → archive shipments are received one box at a time. The archive incoming queue remains open until all manifest boxes and discrepancies are resolved. A received box may appear in the ready-to-place work surface immediately, without waiting for the whole shipment. Receipt counts are total manifest boxes, individually received boxes, and boxes awaiting receipt; placement is a separate state and does not change the receipt count. No card-count/seal/package check is part of receipt.
+
+Do not merge box-level receipt counters with P-09 card-level issue/receipt counters.
