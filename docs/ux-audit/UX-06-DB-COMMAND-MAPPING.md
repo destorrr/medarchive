@@ -144,3 +144,21 @@ ORM содержит поля:
 - Не изменялись исходники, тесты, миграции, workflows или deployment configuration.
 - Не создавались SQL-функции, роли, grants или миграции.
 - Не удалялись legacy `CardPlacement`, per-card `ArchiveRequest` или старые статусы.
+
+## 2026-11-22 — corrected command mapping for approved P-09 workflow
+
+The mapping below supersedes the older single-shipment/full-receipt proposal in §4 for archive → CO.
+
+| Target command | Required target semantics | Transaction boundary |
+|---|---|---|
+| request_issue_item | Archive records physical issue of one card position; unissued positions remain pending and can be issued later in the same parent request | One item + custody/DomainEvent update |
+| request_mark_not_found | One item receives not_found with mandatory closed-list reason and optional comment; no write-off or fictitious location update | One item + DomainEvent |
+| request_cancel_remaining | Before any issue, cancel the request; after partial issue, cancel only the remaining unissued items; issued items remain unchanged | Parent + selected remaining items, one commit |
+| request_confirm_item_receipt | CO confirms actual receipt of one physically arrived card; only then custody transfers archive → CO | One item/card + DomainEvent |
+| request_confirm_bulk_receipt | CO confirms a selected set of cards that have actually arrived; per-card actor/time is persisted | Entire selected set, all-or-nothing |
+| box_place_bulk | Place several received boxes on one active shelf | All selected boxes + target shelf, all-or-nothing |
+| box_move_bulk | Move boxes from one or more shelves to one target shelf | All selected boxes + source/target placements, all-or-nothing |
+
+The old request_handover / shipment_receive_all mapping is not an acceptable target contract if it requires one full immutable manifest, one indivisible handover, or full receipt of every card before any custody transition. Physical courier/transport records may be modeled separately; they do not change archive accountability before CO actual receipt.
+
+Ordinary box shipments remain separate from P-09 card fulfilment. Their receipt does not inspect card counts, seals or packaging; box placement remains a separate operation.
