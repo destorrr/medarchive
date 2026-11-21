@@ -106,3 +106,16 @@ The remaining UX-06 work is now primarily documentation and technical readiness:
 7. **Final verification:** complete static cross-document review and evidence checklist. Database preflight, SQL/DDL, pytest, CI and production readiness are separate gates and have not been performed in this documentation-only pass.
 
 No further product question is currently required for the closed workflow rules above. UX-06 remains open until the documentation is fully reconciled and the required technical gates are explicitly dispositioned. UX-07 must not start earlier. No implementation is authorized.
+
+## 2026-11-22 — technical reconciliation progress
+
+The foundational storage model, DB transaction architecture and command mapping have now been amended to supersede the obsolete P-09 full-handover/full-receipt model. The current required workflow is item-level partial issue and actual receipt, archive custody until CO confirms actual receipt, atomic bulk receipt of arrived cards, and cancellation of only unissued remainder after partial issue. Ordinary box receipt and bulk placement/movement rules are also stated in the command and invariant contracts.
+
+Remaining tasks:
+1. Consolidate the old contradictory paragraphs in the main bodies of long technical documents so readers do not have to resolve addenda themselves.
+2. Define exact parent/item persisted states, transitions and terminality, including the mixed state where some cards are received, some are not_found, some are still pending, and some have been issued but not received.
+3. Reconcile DomainEvent catalog, consumer inventory, UI queues, dashboard counters and object timelines to those states.
+4. Verify that DB-62…DB-70 align with earlier DB invariants and command signatures.
+5. Finish security, grants, audit-retention and deployment gates, then run the final static cross-document review.
+
+No further product clarification is currently necessary for these already approved rules. UX-06 remains open; UX-07 and implementation remain blocked.
