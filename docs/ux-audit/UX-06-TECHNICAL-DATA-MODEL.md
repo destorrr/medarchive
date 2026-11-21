@@ -146,7 +146,7 @@ Box (1)
 | Обычное архивное хранение | `current_location_id = archive`, `current_shipment_id IS NULL`, одно активное членство в открытом BoxCycle |
 | Извлечена по заявке | Та же архивная локация, нет активного членства, ровно одна позиция `extracted` у родителя `processing` |
 | Не найдена по заявке | Физически не локализована; membership и shipment отсутствуют; сохраняется терминальная позиция `not_found` в истории P-09, в том числе после `completed`/`cancelled` |
-| В отправлении | `current_shipment_id` задан, членства в обычном хранении нет, позиция `in_shipment` |
+| Выдана, receipt ожидается | `current_shipment_id` указывает на конкретную fulfillment batch, членства в обычном хранении нет, позиция `issued_pending_receipt`; custody остаётся у архива |
 | В ЦО после приёмки | `current_location_id = central_office`, отправление принято, позиция `completed` |
 | Внешнее хранение ЦО | Текущая модель `custody_status` и атрибуты внешней организации; это не маршрут отправления |
 
@@ -308,7 +308,7 @@ Box (1)
 ### Этап M4 — переключение ограничений и workflow
 
 - Перевести `ArchiveRequest` на родителя и внедрить `ArchiveRequestItem`.
-- Внедрить атомарные workflow начала обработки, отмены, исключения, подтверждение фактической передачи и полной приёмки.
+- Внедрить атомарные workflow начала обработки, отмены невыданного остатка, исключения, batch handover, item-level receipt и bulk receipt.
 - Заменить общий guard изменения membership при активном placement на контролируемые транзакционные процедуры с различной семантикой «извлечение» и «перегруппировка».
 - Добавить deferred constraints/triggers для инварианта «архивная карта либо в коробке, либо извлечена активной заявкой».
 - Добавить DB-защиту one-to-many fulfillment batches, item-to-batch uniqueness, batch manifest integrity и item-level custody/receipt.
@@ -403,7 +403,7 @@ Admin deactivation и отзыв/изменение role/location membership и�
 
 Факт нахождения в пути определяется shipment и связью с коробкой, а не попыткой отслеживать физическое местоположение курьера. Не создавать для обычных коробочных отправлений дублирующие `ShipmentCard` для каждой вложенной карты. Handover не меняет состав коробок, циклы и memberships. Receipt обновляет локацию коробки и содержащихся карт атомарно; он сам по себе не назначает коробке полочное место и не создаёт `BoxPlacement` — размещение на полке остаётся отдельной складской операцией.
 
-Для P-09 archive → central_office действует иная модель: shipment manifest содержит отдельные карты через `ShipmentCard`; карты до handover имеют `extracted` без membership, после handover получают `current_shipment_id` и `in_shipment`, после receipt — локацию ЦО и `completed`. Смешивать две модели манифеста запрещено.
+Для P-09 archive → central_office действует иная модель: каждая fulfillment batch содержит отдельные карты через `ShipmentCard`; карты до выдачи имеют `extracted` без membership, после handover конкретной batch получают `current_shipment_id` и `issued_pending_receipt`, при этом custody остаётся у архива; после item-level receipt — локация ЦО и `completed`. Смешивать две модели манифеста запрещено.
 
 ### 4.4. Учётная позиция карты с результатом `not_found`
 
