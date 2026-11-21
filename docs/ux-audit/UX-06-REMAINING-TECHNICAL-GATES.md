@@ -97,14 +97,14 @@ The product decisions below are closed and must not be re-asked: the three activ
 
 The remaining UX-06 work is now primarily documentation and technical readiness:
 
-1. **Transport batch implementation contract:** one-to-many parent → fulfillment batches is now the selected target model. Finish exact persisted columns/constraints, item-to-batch uniqueness, batch state projection, courier snapshot and migration/backfill design. This is technical specification work, not an open product decision.
+1. **Transport batch implementation contract:** one-to-many parent → fulfillment batches is the selected target model. Finish exact persisted columns/constraints, item-to-batch uniqueness, batch state projection, courier snapshot and migration/backfill design. This is technical specification work, not an open product decision.
 2. **Command contract normalization:** make all P-09 command sections agree on item-level issuance/receipt, partial fulfillment, per-card custody, bulk atomic receipt and partial cancellation. Resolve any obsolete full-receipt language, including historical text that is not clearly marked superseded.
-2. **Read surfaces:** finish synchronizing object detail, request timeline, archive/CO queues, dashboard counters and card/box details with the latest item states and privacy scope.
-3. **DB invariants:** validate DB-62…DB-70 against existing DB-01…DB-61, define exact state transitions and typed command signatures, and ensure guards preserve append-only history.
-4. **Event catalog and idempotency:** complete producer/consumer mapping, event payload schemas/versions, ordinary command TTL/retry horizons and final API error envelope.
-5. **Security and deployment:** complete effective grants/principals, role/location scope and read permissions, RLS decision, bootstrap/login throttle, infrastructure principals and rollout compatibility.
-6. **Audit governance:** obtain retention/privacy/legal approval, key custody/KMS/HSM and checkpoint storage decisions; keep audit feed export excluded.
-7. **Final verification:** complete static cross-document review and evidence checklist. Database preflight, SQL/DDL, pytest, CI and production readiness are separate gates and have not been performed in this documentation-only pass.
+3. **Read surfaces:** finish synchronizing object detail, request timeline, archive/CO queues, dashboard counters and card/box details with the latest item states and privacy scope.
+4. **DB invariants:** validate DB-62…DB-70 against existing DB-01…DB-61, define exact state transitions and typed command signatures, and ensure guards preserve append-only history.
+5. **Event catalog and idempotency:** complete producer/consumer mapping, event payload schemas/versions, ordinary command TTL/retry horizons and final API error envelope.
+6. **Security and deployment:** complete effective grants/principals, role/location scope and read permissions, RLS decision, bootstrap/login throttle, infrastructure principals and rollout compatibility.
+7. **Audit governance:** obtain retention/privacy/legal approval, key custody/KMS/HSM and checkpoint storage decisions; keep audit feed export excluded.
+8. **Final verification:** complete static cross-document review and evidence checklist. Database preflight, SQL/DDL, pytest, CI and production readiness are separate gates and have not been performed in this documentation-only pass.
 
 No further product question is currently required for the closed workflow rules above. UX-06 remains open until the documentation is fully reconciled and the required technical gates are explicitly dispositioned. UX-07 must not start earlier. No implementation is authorized.
 
