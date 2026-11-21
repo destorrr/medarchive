@@ -97,7 +97,8 @@ The product decisions below are closed and must not be re-asked: the three activ
 
 The remaining UX-06 work is now primarily documentation and technical readiness:
 
-1. **Command contract normalization:** make all P-09 command sections agree on item-level issuance/receipt, partial fulfillment, per-card custody, bulk atomic receipt and partial cancellation. Resolve any obsolete full-receipt language, including historical text that is not clearly marked superseded.
+1. **Transport batch model:** decide the technical normalization for partial physical issue (multiple batches per parent vs one transport aggregate with multiple item-level issue events), replace the obsolete single `fulfillment_shipment_id` assumption, and define courier assignment per batch. This is a technical design gate, not an open product decision.
+2. **Command contract normalization:** make all P-09 command sections agree on item-level issuance/receipt, partial fulfillment, per-card custody, bulk atomic receipt and partial cancellation. Resolve any obsolete full-receipt language, including historical text that is not clearly marked superseded.
 2. **Read surfaces:** finish synchronizing object detail, request timeline, archive/CO queues, dashboard counters and card/box details with the latest item states and privacy scope.
 3. **DB invariants:** validate DB-62…DB-70 against existing DB-01…DB-61, define exact state transitions and typed command signatures, and ensure guards preserve append-only history.
 4. **Event catalog and idempotency:** complete producer/consumer mapping, event payload schemas/versions, ordinary command TTL/retry horizons and final API error envelope.
