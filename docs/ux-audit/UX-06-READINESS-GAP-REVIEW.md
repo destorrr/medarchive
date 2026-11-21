@@ -110,3 +110,11 @@ Search handler также явно разрешает viewer; полный searc
 ## 10. D-06 — viewer исключён без миграции (2026-11-21)
 
 МедАрхив ещё не введён в эксплуатацию; пользовательских/операционных данных нет. Миграция viewer accounts, actor references и legacy ACL не требуется. Роль `viewer` полностью исключается из целевой модели и будущей реализации во всех слоях; целевые роли — `admin`, `branch`, `central_office`, `archive`. Удалить legacy viewer routes, UI/options, schema/ORM allowances и тестовые ожидания при реализации. Не перераспределять права автоматически. Исторические статические findings остаются основанием для удаления потенциально глобальных viewer paths, но account preflight/migration plan больше не требуются. Реализация не разрешена.
+
+## 2026-11-22 — P-09 technical baseline superseded
+
+The earlier readiness findings that assumed one indivisible fulfillment shipment and full shipment receipt are superseded. The approved P-09 workflow requires item-level archive issue, item-level actual CO receipt, partial issue, later issue of pending cards within the same request, partial cancellation of only unissued items, and atomic bulk receipt of selected cards that have actually arrived. Archive retains accountable custody until the corresponding CO receipt is confirmed. A courier's physical possession does not itself transfer accountable custody to CO.
+
+The base storage model, DB transaction architecture and command mapping now contain explicit superseding addenda. Remaining readiness work is to normalize their earlier body text and derive one consistent set of persisted states, typed command signatures, event names/payloads, read models, queue counters and concurrency guards. This is a documentation/specification task before implementation; no DB or runtime behavior has been changed.
+
+Ordinary box receipt remains distinct: no card count, seal or packaging inspection; placement is separate; bulk place/move is atomic; multi-box card extraction is prohibited.
