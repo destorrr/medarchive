@@ -269,7 +269,7 @@
 | Remove item | возврат карты в коробку, новое/активное membership, item removed_by_archive, comment/event | item удалён, карта осталась без хранения |
 | Cancel до processing | parent cancelled, pending items cancelled, reason/event | часть состава осталась активной |
 | Cancel после processing | возврат всех extracted карт, terminal item statuses, parent cancelled, events | часть карт возвращена, часть оставлена извлечённой |
-| Handover | parent lock, один shipment, полный manifest, все items in_shipment, custody transfer, events | partial shipment или повторный handover |
+| Handover batch | parent/batch/item locks, selected batch manifest, items issued_pending_receipt, archive custody unchanged, events | повторная выдача, item в двух batches, ошибочный parent reference |
 | Receive all | полный manifest validation, все карты/коробки перемещены, shipment received, items completed, parent completed при выполнении условий | частичная приёмка или completed parent при непринятом shipment |
 | Regroup | lock всех коробок/карт, close old memberships/cycles, create new cycles/memberships, preserve placements, events | автоматическое снятие placement пустой коробки по общему trigger |
 | Admin correction | allowlisted correction, reason, before/after audit, actor/time | произвольный UPDATE без отдельной записи аудита |
