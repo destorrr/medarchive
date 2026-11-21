@@ -214,7 +214,7 @@ DB boundary обязан проверять:
 
 **Вход:** `request_id`, `item_id`, идентификатор текущего активного архивного membership/коробки, idempotency metadata. Комментарий исправления не запрашивается и не является обязательным; исходный комментарий `removed_by_archive` сохраняется в истории.
 
-**Предусловия:** parent `processing`; `fulfillment_shipment_id IS NULL`; item имеет текущий статус `not_found` или `removed_by_archive`; карта фактически обнаружена в архивном хранении и может быть извлечена из конкретной коробки. Запрещено исправлять результат после создания fulfillment-черновика, после handover или после завершения/отмены parent.
+**Предусловия:** parent `processing`; NOT EXISTS fulfillment batch for this parent; item имеет текущий статус `not_found` или `removed_by_archive`; карта фактически обнаружена в архивном хранении и может быть извлечена из конкретной коробки. Запрещено исправлять результат после создания первой fulfillment batch, после handover или после завершения/отмены parent.
 
 **Изменения:**
 - заблокировать parent, item, card, активное membership, BoxCycle и BoxPlacement;
