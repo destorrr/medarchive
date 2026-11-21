@@ -1326,4 +1326,4 @@ Record account deactivation/administrative disabling through its existing mandat
 
 Это дополнение выявляет конкретное документальное расхождение: shipment route audit, DB command contracts, technical data model, invariants и readiness plan ранее описывали P-09 как полную приёмку одним действием. Их необходимо синхронизировать с item-level выдачей/получением и частичным исполнением. Сами бизнес-решения закрыты; это работа по обновлению документации и технических контрактов, а не новые вопросы владельцу продукта.
 
-Также требуется внести новые правила массовых операций с коробками в DB command contracts и DB invariants, затем проверить соответствующие object-detail и queue contracts.
+Правила массовых операций с коробками уже добавлены в DB command contracts и DB invariants; item-level выдача/получение отражена также в technical data model и object-detail contract. Остаток — сверить точные typed command signatures, persisted state names, очереди/счётчики и полную связность этих контрактов с event catalog и security scope.
