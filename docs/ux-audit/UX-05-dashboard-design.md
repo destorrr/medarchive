@@ -409,7 +409,7 @@ This addendum supersedes earlier UX-05 statements that P-09 remains open only un
 ### Archive P-09 queue
 
 - The archive work queue includes parent requests in submitted and processing states while any actionable or nonterminal item remains.
-- A request remains in processing when some cards are already issued but their actual receipt by CO is not yet confirmed, when some cards remain pending issue, or when other items are still being processed.
+- A request remains in `processing` while the archive processes all its items before shipment creation, and after the single atomic handover while CO has not yet confirmed receipt of every sent card. No item remains pending issue or processing after handover.
 - Historical wording below describes a superseded partial-issue workflow. Current rule (2026-11-22): all P-09 items are processed before a single full-manifest shipment is created and handed over atomically. The request remains in `processing` until every sent card has item-level receipt; after handover there is no partial-issue remainder cancellation. If no `extracted` items exist, the request completes without a shipment.
 - The general new-request counter continues to count only submitted requests. Opening a request does not decrement it; transition to processing does.
 - The archive queue row shows request number, creation date, CO initiator, card count and parent status; patient names/card numbers remain excluded from queue rows.
