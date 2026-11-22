@@ -91,22 +91,22 @@ Consequences:
 
 The organization has no approved audit retention periods; this remains a blocking pre-production governance gate. No duration is inferred. Documentation only; implementation is not authorized.
 
-## 2026-11-22 — superseding decisions and revised UX-06 worklist
+## 2026-11-22 — revised UX-06 worklist (supersedes the earlier partial-issue assumptions)
 
-The product decisions below are closed and must not be re-asked: the three active routes; item-level partial archive-to-CO card issuance and receipt; archive custody until actual CO receipt; mandatory reason for not_found; partial cancellation after issuance; atomic bulk receipt of actually received cards; no card-count/seal/package inspection at box receipt; atomic bulk box placement and movement; no multi-box card extraction.
+The earlier paragraph in this section describing item-level partial archive-to-CO issuance and cancellation of the unissued remainder is superseded by the product clarification later on 2026-11-22. The approved P-09 workflow is: every item is fully processed before shipment creation; one immutable manifest contains all and only `extracted` cards; the entire manifest is handed over in one atomic operation; actual CO receipt remains item-level and may be partial; archive custody remains until the receipt of each card; cancellation is permitted only for the whole request before handover.
 
-The remaining UX-06 work is now primarily documentation and technical readiness:
+The following worklist remains current:
 
-1. **Single P-09 shipment implementation contract:** one-to-one parent → at most one fulfillment shipment is the selected target model. Finish exact persisted columns/constraints, full-manifest guard, item-to-shipment linkage, shipment state projection, courier snapshot and migration/backfill design. This is technical specification work, not an open product decision.
-2. **Command contract normalization:** make all P-09 command sections agree on item-level issuance/receipt, partial fulfillment, per-card custody, bulk atomic receipt and partial cancellation. Resolve any obsolete full-receipt language, including historical text that is not clearly marked superseded.
-3. **Read surfaces:** finish synchronizing object detail, request timeline, archive/CO queues, dashboard counters and card/box details with the latest item states and privacy scope.
-4. **DB invariants:** validate DB-62…DB-70 against existing DB-01…DB-61, define exact state transitions and typed command signatures, and ensure guards preserve append-only history.
+1. **Single P-09 shipment implementation contract:** finish exact persisted columns/constraints, full-manifest guard, item-to-shipment linkage, shipment state projection, courier snapshot and migration/backfill design.
+2. **Command contract normalization:** keep processing-before-shipment, one full manifest, atomic handover, item-level/bulk receipt and per-card custody consistent across commands and state transitions.
+3. **Read surfaces:** finish synchronizing object detail, request timeline, archive/CO queues, dashboard counters and card/box details with parent/item states and privacy scope.
+4. **DB invariants:** validate DB-62…DB-73 against DB-01…DB-61, define exact state transitions and typed command signatures, and ensure guards preserve append-only history.
 5. **Event catalog and idempotency:** complete producer/consumer mapping, event payload schemas/versions, ordinary command TTL/retry horizons and final API error envelope.
-6. **Security and deployment:** complete effective grants/principals, role/location scope and read permissions, RLS decision, bootstrap/login throttle, infrastructure principals and rollout compatibility.
-7. **Audit governance:** obtain retention/privacy/legal approval, key custody/KMS/HSM and checkpoint storage decisions; keep audit feed export excluded.
-8. **Final verification:** complete static cross-document review and evidence checklist. Database preflight, SQL/DDL, pytest, CI and production readiness are separate gates and have not been performed in this documentation-only pass.
+6. **Security and deployment:** complete effective grants/principals, role/location scope and read permissions, RLS disposition, bootstrap/login throttle, infrastructure principals and rollout compatibility.
+7. **Audit governance:** obtain retention/privacy/legal approval for AdminSecurityAudit R1–R4; keep audit-feed export excluded; do not add cryptographic integrity feature that the owner rejected.
+8. **Final verification:** complete static cross-document review and evidence checklist. Database preflight, SQL/DDL, pytest, CI and production readiness remain separate gates and have not been performed in this documentation-only pass.
 
-No further product question is currently required for the closed workflow rules above. UX-06 remains open until the documentation is fully reconciled and the required technical gates are explicitly dispositioned. UX-07 must not start earlier. No implementation is authorized.
+No further product question is currently required for the P-09 workflow. UX-06 remains open until the documentation is reconciled and technical gates are explicitly dispositioned. UX-07 must not start earlier. No implementation is authorized.
 
 ## 2026-11-22 — technical reconciliation progress
 
