@@ -154,3 +154,16 @@ Static source review confirms the password-management target is not implemented 
 - The global admin audit page still queries legacy `DomainEvent admin.%` rows and renders raw JSON payloads.
 
 These findings are documented in `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. They require separate command, schema, session and UI contracts before implementation; no source code was changed.
+
+
+## 2026-11-22 — read-surface readiness gaps refreshed
+
+Current source review reconfirms the read-surface blockers recorded in UX-06-ROLE-SCOPED-HISTORY-SEARCH-AUDIT.md:
+
+- /history and dashboard recent movements leave admin/legacy-viewer operational DomainEvent queries unscoped; target admin must not have a global operational feed.
+- Branch card history is derived from origin_branch_id and can outlive archive handover, contrary to D-08. Preserve the separate P-08 own-shipment manifest/timeline.
+- Card search results do not yet expose the full approved target identity fields; search input remains FIO-only.
+- General card/box object detail routes and their timelines are absent in the inspected PostgreSQL routers. Admin's existing shipment detail path is blocked by operational-location reader checks.
+- Archive request pages remain bound to the legacy per-card request model, not the P-09 parent/item aggregate.
+
+These are implementation/readiness findings from static code inspection. The target object-detail authorization contract remains in UX-06-OBJECT-DETAIL-AND-TIMELINE-CONTRACT.md.
