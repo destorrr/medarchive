@@ -118,3 +118,16 @@ The earlier readiness findings that assumed one indivisible fulfillment shipment
 The base storage model, DB transaction architecture and command mapping now contain explicit superseding addenda. Remaining readiness work is to normalize their earlier body text and derive one consistent set of persisted states, typed command signatures, event names/payloads, read models, queue counters and concurrency guards. This is a documentation/specification task before implementation; no DB or runtime behavior has been changed.
 
 Ordinary box receipt remains distinct: no card count, seal or packaging inspection; placement is separate; bulk place/move is atomic; multi-box card extraction is prohibited.
+
+
+## 2026-11-22 — dashboard queues and counters: current implementation gap
+
+Read-only review of `src/medarchive/routers/postgresql_dashboard.py` (dashboard context, lines 145–250 and history reader) compared with approved queue decisions and target P-09 model found:
+
+1. The current dashboard counts `ArchiveRequest.status IN ('new','in_progress')`. Current ORM requests are per-card; target P-09 is a parent with states `submitted/processing/completed/cancelled`. The target archive work queue must include parent requests in `submitted` and `processing`; the navigation “new requests” counter counts only `submitted`. One legacy count cannot serve both surfaces.
+2. Current CO count filters per-card `requested_by` through users with role central_office; target scope is the parent request owner/creator and must be enforced on parent rows. Archive queue is shared for authorized active archive staff; branch has no P-09 queue.
+3. Current shipment counters count rows joined to shipments with status exactly `in_transit`. Target incoming ordinary box shipments and P-09 card batches need manifest-item projections: for P-09 include outstanding unreceived cards in `in_transit` and `partially_received`; already received items must not be counted as in transit. For ordinary shipments, count each original manifest box exactly once based on its own receipt fact, independently of placement.
+4. Current location counters use broad `from_location_id == scope OR to_location_id == scope`. Target lists/counters must use the explicitly allowed route pair and direction for each role, not merely any shipment touching the location. Current product scope excludes branch→CO and CO→branch.
+5. Current dashboard history resolves request aggregates through the legacy per-card `ArchiveRequest` and its single `fulfillment_shipment_id`. The target projection must resolve parent request, item, and all linked fulfillment batches; batch completion cannot imply parent completion.
+
+These are static source-to-target discrepancies, not proof of incorrect production behavior: the target P-09 schema is not implemented. Before implementation, derive separate SQL/read-model definitions and test fixtures for (a) archive active P-09 queue, (b) archive new-request badge, (c) CO own-request list, (d) sender/receiver shipment queues, (e) box-level receipt counters, and (f) item-level P-09 receipt counters. Apply role/scope filtering before counting, pagination or aggregation; avoid exposing patient PII in queue rows.
