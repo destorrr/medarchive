@@ -263,3 +263,23 @@ External event delivery, outbox, offsets and webhook consumers remain out of pro
 The AdminSecurityAudit common envelope already defines actor, timestamp, command/correlation IDs, outcome, reason and target references as record-level metadata. These fields must not also be duplicated in event-specific JSONB payloads merely because older P-09 tables list them under “required payload”. Payload contains only additional allowlisted event facts. This avoids duplicate/conflicting actor and timestamp values.
 
 Three version axes remain separate: command_version (input semantics), result_version (committed DB result payload), event_version (event-specific payload). The public command envelope currently does not explicitly include command_version; adding it as required integer with first contract version 1 is recorded as a technical proposal, not an owner-approved decision. Every event emitted by one command shares command_id/correlation_id, including one receipt event per card in bulk receipt.
+
+
+## 2026-11-22 — current API error mapping source audit
+
+Static review of PostgreSQL archive, Central Office, shipment and admin routers plus archive/shipment/admin workflow services shows no single typed public error contract equivalent to the proposed DB command result envelope.
+
+Observed patterns:
+- Admin JSON routes map LookupError to 404, ValueError to 422 or 409 depending on endpoint, and IntegrityError to 409 with endpoint-specific generic text.
+- HTML workflow routes commonly catch ValueError and render str(exc) directly into page error state or redirect message; IntegrityError is handled inconsistently, with some handlers rendering a generic message and others relying on constraints.
+- Shipment detail has explicit 403/404 HTTPException cases, while workflow business errors remain service-specific ValueError subclasses.
+- Legacy incident/exception errors and pages remain in current shipment/archive routers even though D-03 excludes that workflow from the target.
+
+Consequences for the target DB command adapter:
+1. Define a closed machine-readable error_code set and command-family allowlists; do not expose raw exception strings, SQLSTATE, constraint names or SQL diagnostics.
+2. Map DB result_code to stable HTTP status and response body in one API adapter; HTML UI maps the same error_code to localized safe text.
+3. Preserve distinction between validation_error, forbidden, not_found/non-disclosure, invalid_state, conflict, idempotency_key_reused and transient infrastructure failure. Do not collapse every IntegrityError into the same business conflict.
+4. A transient infrastructure/commit failure is not a completed ledger outcome and must not be replayed as a stored business result.
+5. Remove legacy incident-specific error mapping with the D-03 surface; do not add it to target error allowlists.
+
+This is static source inspection; no API requests/tests were executed and no handlers were changed.
