@@ -3728,3 +3728,11 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 Синхронизированы UX-03 role matrix, UX-04 navigation, technical data model, storage model, DB command contracts, DB-16/DB-17 test matrix, route/state audit, object detail/timeline, cross-document review и remaining technical gates. Тестовая матрица включает позитивные и негативные role/location cases. Actor granularity внутри локации ЦО (автор заявки или любой активный сотрудник локации) отмечена как узкая детализация для окончательной спецификации; право роли ЦО на отмену остатка не открыто повторно.
 
 В этом проходе изменено 11 уникальных Markdown-путей. Код, ORM, SQL/DDL, миграции, API/UI, тесты, CI и БД не изменялись и не запускались. UX-06 остаётся открытым по прочим readiness gates; UX-07 и реализация не начаты.
+
+## 2026-11-22 — выявлен открытый item outcome при отмене остатка P-09
+
+Сверка terminal set DB-22 с item states выявила, что `removed_by_archive` допускает восстановление и не входит в перечисленные terminal outcomes parent (`completed`, `not_found`, `cancelled`). При этом контракт отмены остатка ранее говорил сохранять `removed_by_archive`, а parent после отмены остатка должен завершиться после receipt всех выданных карт. Если текущий статус `removed_by_archive` оставить неизменным, он может блокировать parent completion.
+
+Зафиксирована предлагаемая, но пока не утверждённая проекция: при отмене невыданного остатка текущий item `removed_by_archive` становится `cancelled`, а исходное append-only событие, комментарий и факт возврата карты в коробку сохраняются; физическое membership повторно не меняется. `not_found` остаётся terminal без изменения. В DB command contract, technical model, DB-17, cross-document review и remaining technical gates это явно помечено как требующее подтверждения владельца; не выдаётся за уже принятое решение.
+
+Также остаётся узкая детализация actor scope ЦО: автор заявки или любой активный сотрудник той же локации. До подтверждения этих двух точек UX-06 не закрывается. Реализация и тесты не запускались.
