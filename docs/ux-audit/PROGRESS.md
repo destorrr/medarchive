@@ -3654,3 +3654,8 @@ Normalized the versioning proposal and legacy compatibility rules across the eve
 ## 2026-11-22 — envelope/payload and version-axis consistency
 
 Clarified that common actor/time/command/correlation/outcome/target metadata belongs to the event envelope and must not be duplicated in JSONB event payloads. Separated command_version, result_version and event_version; the current command input omits command_version, and adding it is documented only as a technical proposal pending approval. No source or schema changes.
+
+
+## 2026-11-22 — refreshed DB principal and grant inventory
+
+Repeated static scan of initial SQL, Alembic env/revisions 0001–0011, Docker Compose and PostgreSQL CI found no executable role provisioning, GRANT/REVOKE, default privileges or SECURITY DEFINER bootstrap; the initial schema's append-only ACL text is only a comment. DB-SEC-04 principal separation is an approved target but not implemented in reviewed repository configuration; actual effective grants and deployment identities remain unverified pending DBA/infra preflight. No live database access or configuration changes.
