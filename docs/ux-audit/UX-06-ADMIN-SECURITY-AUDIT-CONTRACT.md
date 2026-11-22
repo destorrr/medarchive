@@ -263,3 +263,27 @@ This section supersedes the older candidate taxonomy and unresolved-policy summa
 ### Remaining implementation gaps
 
 Static review still finds the successful PostgreSQL login path issuing a cookie after its authentication/throttle transaction without the mandatory `authn.login_succeeded` record. This is a target mismatch, not a runtime test. The full password-change/reset/session-invalidation paths, exact audit schema and DB write boundary, typed payload validation, read permissions and production grants still require source-to-contract verification. No source, SQL, migration, test or deployment change is authorized by this documentation update.
+
+
+## 2026-11-22 — static source review: password lifecycle and admin audit path
+
+Inspected `routers/auth.py`, `routers/postgresql_admin.py`, `routers/postgresql_admin_pages.py`, `services/postgresql_admin_service.py`, `services/auth_service.py`, `dependencies.py` and the PostgreSQL `User`/ `DomainEvent` models on the audit branch. This is source inspection only; no request, DB transaction or test was executed.
+
+### Confirmed target mismatches
+
+1. **No self-service password-change path was found.** The auth router exposes login/logout only. There is no route implementing current-password confirmation, `authn.password_changed`, atomic update+audit or preservation of the current session.
+2. **Administrative password reset is folded into generic user update.** Both JSON and page routes accept an optional password in `PUT /users/{user_id}` / `/admin/users/{user_id}/edit`; `PostgreSQLAdminService.update_user` writes the new hash and emits generic `admin.user_updated` with `password_changed: true`. Target requires a separate `admin.credential_reset` record and a distinct reset command.
+3. **Self-reset is not prohibited by the current route guard.** The route prevents an administrator from deactivating themself or removing their admin role, but does not reject `actor.id == user_id` when a password is supplied. This conflicts with the approved prohibition on administrative self-reset.
+4. **Required re-authentication is absent from the inspected reset path.** The target requires the administrator to confirm their own current password before resetting another account and to apply the existing throttle protection to repeated failed confirmations. Neither JSON nor page reset path accepts/validates the administrator's current password.
+5. **Temporary-password workflow is absent.** The target requires cryptographically strong automatic generation, one-time display, hash-only persistence, no expiry timer, forced limited mode at next login, and mandatory self-service password change before ordinary access. The inspected `User` model has no forced-change state; the login route issues the ordinary session and redirects directly to the normal destination.
+6. **Session semantics are only partially covered.** Session tokens contain a fingerprint of the password hash; dependencies compare it with the current hash, so a hash change invalidates previously issued tokens on their next request. This is not a session registry and cannot evidence per-session invalidation. It also means the current token would be invalidated after self-service password change unless the target flow deliberately issues a replacement token after commit. No such flow was found.
+7. **Admin audit remains on the legacy path.** `_audit_admin_change` appends `admin.*` records to `DomainEvent`; the admin audit page reads those rows and renders their raw JSON payload. The target requires new AdminSecurityAudit writes, event-specific allowlisted presentation and preservation of historical `admin.*` rows as legacy read-only evidence.
+
+### Required target command boundaries
+
+- Self-service password change: verify current password; update hash; invalidate all other sessions while preserving the current session; write `authn.password_changed`; commit atomically.
+- Administrative reset: prohibit self-target; re-authenticate acting admin; apply existing throttle to failed confirmations; generate a strong one-time temporary password; update target credential/forced-change state; invalidate all target sessions; write `admin.credential_reset`; commit atomically; disclose the temporary value once only after successful commit.
+- First successful login with temporary credential: enter restricted password-change-only mode, show the neutral reset notice without identifying the administrator, and do not expose ordinary application functions until the employee sets a new password.
+- Admin/reference-data mutation: write typed AdminSecurityAudit records, not new `admin.*` DomainEvent rows. Historical rows remain unchanged.
+
+The current password-reset behavior is a confirmed static mismatch against owner decisions, not a claim about production runtime. Implementation remains unauthorized.
