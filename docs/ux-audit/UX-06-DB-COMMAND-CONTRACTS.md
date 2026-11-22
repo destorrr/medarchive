@@ -331,3 +331,21 @@ DB boundary обязан проверять:
 
 **Запрет:** переназначение после фактической передачи, назначение нового неактивного курьера и переназначение сотрудником, отличным от автора черновика, запрещены. Если ранее назначенный курьер деактивирован после назначения, это не меняет существующее назначение и не препятствует подтверждению передачи.
 
+
+
+## 2026-11-22 — command/event version axes and envelope separation
+
+This clarification supersedes any interpretation that actor/time/command metadata must be duplicated inside JSONB payload.
+
+The common event envelope fields defined in UX-06-ADMIN-SECURITY-EVENT-CATALOG.md are top-level record fields: occurred_at, actor_user_id, actor_role_code, actor_scope_ref, outcome, reason_code, target_type/target_id, command_id, correlation_id, source_channel and event_type/event_version. Event-specific payload contains only additional allowlisted facts needed by that event. Where the existing P-09 event table lists actor_user_id or occurred_at in its “required minimal payload”, those values are envelope metadata, not duplicated payload keys. This keeps payloads minimal and prevents conflicting actor/time copies.
+
+Version axes are independent:
+- command_version: input semantics/canonicalization for a command;
+- result_version: public committed result_payload schema (the common result envelope baseline 1 is approved);
+- event_version: event-specific payload schema.
+
+The public command input list currently names command_id and correlation_id but does not explicitly name command_version. Proposed contract: add a required integer command_version to the command envelope before DB API freeze; the first published input contract for each command starts at 1. This is a design proposal, not an owner-approved field/number. Do not reuse result_version or event_version for command input.
+
+A command-level event emitted by a business operation and every per-item event in an atomic bulk command share command_id/correlation_id. A single command may emit multiple DomainEvent records; each keeps its own event ID, event_type/version, aggregate identity and occurred_at. AdminSecurityAudit remains a separate authoritative record where required.
+
+No implementation or DDL is authorized by this clarification.
