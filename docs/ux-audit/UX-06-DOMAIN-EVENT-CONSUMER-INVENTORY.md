@@ -92,3 +92,29 @@ The current consumer inventory must be extended before implementation to project
 2. P-09 archive → CO: one request item per medical card; one parent may have multiple fulfillment batches; each batch has its own subset manifest and independent shipment status projection. Partial archive issue and item-level actual CO receipt are separate events. Archive custody remains until item receipt; atomic bulk receipt emits one item receipt event per card in the same transaction. Parent remains processing while any item is nonterminal.
 
 Object timelines must show item-level actor/time without exposing unrelated card history. Queue/dashboard projections must not infer parent completion from a shipment draft, courier dispatch or partial item receipt. Normalized target event types are specified in the event catalog: `shipment.draft_created`, `shipment.handed_over`, `archive_request.item_marked_not_found`, `archive_request.item_result_corrected`, `archive_request.item_removed_by_archive`, `archive_request.item_received_by_central_office`, `archive_request.remaining_items_cancelled`, `archive_request.completed`. Final integer schema versions, exact payload validators and effective-grant review remain pre-implementation gates.
+
+
+## 2026-11-22 — повторная сверка readers и producers с целевым каталогом
+
+Повторно просмотрены конкретные PostgreSQL router/service paths, а не только прежняя сводная таблица.
+
+### Подтверждённые внутренние readers
+
+| Код | Текущий источник | Фильтрация/использование | Целевое действие |
+|---|---|---|---|
+| `routers/postgresql_dashboard.py` recent movements | `select(DomainEvent)` | Общая лента; далее payload используется для формирования действий/сводок | Сохранить только scoped operational projection; глобальный feed не переносить |
+| `routers/postgresql_dashboard.py` history | `select(DomainEvent)` | История по доступным card/box/shipment/archive_request IDs | Сохранить object-scoped timeline и проверить новые parent/item/batch aggregates |
+| `routers/postgresql_shipments.py` detail | `DomainEvent` по shipment aggregate | Выводит event label, actor и payload | Сохранить; payload отображать через allowlist и с object access checks |
+| `routers/postgresql_admin_pages.py` audit | `event_type LIKE 'admin.%'` | Глобальная административная лента и фильтры | Перенести новые admin/security facts в отдельный audit store; исторические DomainEvent сохранить read-only до миграции/retirement |
+| `routers/postgresql_admin_pages.py` exception resolution | Точечный `shipment.exception_resolved` | Показывает resolution note/actor | Не переносить: legacy «Инциденты» исключены решением D-03; удалить reader вместе с legacy surface, не использовать как target audit |
+
+### Несовпадения producer ↔ target catalog
+
+- Текущий shipment workflow записывает `shipment.created`; целевой нормализованный каталог P-09 использует `shipment.draft_created`. Нужен переходный адаптер/новый producer contract; нельзя молча переименовать исторические события.
+- Текущий shipment workflow всё ещё содержит producers `shipment.exception_registered` и `shipment.exception_resolved`, а также exception-resolution reader в admin pages. Они относятся к исключённому legacy-процессу D-03 и не должны входить в target event allowlist. Их наличие в исходниках означает остаточный legacy код, а не отмену решения D-03.
+- Текущий admin service пишет `admin.*` в общий `DomainEvent`. Это подтверждённое текущее состояние; целевая архитектура требует отдельный AdminSecurityAudit. Исторические записи не удалять и не переписывать.
+- Текущая ORM-модель `DomainEvent` не содержит `event_version`, `command_id` и `correlation_id`. Поэтому target catalog нельзя считать реализованным только на основании существующего JSONB payload.
+
+### Scope и граница
+
+Внешние event consumers по решению владельца продукта сейчас не проектируются. Это не снимает обязательную проверку deployment-level readers/jobs и DB credentials/grants перед изменением event contract. В этом проходе просмотрены только доступные исходники; production jobs и внешние SQL readers не подтверждены.
