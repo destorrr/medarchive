@@ -3709,3 +3709,9 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 Синхронизированы DB command contracts, route/state matrix, UX-05 dashboard queue, domain event consumer inventory, cross-document review и remaining technical gates. В route/state audit исправлена также устаревшая формулировка об одной fulfillment transport record: действует one-to-many parent → batches.
 
 Обновлено 7 уникальных Markdown-документов. Изменения только документальные; код, ORM, SQL/DDL, миграции, API/UI, тесты, CI и БД не затрагивались. UX-06 остаётся открытым по остальным readiness gates; UX-07 и реализация не начаты.
+
+## 2026-11-22 — исправлено право ЦО на отмену остатка P-09
+
+Повторная сверка обнаружила, что P-09 §30 разрешает после частичной выдачи отменять только невыданные позиции как ЦО, так и архиву, но часть технических/UI документов предоставляла это действие только архиву. Синхронизированы UX-03 role matrix, DB command contracts, route/state matrix, object detail/timeline, UX-04 navigation и cross-document review. ЦО действует только в пределах своей локации-заявителя; архив — при доступе к очереди и заявке; причина обязательна. Полная отмена до первой физической выдачи остаётся за архивом; выданные позиции не отменяются.
+
+Остаётся уточнить только actor granularity внутри локации ЦО (автор заявки или любой активный сотрудник локации); это не меняет уже утверждённое право ЦО на отмену остатка. Код и тесты не менялись.
