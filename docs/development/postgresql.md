@@ -65,7 +65,7 @@ The next Alembic revision adds database-enforced workflow protections:
 - active box membership cannot be edited while a box is assigned to a draft/in-transit shipment or placed on an archive shelf;
 - deferred constraint triggers validate that every active card in a box has the same physical location or transit shipment as its box;
 - deferred shipment checks validate non-empty manifests, exact box membership snapshots, object transit locations, complete receipt, and request-backed archive-to-central fulfillment;
-- **legacy baseline only:** archive requests are tied to one fulfillment shipment and complete with that shipment's receipt; this single-shipment/full-receipt contract is superseded by the approved UX-06 P-09 target below and must not be treated as the target design;
+- **legacy baseline only:** current ORM still models one per-card request and shipment-wide receipt. The target retains at most one fulfillment shipment per grouped parent, but replaces shipment-wide receipt with item-level receipt and a `partially_received` shipment projection; use the P-09 target section below, not this legacy implementation description.
 - archive shelf placement is restricted to active, non-empty boxes physically located in the archive;
 - domain events reject UPDATE and DELETE; corrections must be appended as new events.
 
