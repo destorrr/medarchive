@@ -76,3 +76,19 @@
 ## 5. Границы вывода
 
 Это статическая сверка исходников миграций и ORM-модели. Она не является подтверждением успешного применения миграций к реальной базе. Код приложения и миграции не менялись.
+
+
+## 2026-11-22 — повторная проверка полного Alembic-графа и initial revision
+
+Повторно прочитаны все 11 файлов в `migrations/versions/`, их `revision`/ `down_revision`, `migrations/env.py`, `alembic.ini`, а также `db/postgresql/001_initial_schema.sql` и полный хвост `0001_initial_postgresql_schema.py`.
+
+Подтверждено:
+- Граф миграций линейный, с единственным root `0001_initial` и единственной вершиной файловой истории `0011_login_throttles`. Два файла с префиксом `0007` не образуют fork: `0007_transition_metadata_immutable.py` имеет revision ID `0007_transition_meta`; файл `0007_external_organization_custody.py` имеет revision ID `0009_external_org_custody` и зависит от `0008_shipment_integrity`.
+- Цепочка: `0001_initial → 0002_workflow_guards → 0003_card_placements → 0004_receipt_manifest_guard → 0005_card_external_custody → 0006_external_custody_at_other → 0007_transition_meta → 0008_shipment_integrity → 0009_external_org_custody → 0010_archive_fulfill → 0011_login_throttles`.
+- `0011_login_throttles` — файловая head-ревизия на этой ветке. Фактическое значение `alembic_version` в работающей БД неизвестно и этим аудитом не подтверждено.
+- `0001_initial_postgresql_schema.py` содержит SQL, замороженный непосредственно в revision; upgrade удаляет строки BEGIN/COMMIT и исполняет statements по отдельности. Текст внутри замороженного SQL всё ещё называет схему draft/not production migration. Тот же статус указан в отдельном `db/postgresql/001_initial_schema.sql`. Следовательно, это внутреннее противоречие статуса bootstrap revision, а не основание считать SQL-файл независимым фактическим DDL.
+- `migrations/env.py` оставляет `target_metadata = None`; автоматическое сравнение ORM metadata с БД через Alembic autogenerate не настроено.
+
+Вывод: прежнее предположение о возможной развилке снято — граф линейный. Открытыми остаются подтверждение статуса bootstrap revision, реального DB head, drift и точная сверка ORM/DDL/triggers/indexes/grants. Переименование файла revision 0009 не требуется для устранения графовой проблемы и не должно предприниматься без отдельной оценки опубликованной истории.
+
+Не выполнялись подключение к PostgreSQL, `alembic history/current/check/upgrade`, DDL, миграции или тесты. Это read-only анализ Git-файлов, а не DB preflight.
