@@ -1381,3 +1381,31 @@ DB-SEC-04 owner/migrator/runtime principal separation is an approved target deci
 The 2026-11-22 source audits add confirmed static mismatches: legacy global operational history/dashboard readers, branch card history that can outlive archive handover, missing general card/box detail timelines, legacy per-card P-09 pages, and absent approved password lifecycle/forced-change flows. See the role-scoped history audit, admin security audit contract and readiness gap review.
 
 This correction is documentation-only. No application, database, migration, test or deployment behavior was changed.
+
+## 2026-11-22 — сквозная сверка P-09: batches, item receipts и отмена остатка
+
+Проверены актуальные редакции technical data model, DB command contracts, invariants DB-71…DB-73, route/state audit, readiness review и event/read-model inventory.
+
+### Согласовано между целевыми документами
+
+- Parent P-09 → 0..N fulfillment batches; каждая batch принадлежит одному parent и содержит только выбранные items этого parent.
+- Item может иметь не более одной текущей активной/выданной batch; отмена draft batch атомарно освобождает текущую ссылку item, не удаляя исторический manifest.
+- Batch имеет состояния `draft`, `in_transit`, `partially_received`, `received`, `cancelled`. `partially_received` возникает после первого item receipt, `received` — только после receipt всех items данной batch.
+- Item receipt — отдельный факт на каждую карту. Bulk receipt набора реально поступивших карт — одна транзакция; любая недопустимая позиция откатывает весь набор.
+- Handover партии не переводит custody в ЦО. Custody меняется только у конкретной карты при её item-level receipt.
+- Исправление `not_found` / `removed_by_archive` оценивается по конкретному item. Наличие других batches того же parent не блокирует восстановление; item, уже назначенный в активную/выданную batch или получивший receipt, восстановлению не подлежит.
+- Создание batch, handover, cancel remainder и receipt сериализуются на parent/items; инварианты DB-71…DB-73 отражают one-to-many и item-level lifecycle.
+
+### Найдено противоречие / пробел в статусной проекции parent
+
+После частичной выдачи команда отмены отменяет только невыданный остаток; уже выданные items остаются `issued_pending_receipt` и должны продолжить lifecycle до фактического receipt ЦО. При этом матрица действий route/state audit для parent `cancelled` описывает только read-only доступ, а технические документы не задают однозначно, в какой момент parent получает статус `cancelled`, если ещё остаются выданные, но не принятые карты.
+
+Это не меняет согласованное право отменить остаток и не позволяет отменять выданные карты. Это незакрытая техническая проекция состояния: необходимо явно определить, остаётся ли parent в `processing` до receipt последней выданной карты с последующим переходом в `cancelled`, либо используется иная двухфазная модель. До фиксации этого правила UI/API не должны скрывать возможность ЦО подтвердить уже выданные карты только из-за отмены остатка. Parent нельзя считать полностью завершённым, пока существует `issued_pending_receipt`.
+
+### Устаревшие формулировки
+
+В исторической записи этого review (раздел 16, строки о единственном fulfillment shipment и `ArchiveRequest.fulfillment_shipment_id`) сохранён прежний вариант one-to-one. Он superseded решением one-to-many от 2026-11-22 и не является действующей спецификацией. Действующая матрица выше и раздел о транспортных партиях (раздел 4) имеют приоритет. Аналогично, ранние упоминания полного handover/full receipt следует читать как исторические.
+
+### Граница проверки
+
+Проверка статическая, по документам в ветке `docs/ux-audit-project`. ORM, SQL/DDL, миграции, тесты, API/UI и БД не изменялись и не запускались. UX-06 остаётся открытым до закрытия parent terminal-state projection и остальных readiness gates.
