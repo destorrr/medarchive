@@ -167,3 +167,30 @@ Current source review reconfirms the read-surface blockers recorded in UX-06-ROL
 - Archive request pages remain bound to the legacy per-card request model, not the P-09 parent/item aggregate.
 
 These are implementation/readiness findings from static code inspection. The target object-detail authorization contract remains in UX-06-OBJECT-DETAIL-AND-TIMELINE-CONTRACT.md.
+
+
+## 2026-11-22 — разграничение UX-06 design exit и implementation/production gates
+
+Эта классификация устраняет смешение проектного завершения UX-06 с готовностью к DDL, миграции и эксплуатации. Она **не объявляет UX-06 завершённым** и не снимает обязательные технические проверки.
+
+### A. Проверить до design exit UX-06 / начала UX-07
+
+1. Актуальные UX-сценарии, роли, маршруты, состояния, очереди и карточки объектов согласованы между основными документами; все исторические one-to-many/partial-handover P-09 формулировки однозначно помечены superseded и не попадают в действующие acceptance criteria.
+2. Для P-09 однозначны обработка всех позиций до единственного полного shipment, атомарный handover, отдельный receipt/custody каждой карты, отмена всей заявки только до handover и parent terminal projection.
+3. Есть перечень оставшихся UX-решений (если есть) и явная граница между пользовательским сценарием и техническим контрактом; не задавать повторно уже согласованные продуктовые вопросы.
+4. Требования к правам, поиску, истории, ошибкам, минимизации PII и аудиту отражены в UX-контрактах; расхождения в документах перечислены с владельцем закрытия.
+5. Есть короткий handoff для UX-07: входные утверждённые решения, открытые design blockers, deferred implementation gates и запрет считать отсутствие runtime evidence успешной проверкой.
+
+### B. Обязательные до implementation/API/DDL freeze (не автоматически UX-07 blockers)
+
+- Typed command/event contracts: command versions, canonicalization/hash, per-result replay/negative policy, HTTP error mapping, event schemas/validators and compatibility fixtures.
+- Security design: точные DB principals/grants, read scope, конкурентный revoke/replay lock order, AdminSecurityAudit schema and retention governance.
+- Migration specification: детерминированная legacy→target mapping, P-09 one-to-one cardinality, receipt/custody reconciliation, legacy read compatibility, rollback/forward-fix and quarantine rules.
+
+### C. Обязательные до cutover / production readiness
+
+- Read-only environment inventory: actual deployment identities, external event consumers, effective grants, data preflight and ambiguities.
+- Непроизводственная репетиция миграции и backup/restore, SQL/API/security/concurrency test evidence, operational verification and sign-off.
+- Организационное утверждение AdminSecurityAudit retention/legal hold до эксплуатации; сроки не придумывать.
+
+**Критерий:** UX-07 может начаться после положительной документальной проверки A, даже если B/C остаются открытыми и явно закреплены за технической реализацией. Нельзя объявлять готовность к реализации или production без B/C. Этот раздел — предложение порядка управления этапами, не подмена ранее утверждённого плана и не самостоятельное разрешение на старт UX-07.
