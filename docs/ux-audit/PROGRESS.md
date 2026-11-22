@@ -3833,3 +3833,10 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 - В `UX-06-REMAINING-TECHNICAL-GATES.md` обнаружено противоречие: после отмены сценария partial issue исторический раздел по-прежнему требовал позитивные тесты отмены остатка сотрудниками ЦО/архива.
 - Уточнено, что отмена остатка после handover в P-09 отсутствует. Актуальные тесты проверяют только отмену всей заявки до handover уполномоченным сотрудником архива и запрет отмены после handover для всех ролей.
 - Исправление документационное, без изменения исходников/миграций/БД/тестов. UX-06 остаётся открытым.
+
+
+### 2026-11-22 — UX-06: отрицательные исходы command ledger
+- В `UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md` добавлена матрица классов отрицательных результатов: envelope validation, key reuse, replay read denial, новая mutation authorization, input validation, mutable business conflicts, object non-disclosure, infrastructure/unknown commit outcome.
+- Отдельно закреплено, что неизвестный результат commit требует retry с тем же command_id и проверки ledger, а не безусловной повторной mutation. Инфраструктурные ошибки не становятся completed outcomes.
+- Политика сохранения/replay конкретных `forbidden`, `not_found`, `invalid_state`, `conflict` остаётся открытым gate; добавленная матрица не является её утверждением.
+- Документационные изменения; код, БД, миграции, тесты и CI не запускались. UX-06 открыт, UX-07 не начат.
