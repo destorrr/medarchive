@@ -3797,3 +3797,14 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 Также снята устаревшая формулировка раннего раздела idempotency audit, будто retention и базовая архитектура command ledger всё ещё не согласованы. В актуальном тексте разделены утверждённые решения (90 дней для обычных завершённых ledger records; бессрочные identities необратимых логистических/административных команд; точный replay committed result envelope) и оставшиеся технические gates (canonicalization/hash, negative-outcome replay, client retry horizon, bounded cleanup/backup-restore, validators и HTTP mapping).
 
 Изменены только Markdown-документы. Код, ORM, SQL/DDL, миграции, БД, тесты и CI не менялись и не запускались. UX-06 остаётся открытым; UX-07 не начат.
+
+
+## 2026-11-22 — event envelope и lock-order cross-check
+
+Очередная междокументная сверка выявила два технических расхождения и одну неполноту формулировки:
+
+- В каталоге AdminSecurityAudit поле версии общего envelope называлось `schema_version`, тогда как целевая модель DomainEvent и актуальный технический контракт используют `event_version` для версии event-specific payload. Поле приведено к `event_version`; оно явно отделено от `command_version` и `result_version`.
+- В P-09 event catalog таблица местами повторяла в JSONB payload actor/time и top-level reason, хотя они уже принадлежат общему event envelope. Payload описан как набор только дополнительных доменных фактов; дублирование метаданных устранено для перечисленных P-09 событий.
+- В transaction architecture оставался прежний общий порядок блокировок (parent → cards → boxes → shipment), который противоречил принятому P-09 исключению (parent → shipment → items → cards/memberships/boxes). §5.2 теперь явно разделяет общий authorization lock prefix и resource lock order по семействам команд; DB-73 дополнен тем же authorization prefix.
+
+Изменены только Markdown-документы: AdminSecurityAudit event catalog, DB security/transaction architecture, DB invariant/test matrix и этот progress log. Код, ORM, SQL/DDL, миграции, БД, тесты и CI не изменялись и не запускались. UX-06 остаётся открытым; UX-07 не начат.
