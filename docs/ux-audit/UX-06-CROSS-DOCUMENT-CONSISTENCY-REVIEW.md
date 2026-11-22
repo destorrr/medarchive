@@ -1404,7 +1404,7 @@ This correction is documentation-only. No application, database, migration, test
 
 ### Устаревшие формулировки
 
-В исторической записи этого review (раздел 16, строки о единственном fulfillment shipment и `ArchiveRequest.fulfillment_shipment_id`) сохранён прежний вариант one-to-one. Он superseded решением one-to-many от 2026-11-22 и не является действующей спецификацией. Действующая матрица выше и раздел о транспортных партиях (раздел 4) имеют приоритет. Аналогично, ранние упоминания полного handover/full receipt следует читать как исторические.
+В исторической записи этого review сохранён вариант one-to-one, который позднее был ошибочно заменён one-to-many. Уточнением владельца продукта от 2026-11-22 one-to-many отменён, а one-to-one восстановлен как действующее правило: одна P-09 — не более одного полного shipment, один handover всего manifest. Исторические формулировки о нескольких партиях и частичной выдаче не являются действующей спецификацией.
 
 ### Граница проверки
 
@@ -1419,7 +1419,7 @@ This correction is documentation-only. No application, database, migration, test
 - ранее выданные позиции остаются `issued_pending_receipt`; ЦО продолжает item-level receipt;
 - когда все позиции терминальны (получены ЦО, `not_found` или отменены как невыданный остаток), parent становится `completed` и публикуется `archive_request.completed`.
 
-Таким образом, после частичной выдачи родительская заявка не переходит в `cancelled`. Дополнительное продуктовое решение не требуется. Матрица route/state, command event semantics, dashboard queue и event consumer inventory синхронизированы. Также исправлено устаревшее утверждение о единственной fulfillment transport record: актуальна one-to-many модель parent → batches.
+Таким образом, после частичной выдачи родительская заявка не переходит в `cancelled`. Дополнительное продуктовое решение не требуется. Матрица route/state, command event semantics, dashboard queue и event consumer inventory синхронизированы. Эта запись о one-to-many модели и отмене остатка сама superseded уточнением владельца продукта от 2026-11-22: актуальна one-to-one модель parent → единственное полное отправление.
 
 Проверка статическая; исходники, ORM, SQL/DDL, миграции и тесты не менялись и не запускались.
 
@@ -1434,3 +1434,22 @@ This correction is documentation-only. No application, database, migration, test
 ## 2026-11-22 — item terminality при отмене остатка P-09
 
 Сверка parent terminality (`completed` только при item outcomes `completed`, `not_found` или `cancelled`) с item states выявила незакрытую детализацию cancel remainder. `removed_by_archive` — исправляемый результат, а не один из перечисленных terminal outcomes parent; оставлять такой текущий статус без изменения после отмены остатка может блокировать DB-22 и завершение заявки. Предлагаемая техническая проекция: при cancel remainder текущий item `removed_by_archive` → `cancelled`; исходное append-only событие `item_removed_by_archive`, комментарий и факт возврата карты в коробку сохраняются, физическое membership не меняется. `not_found` уже является terminal outcome и остаётся неизменным. Выданные items не затрагиваются. Этот переход логически следует из согласованного terminal set, но прямого подтверждения владельца именно для `removed_by_archive` в P-09 не найдено; оставить его открытым до подтверждения.
+
+## 2026-11-22 — итоговая корректировка P-09 после уточнения владельца продукта
+
+Владелец продукта подтвердил: все карты одной заявки обрабатываются полностью, и только затем отправляются. Нельзя отправить часть карт, а остальные позиции этой же заявки обрабатывать позднее.
+
+Итоговая действующая модель:
+- одна групповая заявка ЦО содержит фиксированный набор позиций;
+- архив завершает обработку каждой позиции до создания отправления; окончательные результаты — `extracted`, `not_found`, `removed_by_archive`;
+- создаётся не более одного fulfillment shipment; его manifest содержит все и только позиции `extracted`;
+- handover всего manifest выполняется одной атомарной операцией; частичная выдача и несколько отправлений по одной заявке запрещены;
+- item-level receipt сохраняется: ЦО подтверждает только фактически поступившие карты, а custody переходит ЦО отдельно для каждой карты после receipt; shipment может быть `partially_received`;
+- после handover отмена заявки и отмена остатка запрещены; до handover всю заявку с обязательной причиной может отменить только уполномоченный сотрудник архива;
+- если все позиции имеют окончательные результаты `not_found`/`removed_by_archive`, shipment не создаётся и parent может перейти в `completed`.
+
+Следовательно, ранее обсуждавшееся изменение `removed_by_archive → cancelled` при отмене остатка не требуется: сценария отмены остатка после частичной выдачи нет. `removed_by_archive` остаётся окончательным результатом, исходное событие и комментарий сохраняются.
+
+Все разделы выше, описывающие one-to-many batches, частичную выдачу или `archive_request.remaining_items_cancelled`, являются историческими записями и superseded этим уточнением. Действующие контракты синхронизированы в storage model, technical data model, DB command contracts, invariants/test matrix, route/state audit, object detail/timeline, implementation readiness и remaining technical gates.
+
+Проверка статическая, по документации ветки `docs/ux-audit-project`. Исходники, ORM, SQL/DDL, миграции, тесты и БД не менялись и не запускались.
