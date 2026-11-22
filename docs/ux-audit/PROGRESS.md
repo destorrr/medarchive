@@ -3569,4 +3569,4 @@ UX-06 остаётся **в работе**. Продуктовые ответы 
 
 Синхронизированы `UX-06-TECHNICAL-DATA-MODEL.md`, `UX-06-DB-COMMAND-CONTRACTS.md`, `UX-06-INVARIANTS-DB-TEST-MATRIX.md`, `UX-06-IMPLEMENTATION-READINESS-PLAN.md` и `UX-06-REMAINING-TECHNICAL-GATES.md`.
 
-**Ограничение:** фактические SQLAlchemy модели, Alembic revisions и production-like данные в этом проходе не инспектировались и не изменялись. Поэтому имена/типы колонок и backfill mapping остаются целевой спецификацией до read-only preflight; миграции, DDL, ORM и тесты не запускались.
+**Ограничение:** статически прочитаны `src/medarchive/adapters/postgresql/models.py`, `migrations/versions/0002_workflow_guards.py`, `migrations/versions/0003_card_placements.py`, `alembic.ini`, `migrations/env.py` и `docs/development/postgresql.md`. Полный Alembic chain/initial DDL, фактический Alembic head, production-like данные, effective grants и deployment runtime не проверялись. Поэтому точные SQL-типы/constraint names и backfill mapping требуют read-only preflight; миграции, DDL, ORM и тесты не запускались и не менялись.
