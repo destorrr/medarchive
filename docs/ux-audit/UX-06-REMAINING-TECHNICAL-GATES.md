@@ -216,3 +216,8 @@ The remaining read-surface gate now explicitly includes the current /history and
 The current target catalog has normalized P-09 event names and semantic payload descriptions, but no complete integer event versions or machine-validated per-event schemas. A proposed convention (not owner-approved implementation detail) is event_version 1 for each new normalized event's first schema, with explicit increments for incompatible changes. Historical events are immutable and unversioned where no version was recorded; no guessed backfill. Legacy shipment.created may be mapped read-only only when payload proves equivalence; exception events remain retired per D-03; historical admin.* remains read-only legacy evidence.
 
 Command result_version, command_version and event_version are separate. Shared command_id/correlation_id link all mandatory records from one command, including one item event per card in atomic bulk receipt. Still open: client key lifecycle, canonicalization/hash version, negative-outcome replay policy, complete validators/limits, HTTP error mapping, retry horizon and safe cleanup. See UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md.
+
+
+## 2026-11-22 — envelope/payload and command versioning gate
+
+Clarified that actor/time/command/correlation/outcome/target metadata belong to the common event envelope, not duplicated inside event JSONB payloads. The command API currently omits an explicit command_version despite separately versioning result_version and event_version; adding command_version as an integer input-contract version is proposed but not owner-approved. These three axes must remain independent. See UX-06-DB-COMMAND-CONTRACTS.md and UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md.
