@@ -242,3 +242,10 @@ The opening gate table and older retention/security paragraphs are superseded by
 - DB-SEC-04 principal split is an approved target decision; the absence of executable grants/provisioning in repository files and shared DB URL are implementation gaps. Effective deployed grants remain unknown until read-only DBA/infra preflight.
 
 The event/command versioning convention and command_version addition remain technical proposals, not owner-approved field assignments. This document must be read together with the current event ownership audit and cross-document consistency review.
+
+
+## 2026-11-22 — typed API error mapping gate confirmed by source
+
+Current PostgreSQL routers/services do not implement one stable typed error contract: admin JSON endpoints map LookupError/ValueError/IntegrityError to varying 404/422/409 responses; HTML workflow paths often render raw str(ValueError), and IntegrityError handling varies. Shipment detail has separate 403/404 behavior. Legacy incident errors remain in source but are excluded by D-03.
+
+Target adapter must map a closed DB result_code allowlist to stable HTTP status/body and safe localized UI text; never expose raw exception/SQL diagnostics. Distinguish validation, authorization, object non-disclosure, invalid state, conflict, idempotency-key reuse and transient infrastructure failure. Transient failures are not completed ledger outcomes. Static inspection only.
