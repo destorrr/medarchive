@@ -186,3 +186,16 @@ Separate target read models and tests are required. Legacy dashboard SQL is not 
 Target policy требует сохранить обязательный успешный login audit до выдачи session cookie; при невозможности commit audit запись сессия не выдаётся. Следовательно, текущая реализация не соответствует fail-closed target: транзакция authentication/throttle завершается без обязательного audit record, а cookie выдаётся после неё. Нужен единый transaction boundary, который фиксирует успешное authentication outcome и обязательный audit event до token/cookie issuance. При этом raw username/IP и их digests не включать в audit payload; throttle bucket остается отдельным механизмом.
 
 Logout сейчас только удаляет cookie; по target catalog logout — best-effort telemetry, поэтому отсутствие durable mandatory logout event не блокирует текущую операцию. Это статический source finding; runtime auth flow и тесты не запускались.
+
+
+## 2026-11-22 — AdminSecurityAudit decisions reconciled
+
+The event catalog now contains later owner decisions that supersede older candidate-policy text. The current target is summarized in `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`:
+
+- Mandatory records include successful login (`authn.login_succeeded`), successful self-service password change (`authn.password_changed`), successful administrative reset (`admin.credential_reset`) and approved admin/correction actions.
+- Failed login/throttle attempts, ordinary session expiry and per-request invalid-session rejections are not persisted. Explicit logout is best-effort telemetry.
+- Selected high-risk authorization denials use only operation/reason aggregation, 15-minute windows, threshold 5, cap 100 aggregates/application hour, 30-day retention; best-effort drop-on-failure with no retry/queue and no request-path impact.
+- No AdminSecurityAudit export or separate cryptographic integrity-verification feature.
+- AdminSecurityAudit retention durations remain a blocking governance gate: no automatic/ad hoc deletion until a versioned R1–R4 schedule is approved; no guessed or indefinite duration.
+
+The PostgreSQL successful-login path remains a confirmed static implementation gap: mandatory success audit is absent before cookie issuance. Password lifecycle and exact DB/audit boundary remain to be checked. This does not constitute runtime verification or implementation authorization.
