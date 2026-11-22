@@ -3549,3 +3549,9 @@ UX-06 остаётся **в работе**. Продуктовые ответы 
 - Старые формулировки полной P-09 receipt и запрета любой отмены после handover помечены как superseded, а не оставлены как действующие правила.
 
 **Остаток UX-06:** точные SQL columns/indexes/constraints и migration/backfill; окончательные integer schema versions и payload validators; финальная проверка dashboard/read-model counters и очередей по всем ролям; проверка effective grants/RLS, idempotency/retry horizons и audit retention/legal gates; итоговый cross-document review. Реализация, SQL/DDL, миграции, тесты и CI не запускались.
+
+## 2026-11-22 — контрольная сверка P-09 после нормализации
+
+Повторно прочитаны и проверены 12 ключевых документов UX-06/UX-05: продуктовые решения, техническая модель, DB command contracts/mapping, invariants, object detail/timeline, event catalog, consumer inventory, dashboard, cross-document review, remaining gates и progress. По целевым формулировкам не осталось совпадений с устаревшими правилами полной P-09 receipt, единственного shipment на parent или запрета отмены остатка после любого handover. Старые исторические записи сохранены с явной пометкой superseded. Cross-document matrix обновлена ссылками на DB-71…DB-73.
+
+Проверка была документальной и read-only. Это не означает, что SQL/ORM/API реализованы или протестированы. UX-06 остаётся открытым до завершения технических gates и полного финального аудита.
