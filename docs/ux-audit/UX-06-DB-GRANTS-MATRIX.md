@@ -286,3 +286,10 @@ PostgreSQL grants ограничивают runtime principal на уровне �
 - Самостоятельный экспорт не входит в текущий утверждённый scope; если будет отдельно одобрен, он не может обходить те же field/scope predicates.
 
 Перед production cutover подготовить таблицу `role × object × field set × operation × scope × read surface` и негативную матрицу для прямого API/URL, чужих ID, фильтров, autocomplete, пагинации, counts, dashboards и выгрузок. Проверить реальные effective grants, views/functions, inherited roles, PUBLIC/default privileges и поведение на целевой PostgreSQL. Статическая проверка UI или ORM query недостаточна. Это проектный контракт; реализация, DDL и grants не разрешены настоящим документом.
+
+
+## 2026-11-22 — source inventory refreshed for DB principals and grants
+
+Repeated the static scan of initial SQL, Alembic env/revisions 0001–0011, Docker Compose and PostgreSQL CI. No executable principal provisioning or GRANT/REVOKE/default-privilege/SECURITY DEFINER setup was found; the initial schema contains only a comment about intended future append-only revocation. CI's Alembic upgrade is not evidence of a separate migrator identity.
+
+DB-SEC-04 target roles are already approved; repository configuration still lacks the owner/migrator/runtime separation and the reviewed deployment audit still identifies a shared MEDARCHIVE_DATABASE_URL for app/Alembic/bootstrap/backup. Effective grants and deployed principals cannot be determined from source and require read-only DBA/infra preflight. No live database was queried.
