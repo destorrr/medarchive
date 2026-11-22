@@ -43,7 +43,7 @@
 ArchiveRequest (1)
   ├── ArchiveRequestItem (N) ── Card (1)
   ├── DomainEvent (N) [aggregate_type/id + request_id]
-  └── Shipment fulfillment batches (0..N, только archive → central_office)
+  └── Shipment fulfillment (0..1, только archive → central_office)
 
 Shipment fulfillment batch (N)
   ├── request_id → ArchiveRequest (1)
@@ -77,7 +77,7 @@ Box (1)
 | `submitted_at` | Факт отправки заявки в архив |
 | `processing_started_at`, `processing_started_by` | Факт явного начала обработки архивом |
 | `cancelled_at`, `cancelled_by`, `cancellation_reason` | Actor и время обязательны; причина обязательна для отмены после отправки, но отсутствует при самостоятельной отмене автором черновика |
-| `fulfillment_batches` | One-to-many связь родителя с транспортными партиями P-09; каждая партия имеет собственный immutable manifest |
+| `fulfillment_shipment_id` | Nullable UNIQUE FK на единственное fulfillment-отправление P-09; полный manifest содержит все позиции `extracted` |
 | `completed_at` | Заполняется только при выполнении критерия завершения |
 
 Не добавлять в родителя дублирующие поля карты, коробки или полки. Состав хранится в дочерних позициях.
@@ -88,8 +88,8 @@ Box (1)
 - `draft → cancelled`: только автор черновика; причина не требуется.
 - `submitted → processing`: любой активный сотрудник архива с доступом к очереди P-09 и заявке; переход атомарно извлекает все карты из зафиксированного набора. Инициатор начала обработки не получает эксклюзивных прав на дальнейшую обработку.
 - `submitted → cancelled`: только уполномоченный сотрудник архива; причина обязательна.
-- `processing → completed`: после окончательного исхода каждой позиции (получена ЦО, not_found или отменена как невыданный остаток); выданная, но не полученная карта не терминальна.
-- `processing`: архив обрабатывает все позиции заявки до создания первой fulfillment-партии. Первая партия запрещена, пока каждая позиция не получила окончательный результат `extracted`, `not_found` или `removed_by_archive`. После создания первого fulfillment-черновика результаты обработки неизменяемы. До первой выдачи архив может отменить всю заявку с обязательной причиной и атомарным возвратом извлечённых карт. После частичной выдачи отменяются только ещё не выданные позиции `extracted`; уже выданные продолжают lifecycle до receipt ЦО, а `not_found` и `removed_by_archive` сохраняются без изменения.
+- `processing → completed`: после receipt всех карт единственного fulfillment-отправления; остальные позиции должны иметь окончательный результат `not_found` или `removed_by_archive`;
+- `processing`: архив полностью обрабатывает все позиции до создания единственного fulfillment-отправления.
 - Завершённые и отменённые позиции/заявки неизменяемы, кроме отдельного административного корректирующего механизма P-07.
 
 ### 3.2. Позиция `ArchiveRequestItem`
@@ -107,7 +107,7 @@ Box (1)
 | `resolved_at`, `resolved_by` | Актуальные метаданные последнего результата-исключения `not_found` или `removed_by_archive`; исходные значения каждого решения и исправления сохраняются в append-only DomainEvent. Для текущего `extracted` используются актуальные `extracted_at`, `extracted_by` |
 | `not_found_reason_code` | Обязательный FK на закрытый справочник причин для результата `not_found` |
 | `resolution_comment` | Обязателен при первой фиксации `removed_by_archive`; при повторной фиксации после исправления новый комментарий необязателен. Для `not_found` свободный комментарий необязателен |
-| `fulfillment_batch_id` | Nullable FK на транспортную партию; один item не может быть связан более чем с одной выданной/активной партией |
+| `shipment_card_id` | Nullable UNIQUE связь с единственной строкой `ShipmentCard`, если позиция вошла в fulfillment manifest |
 | `source_membership_id` | Ссылка на закрываемое членство, если применимо; FK RESTRICT для трассировки исходной коробки/цикла |
 | `returned_membership_id` | Ссылка на новое членство при возврате карты после исключения/отмены |
 | `created_at`, `updated_at` | Системные даты |
@@ -125,8 +125,8 @@ Box (1)
 - CHECK для допустимых статусов родителя и позиции.
 - CHECK согласованности метаданных: `cancelled` требует actor/time; nonblank reason обязателен, если родитель был `submitted` или `processing`, и отсутствует для отмены черновика автором; первичная фиксация `removed_by_archive` требует actor/time/comment; повторная фиксация после исправления требует actor/time, новый комментарий необязателен; `not_found` требует actor/time.
 - UNIQUE partial на `card_id` для позиций с активным признаком `reservation_active = true` — карта не может одновременно быть зарезервирована более чем за одной незавершённой P-09. Признак сохраняется для всех включённых в состав позиций независимо от текущего результата (`pending`, `extracted`, `removed_by_archive`, `not_found`, `issued_pending_receipt`); draft tombstone его не имеет. Резервирование снимается только при переходе родителя в `completed` или `cancelled`.
-- Каждая транспортная партия хранит FK `request_id` на родителя; parent → batches — one-to-many. Создание первой партии защищено проверкой завершения обработки всех позиций parent.
-- Каждый item имеет nullable `fulfillment_batch_id`; partial UNIQUE/guard запрещает назначать одну позицию более чем в одну активную/выданную партию.
+- Родитель хранит nullable UNIQUE FK `fulfillment_shipment_id` на единственное fulfillment-отправление;
+- В `ShipmentCard` хранится `request_item_id`; составной FK/guard проверяет принадлежность строки manifest позиции этого parent.
 - Создание партии, её manifest и связи с выбранными items выполняются одной транзакцией.
 - Не использовать единственный `ArchiveRequest.fulfillment_shipment_id`; отмена одной draft партии не отменяет parent и не освобождает/меняет другие партии.
 - Deferred consistency guard проверяет, что каждая карта партии принадлежит parent, item status и batch status согласованы, а состав партии неизменяем после handover.
@@ -238,7 +238,7 @@ Box (1)
 Миграция выполняется только после отдельного разрешения на реализацию и read-only preflight. Это проект последовательности, а не утверждение, что фактическая legacy-схема уже проверена.
 
 1. **Baseline и инвентаризация.** Подтверждённая статическая ORM-сверка на текущей ветке: `ArchiveRequest` — per-card (`card_id`, `requested_by`, `status=new/in_progress/completed/not_found/cancelled`, `fulfilled_by`, `fulfillment_shipment_id`); CHECK `ck_archive_request_fulfillment` связывает in_progress/completed с единственным shipment, а partial UNIQUE `uq_card_one_active_archive_request` резервирует карту. `Shipment` имеет статусы `draft/in_transit/received/exception/cancelled`, courier FK, `issued_by`, `handed_over_at`, shipment-level `received_by/received_at`; `ShipmentCard` имеет PK `(shipment_id, card_id)` и nullable `box_id`, без request_item/individual receipt. `Card` имеет взаимоисключающие `current_location_id/current_shipment_id`, а `custody_status` описывает внешнее хранение, не custodian location. Перед DDL дополнительно подтвердить фактический Alembic head, SQL DDL, grants и production-like данные. Снять backup и подтвердить restore на изолированной среде. Проверить все активные и исторические per-card ArchiveRequest, связи с shipment, manifest, handover/receipt, timestamps, actor IDs и card custody.
-2. **Аддитивная схема.** Текущая `archive_requests` — legacy per-card таблица, поэтому нельзя преобразовывать её на месте, пока старое приложение/reader ещё работает. Создать отдельную shadow parent table (рабочее имя `archive_request_parents`) и `archive_request_items`; добавить nullable `shipments.request_id` на shadow parent, `archive_request_items.fulfillment_batch_id`, `shipment_cards.request_item_id`, item-level `shipment_cards.received_by/received_at`, `cards.custody_location_id`, `shipments.courier_name_snapshot`; расширить CHECK/trigger для `partially_received`; добавить courier FK/snapshot и прочие actor/time поля только после сверки фактического DDL. Сохранить legacy `archive_requests` и её колонки/FK неизменными на период совместимости. Каноническое переименование shadow parent в `archive_requests` допускается только отдельной cutover revision после подтверждения отсутствия legacy readers/writers; точные имена/зависимости фиксируются по фактическому Alembic/ORM preflight. Составные FK/уникальности добавлять после reconciliation существующих данных. На cutover необходимо версионированно заменить legacy guards из `migrations/versions/0002_workflow_guards.py`: `medarchive_guard_shipment_update`, shipment consistency/deferred triggers и `medarchive_guard_archive_request`, поскольку они требуют shipment-wide transit/receipt и legacy `archive_requests.fulfillment_shipment_id`. До cutover legacy guards продолжают обслуживать только старые endpoints; новые parent/item/batch команды должны иметь отдельный безопасный путь и не смешиваться с legacy aggregate.
+2. **Аддитивная схема.**
 3. **Детерминированное преобразование заявок.** Каждая legacy per-card request становится parent + одной item; сохранить исходный UUID в `legacy_archive_request_id`/legacy reference и не переиспользовать его как parent ID, пока не проверены все существующие FK/API. Создать устойчивую mapping table `legacy_archive_request_map(legacy_request_id UNIQUE, parent_request_id, item_id, migration_batch_id)`. Backfill идемпотентен по исходному UUID; повторный запуск не создаёт повторных parent/items/events.
 4. **Преобразование fulfillment.** Создавать batch только если связь старого shipment ↔ legacy request/card manifest доказуема однозначно. Сопоставлять ShipmentCard с item через сохранённый legacy request/card pair. Не объединять разные старые shipment rows в одну batch только по совпадению даты, курьера или набора карт. Если один старый shipment содержит карты нескольких per-card requests, группировать их под общим parent только при наличии доказуемого общего исходного запроса; иначе сохранить исходные shipment records как legacy и поместить связь в reconciliation report, не угадывать.
 5. **Статусы и custody.** Не выводить receipt из одного только статуса shipment, если нет подтверждённого item/card receipt evidence. Если legacy receipt был shipment-wide и не содержит item-level факта, сохранить legacy событие и классифицировать строки в quarantine/reconciliation; не генерировать фиктивные item receipt. Аналогично, handover и custody переносить только по доказуемым событиям/полям. Ambiguous rows блокируют cutover.
@@ -321,15 +321,15 @@ Box (1)
 - В состоянии `draft`: только автор ЦО может отменить собственный черновик без причины; физические членства/размещения не меняются.
 - В состоянии `submitted` до начала обработки: уполномоченный сотрудник архива может отменить заявку с обязательной причиной; физические членства/размещения не меняются.
 - В состоянии `processing` до первой физической выдачи: уполномоченный сотрудник архива может отменить заявку с обязательной причиной; все извлечённые карты возвращаются в коробки, все незавершённые позиции получают `cancelled`, parent отменяется атомарно.
-- После одной или нескольких частичных выдач разрешено отменить **только ещё не выданный остаток**. Уполномоченный сотрудник архива указывает обязательную причину; извлечённые, но не выданные карты возвращаются в коробки, соответствующие позиции становятся `cancelled`. Уже выданные позиции не отменяются, не возвращаются архивом и остаются `issued_pending_receipt` до фактического подтверждения получения ЦО.
-- События `not_found` и `removed_by_archive` остаются в append-only истории. `not_found` входит в terminal outcomes parent. Для невыданной позиции с текущим статусом `removed_by_archive` требуется зафиксировать terminal projection при cancel remainder: предлагаемое решение — текущий item status → `cancelled`, при сохранении исходного события/комментария и без повторного изменения membership карты, уже возвращённой в коробку. Этот переход не считается утверждённым до подтверждения владельцем. Parent остаётся `processing`, пока хотя бы одна выданная карта ожидает receipt. После terminal outcome всех позиций parent переходит в `completed` (или `cancelled`, если ни одна позиция не была выдана и вся заявка отменена до выдачи — по parent state contract).
+- После фактического handover отмена заявки запрещена: все позиции `extracted` уже переданы в составе единственного отправления.
+- События `not_found` и `removed_by_archive` остаются в append-only истории и являются окончательными результатами обработки; `removed_by_archive` не переводится в `cancelled`.
 - Отмена draft конкретной transport batch до handover не отменяет parent и другие batches; отменённая batch сохраняется в истории, её ещё не выданные items могут быть включены в другую batch.
-- Handover любой одной batch **не запрещает** отмену невыданного остатка parent. Сериализация отмены остатка и batch handover блокирует parent и затронутые items; уже handed-over items остаются вне отменяемого набора.
+- Handover и cancel parent сериализуются на parent/items/shipment: если первым выполнен handover, отмена всей заявки отклоняется; если первой выполнена отмена, handover отклоняется.
 - Все возвраты невыданных карт, item state updates, причина/actor/time и событие отмены остатка выполняются атомарно.
 
 ### 5.4. Создание транспортной партии P-09
 
-Целевая техническая нормализация частичной выдачи: **одна P-09 parent → много транспортных партий (Shipment / fulfillment batches)**. Каждая партия содержит только карты, физически выдаваемые в этой партии. Это не меняет продуктовые правила: частичная выдача, item-level receipt и custody архива до получения ЦО.
+Целевая техническая модель P-09: **одна заявка → не более одного полного fulfillment-отправления**. Обработка всех позиций завершается до создания отправления; все карты `extracted` включаются в один manifest и передаются одной операцией. Item-level receipt и custody архива до фактического получения ЦО сохраняются.
 
 1. Заблокировать parent; убедиться, что он processing.
 2. Выбрать непустой набор позиций со статусом «Найдена, готова к передаче», которые ещё не назначены в другую транспортную партию и не выдавались.
@@ -340,7 +340,7 @@ Box (1)
 7. Родитель остаётся processing.
 
 **Кардинальность и ограничения:**
-- ArchiveRequest имеет связь one-to-many с fulfillment shipments/batches; единственный ArchiveRequest.fulfillment_shipment_id не используется.
+- ArchiveRequest имеет nullable UNIQUE связь с единственным fulfillment shipment;
 - Один item может быть связан не более чем с одной выданной/активной партии; уникальность защищается DB constraint.
 - Одна партия содержит одну или несколько карт только из одного parent.
 - Партия не обязана содержать все позиции parent. После handover можно создать следующую партию для других невыданных позиций.
@@ -363,8 +363,8 @@ Box (1)
 - Bulk receipt блокирует выбранные request items/cards в стабильном порядке, повторно проверяет actor scope и допустимость receipt; если одна позиция не допускает подтверждения, весь набор откатывается.
 - В одной транзакции для каждой выбранной карты фиксируются item receipt, custody archive → CO, учётная локация ЦО, actor/time и отдельный DomainEvent.
 - Частичная приёмка транспортной партии допустима на уровне карт. Состояние партии является проекцией: in_transit/partially_received/received в зависимости от количества фактически подтверждённых items. Receipt одной карты не меняет остальные.
-- Parent становится completed, когда все позиции имеют окончательный исход: получены ЦО, not_found либо отменены как невыданный остаток. Выданная, но не подтверждённая карта остаётся неокончательной; parent остаётся processing.
-- После частичной выдачи отменяются только невыданные позиции; выданные карты продолжают lifecycle до фактического receipt ЦО.
+- Parent становится `completed`, когда все карты единственного отправления получили receipt, а остальные позиции имеют окончательный исход `not_found` или `removed_by_archive`;
+- После handover частичная отмена не допускается;
 - Повтор с тем же command_id возвращает исходный результат; новый command_id не создаёт повторный receipt и не меняет custody.
 
 ### 5.7. Перегруппировка
@@ -422,10 +422,10 @@ Box (1)
 ### Этап M4 — переключение ограничений и workflow
 
 - Перевести `ArchiveRequest` на родителя и внедрить `ArchiveRequestItem`.
-- Внедрить атомарные workflow начала обработки, отмены невыданного остатка, исключения, batch handover, item-level receipt и bulk receipt.
+- Внедрить атомарные workflow начала обработки, полной отмены до handover, фиксации исключений, единого handover полного manifest, item-level receipt и bulk receipt.
 - Заменить общий guard изменения membership при активном placement на контролируемые транзакционные процедуры с различной семантикой «извлечение» и «перегруппировка».
 - Добавить deferred constraints/triggers для инварианта «архивная карта либо в коробке, либо извлечена активной заявкой».
-- Добавить DB-защиту one-to-many fulfillment batches, item-to-batch uniqueness, batch manifest integrity и item-level custody/receipt.
+- Добавить DB-защиту one-to-one fulfillment shipment, полного manifest, item-to-shipment uniqueness и item-level custody/receipt.
 - Обновить dashboard/list predicates так, чтобы счётчики и списки использовали единые определения.
 
 ### Этап M5 — очистка legacy и проверка
@@ -445,9 +445,9 @@ Box (1)
 6. Карта не может одновременно иметь membership и активную extracted-позицию.
 7. Карта не может одновременно иметь две активные позиции разных заявок.
 8. Позиция `issued_pending_receipt` обязана входить ровно в одну fulfillment batch; каждая batch содержит только позиции своего parent.
-9. Один parent может иметь несколько fulfillment batches; маршрут строго archive → central_office.
+9. Один parent может иметь не более одного fulfillment shipment; маршрут строго archive → central_office.
 10. Родитель не может стать `completed`, пока все позиции не терминальны; выданная, но не полученная карта не терминальна.
-11. После частичной выдачи отменяются только невыданные позиции; выданные позиции продолжают lifecycle до receipt ЦО.
+11. После handover отмена заявки запрещена;
 12. При `cancelled` родителе все незавершённые позиции `cancelled`; `not_found`, `removed_by_archive` и `removed_by_central_office` сохраняются.
 13. Терминальные статусы и исходные actor/time/reason/comment неизменяемы.
 14. Исторические memberships, placements, cycles, requests, items, shipments и events не удаляются и не переписываются.
@@ -681,7 +681,7 @@ P-09 timeline остаётся request-scoped проекцией DomainEvent п�
 
 Владелец продукта утвердил, что ЦО может повторно подать запрос на списание той же медицинской карты после отказа архива, но только после устранения причины предыдущего отказа. Повторный запрос создаётся как новая самостоятельная запись, с обязательной причиной из закрытого справочника и собственной историей; предыдущий запрос, причина отказа и событие решения архива сохраняются без изменений. Повторная подача не снимает отказ и не меняет статус карты автоматически: новый запрос проходит обычную проверку архива и исполняется только при наличии отдельного права у активного сотрудника архива и выполнении всех предусловий списания. Реализация не разрешена.
 
-## 2026-11-22 — актуализация модели custody и частичной выдачи archive → central_office
+## 2026-11-22 — уточнение модели единого handover и item-level receipt archive → central_office
 
 Последующие решения владельца продукта supersede более раннюю модель полной приёмки fulfillment P-09 одним действием.
 
