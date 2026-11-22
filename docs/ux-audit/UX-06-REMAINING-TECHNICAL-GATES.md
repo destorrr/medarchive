@@ -134,3 +134,17 @@ Initial revision исполняет встроенную замороженну�
 ## 2026-11-22 — статическая сверка покрытия таблиц ORM и миграций
 
 По именам таблиц ORM (16) сопоставлена с initial Alembic revision (15): единственное добавление после baseline — `card_placements` в revision `0003_card_placements`. `auth_login_throttles` создаётся revision `0011_login_throttles`, но не объявлена ORM-моделью и должна проверяться как SQL-managed объект. Это только проверка имён таблиц; сравнение колонок/ограничений/индексов/триггеров остаётся открытым и требует PostgreSQL catalog inventory.
+
+
+## 2026-11-22 — dashboard queue/counter gate expanded
+
+Static review of `postgresql_dashboard.py` shows current counters are based on legacy per-card ArchiveRequest statuses `new/in_progress` and shipment status `in_transit`, with broad from/to location predicates. This does not implement the approved target projections:
+
+- Archive P-09 work queue: parent status `submitted` + `processing`.
+- Archive navigation new-request badge: only parent status `submitted`.
+- CO P-09 list: only own parent requests, with parent creator/owner scope.
+- P-09 shipment counters: outstanding request items only; include `partially_received` batches and exclude already received items.
+- Ordinary incoming shipment counters: original manifest boxes counted once by individual receipt state; placement does not affect receipt count.
+- Shipment lists/counters: exact allowed route pairs and role direction, not any shipment touching a location.
+
+Separate target read models and tests are required. Legacy dashboard SQL is not a valid implementation specification for target queues.
