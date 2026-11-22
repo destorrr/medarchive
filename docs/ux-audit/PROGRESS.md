@@ -3604,3 +3604,10 @@ UX-06 остаётся **в работе**. Продуктовые ответы 
 Обнаружены разрывы target/legacy: текущий shipment producer пишет `shipment.created`, target P-09 catalog требует `shipment.draft_created`; legacy shipment service всё ещё производит exception events, исключённые D-03; admin service продолжает писать `admin.*` в общий DomainEvent вместо отдельного AdminSecurityAudit. ORM DomainEvent не содержит event_version/command_id/correlation_id. Исторические события нельзя переименовывать или переписывать; нужен compatibility mapping и non-destructive migration.
 
 Обновлены consumer inventory и event ownership/idempotency audit. Внешние consumers сейчас не проектируются по решению владельца продукта; фактические deployment readers/jobs и effective grants остаются обязательным gate. Код, ORM, DDL, миграции, тесты и deployment не менялись.
+
+
+## 2026-11-22 — read-only dashboard queue/counter audit
+
+Проверен `src/medarchive/routers/postgresql_dashboard.py` и сопоставлен с принятыми правилами очередей и P-09. Текущая реализация считает legacy per-card `ArchiveRequest.new/in_progress`, использует shipment status только `in_transit` и широкую проверку маршрута через from/to location. Target read models должны быть отдельными: архивная очередь P-09 (`submitted + processing`), badge новых заявок (`submitted` only), список собственных заявок ЦО, очередь отправлений по точным разрешённым route pairs, box-level receipt counters по неизменяемому манифесту и P-09 item-level outstanding receipt counters с учётом `partially_received`.
+
+Зафиксировано в readiness gap review и remaining technical gates. Исходники, SQL/DDL, ORM, миграции и тесты не менялись; это статическое сравнение текущего кода с утверждённой целевой моделью.
