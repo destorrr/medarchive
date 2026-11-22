@@ -17,9 +17,9 @@
 |---|---|---|
 | External consumers and grants | Подтвердить cron/systemd, ETL/BI, read replicas, ручные SQL consumers, интеграции и effective grants | Нельзя безопасно менять event schema/payload/retention, пока неизвестны читатели и обходные права |
 | Deployment topology | Зафиксировать реальные runtime/migrator/backup/monitoring/maintenance identities, DB URLs и secret distribution | Нельзя окончательно проектировать grants, rotation и operational access на предположительной топологии |
-| Typed command/event catalog | P-09 batch/item event types, command boundaries and transaction semantics normalized in UX-06. Still define exact integer schema versions, machine-validated payload schemas, typed API error mapping and remaining P-04/P-07 contracts | Нужна однозначная DB/API/UI/test boundary до DDL |
-| Admin/security audit policy | Retention/legal hold, IP/identity digest, HMAC key lifecycle, privileged-read scope for business-data exports, business-export access logging, tamper evidence, outage behavior | Без политики нельзя проектировать retention, индексы, key handling и безопасный failover |
-| Command ledger retention | Составить retry horizon для browser clients, workers, scheduled jobs и integrations; определить reversible/irreversible command catalog | TTL до этого может разрешить повторное исполнение старого command_id |
+| Typed command/event catalog | P-09 batch/item event names and transaction semantics normalized. Still define exact event schema versions/validators, command input version/canonicalization, replayable negative outcomes, typed HTTP error mapping and final compatibility fixtures | Нужна однозначная DB/API/UI/test boundary до DDL |
+| Admin/security audit policy | AdminSecurityAudit R1–R4 retention/legal-hold schedule still requires organizational approval; typed store/schema/DB boundary and business-data export audit implementation remain. No audit-feed export, no separate cryptographic integrity feature, no raw IP/identity digests; bounded denial telemetry policy and drop-on-failure are approved | R1–R4 governance and schema/privilege boundary block production readiness |
+| Command ledger retention | Ordinary completed records: approved 90 calendar days; irreversible logistics/admin identities: permanent tombstones. Still verify actual client retry horizons and define bounded cleanup/backup-restore procedure | TTL is decided; operational cleanup safety remains open |
 | Migration/reconciliation | Read-only preflight фактических SQLAlchemy/Alembic таблиц; additive P-09 поля `shipments.request_id`, `archive_request_items.fulfillment_batch_id`, `shipment_cards.request_item_id/received_by/received_at`, `cards.custody_location_id`; расширение `partially_received` и замена shipment-wide guards 0002; deterministic legacy request→parent/item map; доказуемое сопоставление shipment/item; custody/receipt reconciliation; checksums, quarantine и idempotent rerun; отдельно legacy SQLite, viewer, incident, CardPlacement и admin event evidence | Нельзя безопасно выполнять backfill/cutover или destructive retirement без точного mapping и отчётов по неоднозначным данным |
 | Evidence matrix | Positive/negative role tests, DB grants, append-only, atomicity, concurrent replay, rollback, migration verification | Нельзя считать технические контракты реализуемыми без проверяемых критериев приёмки |
 
@@ -53,14 +53,14 @@ Added `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md` as a versioned design proposal. It
 
 **PR-READ-01 resolved (2026-11-19):** the product owner rejected audit records for mass card lookup/search, including large-result and cross-scope searches. Keep successful exports/downloads and report/manifest operations that export patient-identifying data in scope. Ordinary single-card views, routine search, bulk lookup, dashboards and object timelines are excluded.
 
-Retention/legal hold, digest/IP and key lifecycle, business-data export/access logging, tamper evidence, external consumers/grants and deployment topology remain open technical/operational gates. No statutory retention period is assumed.
+AdminSecurityAudit R1–R4 retention/legal hold and business-data export audit implementation remain open. Raw IP/identity digest collection and separate cryptographic integrity verification are excluded by later owner decisions; external deployment readers/grants and deployment topology remain operational gates. No statutory retention period is assumed.
 
 
 ## 7. Retention and integrity controls — 2026-11-19
 
 Added `UX-06-AUDIT-RETENTION-INTEGRITY-PROPOSAL.md`. It proposes R1 privileged action, R2 sensitive export, R3 bounded telemetry and R4 integrity-checkpoint retention classes, with no guessed durations; legal hold and controlled purge/backup reconciliation; no raw IP/identity digest by default; per-event HMAC with externally managed keys; and signed checkpoint manifests in independently administered immutable storage. A global linear hash chain is not recommended as first cut because concurrent transactions and serialized chain-head writes create ordering/contention concerns.
 
-The product owner confirmed (2026-11-19) that the organization has no approved retention periods for administrative audit, security events or personal-data export records. Legal/records/privacy assessment and approval of a versioned R1–R4 schedule is therefore a blocking pre-production governance gate; no interim duration is inferred. Also requires digest necessity decision, KMS/HSM and key custody confirmation, checkpoint storage/cadence, DBA/operator threat model, business-data export audit/access logging and external consumer/grant inventory.
+The product owner confirmed (2026-11-19) that the organization has no approved retention periods for AdminSecurityAudit classes R1–R4. Legal/records/privacy assessment and approval of a versioned schedule is a blocking pre-production governance gate; no interim duration is inferred. Later owner decisions exclude raw IP/identity digests and a separate cryptographic integrity-verification feature, so HMAC/KMS/checkpoint design is not an implementation gate. Business-data export audit/access controls and external deployment reader/grant inventory remain separate gates.
 
 
 ## 8. Audit access/export policy — 2026-11-19
@@ -226,3 +226,19 @@ Clarified that actor/time/command/correlation/outcome/target metadata belong to 
 ## 2026-11-22 — principals/grants source gate reconfirmed
 
 Repository-wide static scan of the current initial SQL, Alembic env and revisions 0001–0011, Docker Compose and PostgreSQL CI found no executable PostgreSQL principal creation, role alteration, GRANT/REVOKE, default privileges or SECURITY DEFINER bootstrap. The only ACL-like statement is a comment in the initial schema describing future append-only intent. DB-SEC-04 target principal split is already approved, but repository config still uses a shared database URL across application/migration/bootstrap/backup paths according to the deployment audit. Actual DB owners, effective grants, inherited memberships and deployed jobs remain unknown until read-only DBA/infra preflight. No DB access or configuration changes were performed.
+
+
+## 2026-11-22 — remaining-gates table reconciled with later owner decisions
+
+The opening gate table and older retention/security paragraphs are superseded by the later decisions and audits below:
+
+- AdminSecurityAudit retention R1–R4 and legal-hold lifecycle remain an organizational governance blocker. No retention duration is guessed.
+- Bounded denial telemetry is already specified: operation/reason grouping only, fixed 15-minute window, threshold five, application-wide cap 100 aggregates/hour, 30 calendar days retention, drop-on-failure without retry/queue, no user-facing alert and infrastructure-only passive health monitoring.
+- Failed login attempts, throttle denials, normal session expiry and per-request invalid-session rejections are excluded from durable audit/telemetry.
+- Raw source IP, IP digests, attempted usernames and identity digests are excluded.
+- AdminSecurityAudit export is prohibited; feed/detail viewing is admin-only and not itself logged.
+- A separate cryptographic integrity-verification feature (hash chain/MAC/signature/checkpoint/job/dashboard/API) is not required. This does not waive append-only controls, atomic mandatory writes, retention governance or backup/restore.
+- Ordinary command ledger TTL is approved at 90 calendar days after completion; irreversible logistics/admin command identities are permanent. Actual retry horizons and safe bounded cleanup/backup-restore behavior remain open.
+- DB-SEC-04 principal split is an approved target decision; the absence of executable grants/provisioning in repository files and shared DB URL are implementation gaps. Effective deployed grants remain unknown until read-only DBA/infra preflight.
+
+The event/command versioning convention and command_version addition remain technical proposals, not owner-approved field assignments. This document must be read together with the current event ownership audit and cross-document consistency review.
