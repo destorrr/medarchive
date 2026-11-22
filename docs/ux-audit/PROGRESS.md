@@ -3659,3 +3659,28 @@ Clarified that common actor/time/command/correlation/outcome/target metadata bel
 ## 2026-11-22 — refreshed DB principal and grant inventory
 
 Repeated static scan of initial SQL, Alembic env/revisions 0001–0011, Docker Compose and PostgreSQL CI found no executable role provisioning, GRANT/REVOKE, default privileges or SECURITY DEFINER bootstrap; the initial schema's append-only ACL text is only a comment. DB-SEC-04 principal separation is an approved target but not implemented in reviewed repository configuration; actual effective grants and deployment identities remain unverified pending DBA/infra preflight. No live database access or configuration changes.
+
+
+## 2026-11-22 — cross-document consistency and readiness gate reconciliation
+
+Completed another consistency pass over the current event ownership/idempotency audit, DomainEvent consumer inventory, command contracts, AdminSecurityAudit catalog, DB grants matrix, deployment-principal audit, readiness review and cross-document consistency review.
+
+Changes made:
+- Separated command_version, result_version and event_version; clarified that actor/time/command/correlation/outcome/target metadata belongs to the common event envelope, not duplicated JSONB payload.
+- Recorded a first-schema event_version=1 convention and explicit command_version as technical proposals only, not owner-approved decisions.
+- Preserved historical events unchanged and specified read-only compatibility mapping only where legacy payload proves semantic equivalence; no synthetic item receipt/custody facts.
+- Corrected stale command-ledger statements: ordinary completed ledger entries retain 90 calendar days; irreversible logistics/admin identities remain permanent. Retry horizon and safe cleanup/backup procedure remain open.
+- Corrected stale security-gate statements: no audit-feed export, no separate cryptographic integrity-verification feature, no raw IP/identity digests, no failed-login/session-expiry records; bounded denial telemetry parameters and drop-on-failure are already decided. AdminSecurityAudit R1–R4 retention governance remains open.
+- Reconfirmed DB-SEC-04 principal separation is an approved target, while repository files still lack executable principal/grant provisioning and the effective deployed ACL remains unknown until read-only DBA/infra preflight.
+
+Updated documents in this pass:
+- UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md
+- UX-06-DOMAIN-EVENT-CONSUMER-INVENTORY.md
+- UX-06-DB-COMMAND-CONTRACTS.md
+- UX-06-DEPLOYMENT-PRINCIPALS-BOOTSTRAP-AUDIT.md
+- UX-06-DB-GRANTS-MATRIX.md
+- UX-06-REMAINING-TECHNICAL-GATES.md
+- UX-06-CROSS-DOCUMENT-CONSISTENCY-REVIEW.md
+- PROGRESS.md
+
+This was a documentation-only pass on branch docs/ux-audit-project. No source code, ORM, SQL/DDL, migrations, tests, CI or deployment files were changed. No live PostgreSQL, pytest, CI or production environment was accessed. UX-06 remains open; UX-07 and implementation remain blocked.
