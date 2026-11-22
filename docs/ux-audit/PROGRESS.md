@@ -3570,3 +3570,19 @@ UX-06 остаётся **в работе**. Продуктовые ответы 
 Синхронизированы `UX-06-TECHNICAL-DATA-MODEL.md`, `UX-06-DB-COMMAND-CONTRACTS.md`, `UX-06-INVARIANTS-DB-TEST-MATRIX.md`, `UX-06-IMPLEMENTATION-READINESS-PLAN.md` и `UX-06-REMAINING-TECHNICAL-GATES.md`.
 
 **Ограничение:** статически прочитаны `src/medarchive/adapters/postgresql/models.py`, `migrations/versions/0002_workflow_guards.py`, `migrations/versions/0003_card_placements.py`, `alembic.ini`, `migrations/env.py` и `docs/development/postgresql.md`. Полный Alembic chain/initial DDL, фактический Alembic head, production-like данные, effective grants и deployment runtime не проверялись. Поэтому точные SQL-типы/constraint names и backfill mapping требуют read-only preflight; миграции, DDL, ORM и тесты не запускались и не менялись.
+
+## 2026-11-22 — уточнение фактического legacy baseline PostgreSQL
+
+Дополнительно прочитаны реальные файлы `src/medarchive/adapters/postgresql/models.py`, `migrations/versions/0002_workflow_guards.py`, `migrations/versions/0003_card_placements.py`, `migrations/env.py`, `alembic.ini` и `docs/development/postgresql.md`.
+
+Подтверждены конкретные legacy ограничения, которые должны быть заменены при будущем cutover:
+- `ArchiveRequest` сейчас per-card; `ck_archive_request_fulfillment` требует связь in_progress/completed с одним `fulfillment_shipment_id`; `uq_card_one_active_archive_request` ограничивает активную заявку на карту.
+- `Shipment` сейчас не имеет `partially_received`; его CHECK/guard разрешают старые shipment-wide переходы.
+- `ShipmentCard` сейчас имеет PK `(shipment_id, card_id)`, nullable `box_id`, но не содержит request item и индивидуального receipt.
+- `Card` требует ровно одно из `current_location_id/current_shipment_id`; отдельного custodian location нет.
+- Revision `0002_workflow_guards` содержит shipment-wide deferred consistency и `medarchive_guard_archive_request`; простого добавления новых колонок недостаточно, эти guards должны быть версионированно заменены на batch/item-level для P-09, сохранив обычные коробочные маршруты.
+- Alembic `target_metadata = None`; ORM не является источником для autogenerate. Исторические revisions переписывать нельзя.
+
+В техническую модель и readiness добавлено требование отдельного `cards.custody_location_id`, item receipt в `shipment_cards`, расширения status/check/trigger contract, shadow parent table на период совместимости и отдельного cutover для legacy guards. `docs/development/postgresql.md` теперь явно помечает текущий single-shipment/full-receipt baseline как legacy, а one-to-many P-09 — как целевой, ещё не реализованный workflow.
+
+Фактический Alembic head, initial DDL, production-like данные, effective grants и полный deployment inventory всё ещё не проверены. Никакие исходники, ORM, миграции, SQL/DDL или тесты не изменялись и не запускались.
