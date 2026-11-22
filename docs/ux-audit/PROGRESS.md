@@ -3701,3 +3701,11 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 Историческое описание единственного fulfillment shipment и `ArchiveRequest.fulfillment_shipment_id` в cross-document review явно помечено как superseded; действующая целевая модель — one-to-many.
 
 Обновлены 4 уникальных Markdown-документа: `UX-06-CROSS-DOCUMENT-CONSISTENCY-REVIEW.md`, `UX-06-REMAINING-TECHNICAL-GATES.md`, `UX-06-SHIPMENT-ROUTE-AND-STATE-AUDIT.md`, `PROGRESS.md`. Изменения документационные; код, ORM, SQL/DDL, миграции, тесты, API/UI, deployment и БД не затрагивались. UX-06 остаётся открытым; UX-07 и реализация не начаты.
+
+## 2026-11-22 — закрыта сверка parent status P-09 после отмены остатка
+
+По первичному решению P-09, technical data model, DB command contract, DB-22 и dashboard semantics подтверждено: после частичной выдачи отменяются только невыданные позиции; parent остаётся `processing`, пока ранее выданные карты ожидают фактического receipt ЦО. После receipt последней выданной карты и terminal outcome всех items parent переходит в `completed`. Статус `cancelled` применяется к полной отмене до первой физической выдачи. Для частичной отмены используется `archive_request.remaining_items_cancelled`, для полной — `archive_request.cancelled`; ЦО продолжает подтверждать ранее выданные карты.
+
+Синхронизированы DB command contracts, route/state matrix, UX-05 dashboard queue, domain event consumer inventory, cross-document review и remaining technical gates. В route/state audit исправлена также устаревшая формулировка об одной fulfillment transport record: действует one-to-many parent → batches.
+
+Обновлено 7 уникальных Markdown-документов. Изменения только документальные; код, ORM, SQL/DDL, миграции, API/UI, тесты, CI и БД не затрагивались. UX-06 остаётся открытым по остальным readiness gates; UX-07 и реализация не начаты.
