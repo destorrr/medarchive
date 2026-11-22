@@ -3629,3 +3629,8 @@ Target decisions подтверждены: admin-only audit feed/details, без
 Target policy требует сохранить обязательный успешный login audit до выдачи session cookie; при невозможности commit audit запись сессия не выдаётся. Следовательно, текущая реализация не соответствует fail-closed target: транзакция authentication/throttle завершается без обязательного audit record, а cookie выдаётся после неё. Нужен единый transaction boundary, который фиксирует успешное authentication outcome и обязательный audit event до token/cookie issuance. При этом raw username/IP и их digests не включать в audit payload; throttle bucket остается отдельным механизмом.
 
 Logout сейчас только удаляет cookie; по target catalog logout — best-effort telemetry, поэтому отсутствие durable mandatory logout event не блокирует текущую операцию. Это статический source finding; runtime auth flow и тесты не запускались.
+
+
+## 2026-11-22 — AdminSecurityAudit policy reconciliation
+
+Reconciled the older audit-contract summary with the later approved event catalog. Current exclusions, bounded denial telemetry limits, no-export decision, no separate integrity-verification feature and retention-governance gate are now stated in the contract and remaining-gates documents. The successful PostgreSQL login audit gap remains open. Documentation-only; no application or database implementation was changed.
