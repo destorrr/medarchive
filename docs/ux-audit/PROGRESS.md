@@ -3840,3 +3840,9 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 - Отдельно закреплено, что неизвестный результат commit требует retry с тем же command_id и проверки ledger, а не безусловной повторной mutation. Инфраструктурные ошибки не становятся completed outcomes.
 - Политика сохранения/replay конкретных `forbidden`, `not_found`, `invalid_state`, `conflict` остаётся открытым gate; добавленная матрица не является её утверждением.
 - Документационные изменения; код, БД, миграции, тесты и CI не запускались. UX-06 открыт, UX-07 не начат.
+
+
+### 2026-11-22 — UX-06: ветвление new command / replay и гонка отзыва прав
+- В `UX-06-DB-COMMAND-CONTRACTS.md` §1.2 разделены новая команда и committed replay: повтор существующего command_id переходит в §1.4, не выполняя бизнес-шаги/события повторно. Конкурентная регистрация ожидает commit/rollback исходной транзакции; committed in_progress без recovery-протокола не допускается.
+- В §1.4 отмечен технический gate сериализации replay read authorization с конкурентной деактивацией/отзывом membership. Проверка должна соответствовать principal/membership lock protocol §1.3, но не должна заново выполнять бизнес-команду.
+- Только документация. ORM, SQL, migrations, runtime, tests и CI не менялись. UX-06 открыт, UX-07 не начат.
