@@ -232,7 +232,7 @@ DB command должна повторно проверять инварианты
 - `archive_request.handed_over.v1`
 - `archive_request.completed.v1`
 - `shipment.handed_over.v1`
-- `shipment.received_all.v1`
+- `archive_request.item_received_by_central_office` (one event per card; shipment `received` is a projection, not a single all-cards event)
 - `box.cycle_repacked.v1`
 - `admin.correction_applied.v1`
 
@@ -261,7 +261,7 @@ DomainEvent — операционная история карты/коробк�
 1. Инвентаризировать реальные PostgreSQL owners, roles, grants и default privileges в целевом окружении; без этого нельзя безопасно отзывать права.
 2. Создать owner/migrator/runtime principals и проверить подключение каждого в отдельной среде.
 3. Добавить новые DB commands и event contract, не отзывая существующий DML в production до перевода всех соответствующих workflows.
-4. Перевести по одному use case, сначала start-processing, затем request cancel/remove/not_found, handover и receive-all.
+4. Перевести по одному use case: start-processing, item outcomes, whole-request cancel before handover, one full-manifest handover, then item/bulk actual receipt.
 5. Перевести router handlers на единый Unit of Work.
 6. Прогнать позитивные, негативные, конкурентные и rollback тесты на PostgreSQL.
 7. Сверить старые и новые события/историю, выполнить preflight и backfill только при доказанной необходимости.
@@ -281,7 +281,7 @@ DomainEvent — операционная история карты/коробк�
 - Невозможность возврата любой карты откатывает всю отмену.
 - Ошибка extraction любой карты откатывает всю обработку заявки.
 - Handover не может отправить неполный состав.
-- Receive-all не допускает частичную приёмку.
+- Item/bulk receipt accepts only cards actually received by CO; bulk receipt is atomic for the selected set and emits one item receipt event per card.
 - DomainEvent append-only и не может быть произвольно вставлен runtime в обход команды.
 - Actor provenance в аудите честно обозначен как application-authenticated до внедрения независимого issuer.
 - Операционная история и административный/безопасностный аудит разделены.
@@ -304,27 +304,27 @@ DomainEvent — операционная история карты/коробк�
 
 ## 2026-11-22 — superseding transaction contract for P-09 and bulk box operations
 
-This addendum supersedes the earlier full-manifest/full-receipt model in §§3–5 and §9 wherever it conflicts with the approved item-level workflow.
+This addendum supersedes the older partial-issue/remainder-cancellation wording in §§3–5 and §9. It retains item-level receipt, but shipment creation and handover use one complete manifest.
 
 ### P-09 item-level operations
 
 The parent archive request contains multiple card items. Archive must finish processing every item before creating the single fulfillment shipment; the full manifest includes all and only `extracted` items. Partial issue, multiple shipments per parent and processing remaining items after handover are prohibited. A `not_found` item requires a closed-list reason code and optional comment; it does not write off the card or invent a new location. `removed_by_archive` is also a final processing outcome and is not converted to `cancelled` by remainder cancellation, because no such post-handover remainder operation exists. Before handover, only archive may cancel the whole request; after handover cancellation is prohibited. Item-level actual CO receipt and archive custody until each receipt remain distinct facts.
 
 The database command boundary must provide:
-- an item-level archive issue/dispatch command;
+- a command that creates the one shipment only after every request item has a final processing outcome, with all and only `extracted` items in its immutable manifest;
 - an item-level actual-receipt command for CO;
 - an atomic bulk actual-receipt command for a selected set of cards that have in fact arrived;
 - an item-level not_found command with mandatory reason code;
-- a partial-cancel command that affects only the unissued remainder.
+- a whole-request cancellation command available only before handover, with mandatory reason; cancellation after handover is prohibited.
 
-Custody remains archive-owned until CO confirms actual receipt of the corresponding card. Courier physical possession does not itself transfer accountable custody to CO. A shipment may describe physical transport, but it must not force all cards into one indivisible receipt or transfer custody to CO at dispatch.
+The full manifest is handed over in one atomic operation. Custody remains archive-owned until CO confirms actual receipt of each corresponding card. Courier physical possession does not itself transfer accountable custody to CO. The shipment has one handover but can have partial item-level receipt.
 
 Bulk receipt locks selected request items and cards in stable UUID order, re-checks state and actor scope under lock, validates that every selected card has actually arrived, writes each item's receipt and actor/time, appends corresponding DomainEvents, and commits all selected items together. Any invalid selected item aborts the entire bulk operation. A repeated command_id returns the original result; a different payload under the same command_id is rejected.
 
-Parent request completion is derived only when every item is terminal (received, not_found, or cancelled as part of the remaining unissued set). Issued-but-not-received items remain nonterminal. The state machine must allow a later issue of a previously pending item without reopening a terminal item.
+Parent request completes only when every item has a final outcome: each `extracted` item has actual CO receipt, while `not_found` and `removed_by_archive` remain final processing outcomes. If no item is `extracted`, the parent completes without creating a shipment. An item awaiting receipt keeps the parent in `processing`; no item is issued later and no remainder cancellation exists.
 
 ### Ordinary box receipt and bulk placement
 
 Ordinary branch→archive and central_office→archive box receipt does not count cards inside boxes and does not inspect seals or packaging. Placement is a separate command. Bulk placement of received boxes onto one active shelf is atomic. Bulk movement from one or more source shelves to one target shelf is atomic; a single invalid box aborts the whole batch. Each box receives its own placement history event with actor/time. Bulk extraction of cards from multiple boxes is prohibited.
 
-The exact SQL function names, item status enum names, event type strings, lock ordering details and API error envelope remain technical design work. They must preserve these approved transaction boundaries and must not reintroduce full-shipment receipt.
+The exact SQL function names, item status enum names, event schema versions, lock ordering details and API error envelope remain technical design work. They must preserve the full-manifest handover and item-level receipt boundaries.
