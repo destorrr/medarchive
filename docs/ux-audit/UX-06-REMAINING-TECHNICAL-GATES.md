@@ -221,3 +221,8 @@ Command result_version, command_version and event_version are separate. Shared c
 ## 2026-11-22 — envelope/payload and command versioning gate
 
 Clarified that actor/time/command/correlation/outcome/target metadata belong to the common event envelope, not duplicated inside event JSONB payloads. The command API currently omits an explicit command_version despite separately versioning result_version and event_version; adding command_version as an integer input-contract version is proposed but not owner-approved. These three axes must remain independent. See UX-06-DB-COMMAND-CONTRACTS.md and UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md.
+
+
+## 2026-11-22 — principals/grants source gate reconfirmed
+
+Repository-wide static scan of the current initial SQL, Alembic env and revisions 0001–0011, Docker Compose and PostgreSQL CI found no executable PostgreSQL principal creation, role alteration, GRANT/REVOKE, default privileges or SECURITY DEFINER bootstrap. The only ACL-like statement is a comment in the initial schema describing future append-only intent. DB-SEC-04 target principal split is already approved, but repository config still uses a shared database URL across application/migration/bootstrap/backup paths according to the deployment audit. Actual DB owners, effective grants, inherited memberships and deployed jobs remain unknown until read-only DBA/infra preflight. No DB access or configuration changes were performed.
