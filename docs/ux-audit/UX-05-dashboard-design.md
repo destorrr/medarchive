@@ -424,3 +424,12 @@ CO can see its submitted requests and the item-level results. The request remain
 Incoming branch → archive and central_office → archive shipments are received one box at a time. The archive incoming queue remains open until all manifest boxes and discrepancies are resolved. A received box may appear in the ready-to-place work surface immediately, without waiting for the whole shipment. Receipt counts are total manifest boxes, individually received boxes, and boxes awaiting receipt; placement is a separate state and does not change the receipt count. No card-count/seal/package check is part of receipt.
 
 Do not merge box-level receipt counters with P-09 card-level issue/receipt counters.
+
+
+## 2026-11-22 — восстановленная концепция управленческой аналитики (дополнение без пересмотра UX-05)
+
+Владелец продукта напомнил ранее предложенную более широкую концепцию: дашборд как инструмент оценки движения карт, очередей и пространственного размещения, с аналитикой за период; интерактивной схемой архивного пространства; общим с ней по данным и фильтрам табличным реестром. Подготовлены low-fidelity схемы и матрица допустимости метрик в `UX-07-WF-06-ANALYTICS-AND-STORAGE-VIEWS.md`.
+
+**Утверждённые ролевые стартовые панели UX-05 сохраняются:** очередь действий важнее статистики; branch/ЦО/archive — свой scope; admin — административная стартовая страница. Перспективный общий управленческий read-only обзор не добавляет новых ролей/прав и потребует отдельного подтверждения аудитории и способа доступа. Не считать концептуальные тренды утверждёнными вычисляемыми KPI.
+
+**D-12 остаётся действующим:** не рассчитывать проценты загруженности, свободные места и пороги перегрузки без физической инвентаризации ёмкости. Текущие уровни `Секция → Полка → Коробка → Карта`; первоначальные `Помещение`/`Стеллаж` сохраняются как будущее расширение модели, не как уже реализованная иерархия. Два режима хранения — визуальный и табличный — должны строиться из одного серверного набора разрешённых объектов и одинаковых фильтров.
