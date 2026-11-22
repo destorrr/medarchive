@@ -259,7 +259,7 @@ Target adapter must map a closed DB result_code allowlist to stable HTTP status/
 - матрица UI для parent `cancelled` сейчас описывает только read-only;
 - документы не фиксируют, когда именно parent переходит из `processing` в `cancelled` при ожидающих receipt.
 
-До реализации нужно зафиксировать точную parent state projection и синхронизировать command result, queue visibility, receipt authorization и timeline. Безопасный обязательный инвариант уже следует из принятого решения: parent не может считаться полностью завершённым, пока есть `issued_pending_receipt`; отмена остатка не отменяет и не блокирует receipt ранее выданных карт. Это технический gate, не новый вопрос о праве отмены остатка.
+До реализации нужно зафиксировать точную parent state projection и синхронизировать command result, queue visibility, receipt authorization и timeline. Эта формулировка относится к ошибочной модели частичной выдачи и superseded уточнением владельца продукта от 2026-11-22. В актуальной модели один handover передаёт весь manifest; parent остаётся `processing` до item-level receipt всех отправленных карт. Отмена после handover запрещена.
 
 ## 2026-11-22 — закрыт gate P-09 parent status после отмены остатка
 
