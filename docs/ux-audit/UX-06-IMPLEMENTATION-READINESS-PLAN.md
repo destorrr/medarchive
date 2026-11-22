@@ -10,7 +10,7 @@
 
 1. физическое хранение: Card → BoxCardMembership → BoxCycle → BoxPlacement;
 2. групповые заявки ЦО: ArchiveRequest parent + ArchiveRequestItem;
-3. one-to-many транспортные партии archive → central_office, per-batch handover и item/bulk receipt;
+3. одно fulfillment-отправление archive → central_office на заявку, полный manifest и единый handover; item/bulk receipt;
 4. защищённые PostgreSQL DB commands и единая транзакционная граница;
 5. разделение owner/migrator/runtime и постепенный отзыв runtime DML;
 6. append-only DomainEvent с typed/versioned контрактом и отдельный admin/security audit;
@@ -170,7 +170,7 @@
 - Extend `shipments_status_check`, `ck_shipment_handover_time`, `ck_shipment_received_fields`, `ck_shipment_exception_fields`, handover/receipt CHECK constraints and deferred shipment guards together. Replace the legacy `medarchive_guard_shipment_update`, shipment consistency triggers and `medarchive_guard_archive_request` from revision `0002_workflow_guards` at the controlled P-09 cutover; they currently enforce shipment-wide transit/receipt and one `fulfillment_shipment_id`. Preserve ordinary box shipment semantics; do not globally impose P-09 partial receipt states on other routes.
 
 **P-09 transport batch backfill**
-- Additive schema only: current `archive_requests` is a per-card table, so create a shadow parent table and `archive_request_items`; introduce nullable `shipments.request_id`, `archive_request_items.fulfillment_batch_id`, `shipment_cards.request_item_id`, item receipt/custody metadata only where absent. Keep legacy per-card request/shipment columns and constraints during compatibility.
+- Additive schema only: current `archive_requests` is a per-card table, so create a shadow parent table and `archive_request_items`; introduce one-to-one parent↔shipment link (nullable UNIQUE `fulfillment_shipment_id` or authoritative UNIQUE `shipments.request_id`), `shipment_cards.request_item_id`, item receipt/custody metadata only where absent. Do not add `archive_request_items.fulfillment_batch_id`.
 - Build deterministic mapping from every legacy per-card request UUID to exactly one parent + one item. Store this mapping in a unique migration map; preserve source IDs, actor/time, comments/reasons and DomainEvent history.
 - Create a fulfillment batch only where the legacy shipment ↔ request/card manifest relation is unambiguous. Do not merge shipment rows based on matching dates, courier names or similar card lists.
 - Do not infer item-level receipt from a legacy shipment-wide received status unless source evidence proves receipt of that specific card. Ambiguous shipment/item/custody rows go to a quarantine report and block cutover; no synthetic receipt/handover events.
@@ -216,7 +216,7 @@
 - завершение без shipment, если все позиции имеют допустимые терминальные исходы.
 
 **5C. Отправления**
-- one-to-many fulfillment batches на parent;
+- one-to-one fulfillment shipment на parent;
 - каждая партия содержит только выбранные ready-to-issue items;
 - отдельный handover для каждой партии;
 - item-level receipt и атомарный bulk receipt только реально поступивших карт;
@@ -297,7 +297,7 @@
 - archive card membership/extracted invariant;
 - no membership + extracted overlap;
 - no duplicate active request items across parents;
-- parent → batches one-to-many; each immutable batch manifest contains only selected items from one parent;
+- parent → one fulfillment shipment; its immutable manifest contains all and only `extracted` items of that parent;
 - each transport batch contains only cards physically issued in that batch; parent item states remain independently tracked;
 - parent cannot complete before all terminal results and receipt;
 - after partial issue only the unissued remainder may be cancelled; issued items remain active until actual CO receipt;
@@ -1302,13 +1302,13 @@ When an account is deactivated or otherwise administratively disabled, the accou
 - Архив может атомарно массово размещать принятые коробки на одной полке и массово перемещать несколько коробок с одной/нескольких полок на одну целевую. Массовое извлечение карт из нескольких коробок запрещено.
 - По заявке ЦО архив выдаёт медицинские карты частями. По каждой карте раздельно фиксируются выдача и фактическое получение ЦО; невыданные карты остаются ожидающими.
 - Статус «Не найдена» устанавливается отдельно для карты с обязательной причиной из закрытого справочника; комментарий необязателен. Карта не списывается и не удаляется; после обнаружения её можно выдать в рамках той же заявки.
-- ЦО отменяет заявку до начала выдачи; после частичной выдачи отменяет только оставшуюся часть.
+- До handover заявку отменяет только уполномоченный сотрудник архива; после handover отмена запрещена.
 - ЦО подтверждает фактическое получение каждой карты; разрешено массовое атомарное подтверждение нескольких фактически поступивших карт. До подтверждения ответственность сохраняет архив; заранее подтверждать нельзя.
 
 ### Оставшиеся технические действия
 
 1. Переписать прежние P-09 full-receipt statements в command contracts, data model, shipment route audit, object detail, invariants и очередях так, чтобы item-level issuance/receipt и partial outcomes были единообразны.
-2. Добавить/проверить DB invariants для item-level custody, частичной отмены, повторной выдачи найденной карты и атомарного bulk receipt.
+2. Добавить/проверить DB invariants для полного manifest и единого handover, item-level custody/receipt, исправления результатов только до draft и атомарного bulk receipt.
 3. Сверить UI-карточку заявки и timeline: отдельные события по картам, статусы ожидания/выдачи/получения/не найдено/отменено, отображение причины и автора.
 4. Синхронизировать progress и cross-document review; после этого выполнить полный перечень оставшихся UX-06 technical/security gates.
 
