@@ -140,3 +140,17 @@ These are static source-to-target discrepancies, not proof of incorrect producti
 Append-only trigger DomainEvent защищает UPDATE/DELETE, но не устанавливает эффективные INSERT privileges и не решает угрозу table owner/superuser. В файловых Alembic revisions/draft SQL исполняемые grants/roles/bootstrap не обнаружены; DB-SEC требует отдельную DBA/infra настройку principals. Реальные grants, owners и RLS остаются неподтверждёнными до read-only preflight целевой PostgreSQL.
 
 Нельзя считать audit implementation готовой только потому, что текущий admin mutation и legacy DomainEvent flush находятся в одной ORM session: отсутствует отдельный AdminSecurityAudit authoritative store и typed payload contract. Retention schedule также не утверждён организацией и блокирует production governance.
+
+
+## 2026-11-22 — password lifecycle and admin audit source gap
+
+Static source review confirms the password-management target is not implemented in the inspected PostgreSQL paths:
+
+- No self-service password-change route or flow was found.
+- Admin password reset is currently an optional password field on generic user-update endpoints; it writes `admin.user_updated` to DomainEvent, not `admin.credential_reset` to AdminSecurityAudit.
+- The current route does not prohibit an administrator from resetting their own password and does not require the acting administrator to re-enter their current password.
+- No forced-password-change state or restricted first-login flow was found in the inspected User model/login route.
+- Password-hash fingerprinting invalidates old stateless tokens on their next request, but no current-session-preserving self-change flow or explicit active-session registry exists.
+- The global admin audit page still queries legacy `DomainEvent admin.%` rows and renders raw JSON payloads.
+
+These findings are documented in `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. They require separate command, schema, session and UI contracts before implementation; no source code was changed.
