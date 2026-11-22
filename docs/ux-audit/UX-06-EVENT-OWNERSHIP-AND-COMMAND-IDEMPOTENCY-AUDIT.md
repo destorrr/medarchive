@@ -323,3 +323,22 @@ Replay must never re-execute the mutation or re-evaluate its original write auth
 **Concurrency tests required:** revoke before replay; replay before revoke; concurrent deactivate; scope removal; multi-scope results; permission change during result projection; different actor with same command_id; timeout after original commit; and no additional DomainEvent/aggregate mutation on any replay. Explicitly test lock ordering against admin security changes and P-09 parent/shipment/item/card operations to avoid deadlocks.
 
 **Open design gate:** choose exact lockable permission/scope representation, ledger lookup/lock ordering, sensitive result projection, API error precedence, and whether revocation requires stronger delivery-time semantics. This section is a technical proposal only; no DB implementation, migration, or tests are authorized.
+
+
+## 2026-11-22 — минимальный план закрытия идемпотентности перед UX-07
+
+Это **реестр оставшихся технических решений**, а не новые продуктовые вопросы. Не считать предыдущие предложения утверждёнными только из-за включения в аудит.
+
+| Gate | Что нужно зафиксировать | Критерий закрытия |
+|---|---|---|
+| I-01 command identity | генерация UUID, жизненный цикл одного command_id при retry/timeout/reload, правила correlation_id | одна таблица последовательностей client → API → ledger, включая неизвестный исход commit |
+| I-02 input fingerprint | версии command input, допустимые поля, нормализация и алгоритм хеша | детерминированные тест-векторы для одинакового и изменённого ввода |
+| I-03 result policy | по каждому result_code: до ledger / committed / rollback; replay и права чтения | матрица без неопределённых исходов; инфраструктурные сбои не считаются completed |
+| I-04 replay security | lock order account/permissions/ledger/business, проверка текущего read scope, защита от утечек | тесты revoke/replay и отсутствие дополнительных событий/мутаций |
+| I-05 API adapter | закрытый error_code, HTTP status, безопасный body и HTML-текст | единые контрактные тесты для JSON и HTML без raw exception/SQL diagnostics |
+| I-06 retention | 90 дней для обычных ledger rows, бессрочное хранение необратимых команд, cleanup/restore | безопасная политика с проверкой максимального retry horizon и восстановления |
+| I-07 event compatibility | event_version и validators, исторические типы только на чтение | schema fixtures и отсутствие переписывания исторических событий |
+
+**Приоритет:** I-03 и I-04 нельзя обходить при реализации; I-01/I-02 нужны до фиксации DB API; I-05/I-06/I-07 завершаются до readiness sign-off. Не требуется повторно согласовывать правило P-09: один parent → максимум одно полное fulfillment-отправление после обработки всех позиций, один handover всего manifest, item-level receipt возможен по отдельным картам.
+
+**UX-06/UX-07 boundary:** эти gates относятся к реализации и безопасности контрактов. Для перехода к UX-07 необходимо отдельно проверить общий UX-06 readiness checklist: данный реестр сам по себе не закрывает UX-06 и не разрешает миграции, код или тесты.
