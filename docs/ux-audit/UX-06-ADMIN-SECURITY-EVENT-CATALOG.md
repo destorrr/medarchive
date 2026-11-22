@@ -73,7 +73,7 @@ Proposed required fields:
 | Field | Rule |
 |---|---|
 | `event_id` | Server-generated immutable UUID; unique |
-| `schema_version` | Positive integer for the envelope contract |
+| `event_version` | Positive integer version of the event-specific payload schema; separate from command and result versions |
 | `event_type` | Closed, namespaced event type from the catalog |
 | `occurred_at` | Database-generated UTC timestamp at the authoritative write boundary |
 | `actor_user_id` | Authenticated actor UUID; nullable only for unauthenticated/unknown-principal telemetry |
@@ -846,19 +846,19 @@ Target event contract proposal (event strings below are the normalized names to 
 
 | Event type | Aggregate/target | Required minimal payload | Transaction boundary |
 |---|---|---|---|
-| `shipment.draft_created` | Fulfillment shipment | `request_id`, `shipment_id`, all `extracted` `request_item_ids`, `actor_user_id`, `occurred_at`, courier reference and historical name snapshot | Shipment + complete manifest + item links + event |
-| `archive_request.cancelled` | Parent request | `request_id`, `actor_user_id`, `occurred_at`, mandatory `reason_code` for submitted/processing | Whole-request cancellation before handover; return of extracted cards and parent/item/shipment state changes + event |
-| `shipment.cancelled` | Fulfillment shipment | `request_id`, `shipment_id`, `actor_user_id`, `occurred_at`, mandatory reason reference | Draft shipment cancellation in the same transaction as whole-request cancellation before handover |
-| `shipment.handed_over` | Fulfillment shipment | `request_id`, `shipment_id`, all manifest `request_item_ids`, `actor_user_id`, `occurred_at` | Shipment draft→in_transit + all manifest items→issued_pending_receipt + event |
-| `archive_request.item_marked_not_found` | Request item | `request_id`, `item_id`, `card_id`, `reason_code`, `actor_user_id`, `occurred_at`; optional bounded comment only if provided | Item result + event |
-| `archive_request.item_result_corrected` | Request item | `request_id`, `item_id`, `card_id`, `previous_status`, `new_status`, `actor_user_id`, `occurred_at`, closed membership reference where relevant | Physical membership/placement correction + item result + event |
-| `archive_request.item_removed_by_archive` | Request item | `request_id`, `item_id`, `card_id`, `actor_user_id`, `occurred_at`, mandatory first-resolution comment | Card return + item result + event |
-| `archive_request.item_received_by_central_office` | Request item | `request_id`, `item_id`, `card_id`, `shipment_id`, `actor_user_id`, `occurred_at` | Item receipt + custody/location transfer to CO + event |
+| `shipment.draft_created` | Fulfillment shipment | `request_id`, `shipment_id`, all `extracted` `request_item_ids`, courier reference and historical name snapshot | Shipment + complete manifest + item links + event |
+| `archive_request.cancelled` | Parent request | `request_id`; mandatory envelope `reason_code` for submitted/processing | Whole-request cancellation before handover; return of extracted cards and parent/item/shipment state changes + event |
+| `shipment.cancelled` | Fulfillment shipment | `request_id`, `shipment_id`; mandatory envelope reason reference | Draft shipment cancellation in the same transaction as whole-request cancellation before handover |
+| `shipment.handed_over` | Fulfillment shipment | `request_id`, `shipment_id`, all manifest `request_item_ids` | Shipment draft→in_transit + all manifest items→issued_pending_receipt + event |
+| `archive_request.item_marked_not_found` | Request item | `request_id`, `item_id`, `card_id`; domain `reason_code` only if distinct from envelope reason; optional bounded comment only if provided | Item result + event |
+| `archive_request.item_result_corrected` | Request item | `request_id`, `item_id`, `card_id`, `previous_status`, `new_status`, closed membership reference where relevant | Physical membership/placement correction + item result + event |
+| `archive_request.item_removed_by_archive` | Request item | `request_id`, `item_id`, `card_id`, mandatory first-resolution comment | Card return + item result + event |
+| `archive_request.item_received_by_central_office` | Request item | `request_id`, `item_id`, `card_id`, `shipment_id` | Item receipt + custody/location transfer to CO + event |
 | `archive_request.completed` | Parent request | `request_id`, terminal item outcome counts, `occurred_at` | Final terminal item outcome + parent completion + event |
 
 For atomic bulk receipt, emit one `archive_request.item_received_by_central_office` event per received card in the same transaction; a shared command/correlation ID links the events. Do not create a single event that implies receipt of all cards in the shipment or parent. Shipment state (`in_transit` / `partially_received` / `received`) is a projection over its own manifest items and their receipt events.
 
-All payloads use aggregate IDs, actor/time and controlled reason codes. Do not duplicate patient names, phone numbers, birth dates or other patient PII. `card_id`/item identifiers are sufficient to resolve an authorized detail view; payload access remains subject to the event-read scope. The event type is closed and versioned; consumers must reject unknown versions safely.
+Actor, role/scope, occurrence time, command/correlation IDs, outcome and top-level reason belong to the common event envelope and must not be duplicated in event-specific JSONB payloads. Payloads contain only additional event facts: aggregate/item/card references, previous/new state, controlled domain reason codes where distinct from the envelope reason, courier reference/snapshot where required, and terminal outcome counts. Do not duplicate patient names, phone numbers, birth dates or other patient PII. `card_id`/item identifiers are sufficient to resolve an authorized detail view; payload access remains subject to the event-read scope. The event type is closed and each event payload uses integer `event_version`; consumers must reject unknown versions safely.
 An atomic bulk CO receipt may emit one command-level correlation and an item-level receipt event for each card, all in the same transaction. Each event identifies the request item/card, actor and timestamp; do not duplicate patient PII in payload where aggregate IDs and minimal outcome metadata suffice. Custody transfer to CO occurs only on the item actual-receipt event. Courier possession or dispatch alone does not transfer accountable custody.
 
 Ordinary incoming box shipments use a distinct box-level event per individually received box. Each event records shipment, box, actor and actual receipt time; that box's custody transfers to archive in the same transaction. The shipment-level state/counters are projections over the original manifest and individual receipt/discrepancy outcomes. Box placement is a separate event and may occur before the rest of the shipment is fully received.
