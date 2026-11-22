@@ -537,3 +537,12 @@ Bulk commands должны быть идемпотентны в рамках о�
 - Receipt не проверяет число карт внутри коробки, пломбы или упаковку.
 
 DB-70 следует читать как запрет count/seal/package inspection, а не как предписание принимать весь shipment целиком. DB command contract должен быть box-level, с независимым actor/time и DomainEvent для каждой коробки.
+
+## 2026-11-22 — DB-71…DB-73: транспортные партии P-09
+
+| ID | Инвариант | Механизм PostgreSQL | Транзакционная граница | Негативная проверка |
+|---|---|---|---|---|
+| DB-71 | Одна P-09 parent может иметь 0..N fulfillment batches; каждая batch принадлежит ровно одному parent, а manifest содержит только items этой заявки. Один item одновременно связан максимум с одной текущей активной/выданной batch | `shipments.request_id` nullable FK + non-unique index; составной UNIQUE `(shipments.id, request_id)`; item composite FK `(fulfillment_batch_id, request_id)`; `shipment_cards.request_item_id` и deferred manifest consistency trigger | Создание партии, subset manifest, item links, courier FK/snapshot и DomainEvent — одна транзакция | Второй batch того же parent разрешён; batch с item чужого parent, повторное назначение item или manifest mismatch отклоняется |
+| DB-72 | Batch state является точной проекцией item-level receipt; custody остаётся у архива до receipt конкретной карты. `received` допустим только при receipt всех items партии, но не завершает parent автоматически | Batch/item state guards, FK/manifest integrity, deferred custody/location consistency trigger | Item receipt, custody/location, batch projection, parent completion при достижении terminal всех items и DomainEvents — одна транзакция | Handover не переводит custody; receipt одной карты не меняет соседние items; batch не становится received при непринятых картах; parent не completed при pending/extracted/issued_pending_receipt |
+| DB-73 | Handover партии и отмена невыданного остатка сериализуются; позднее обнаруженная карта может быть восстановлена и выдана следующей batch той же P-09, если именно этот item ещё не выдан/не получен | Общий lock order parent → items/cards → batches/manifests; повторная проверка item assignment/state; idempotency ledger | Handover одной batch и cancel remainder каждый выполняются атомарно под блокировками parent/items; restore item — отдельная транзакция | Гонка не отменяет уже выданную карту и не выдаёт отменённую позицию; наличие другой batch не блокирует restore невыданного not_found item; двойная выдача невозможна |
+
