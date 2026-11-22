@@ -256,3 +256,10 @@ The ledger must store the exact committed result envelope and replay it without 
 7. Maximum retry horizon of actual clients/jobs and safe bounded ledger cleanup/backup-restore interaction.
 
 External event delivery, outbox, offsets and webhook consumers remain out of product scope. Before event schema change or purge, deployment-level jobs/readers and effective DB grants still require read-only operational confirmation.
+
+
+## 2026-11-22 — envelope/payload boundary and command versioning proposal
+
+The AdminSecurityAudit common envelope already defines actor, timestamp, command/correlation IDs, outcome, reason and target references as record-level metadata. These fields must not also be duplicated in event-specific JSONB payloads merely because older P-09 tables list them under “required payload”. Payload contains only additional allowlisted event facts. This avoids duplicate/conflicting actor and timestamp values.
+
+Three version axes remain separate: command_version (input semantics), result_version (committed DB result payload), event_version (event-specific payload). The public command envelope currently does not explicitly include command_version; adding it as required integer with first contract version 1 is recorded as a technical proposal, not an owner-approved decision. Every event emitted by one command shares command_id/correlation_id, including one receipt event per card in bulk receipt.
