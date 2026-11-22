@@ -3758,3 +3758,20 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 Это уточнение также снимает прежний открытый вопрос о статусе `removed_by_archive` при отмене невыданного остатка: такого сценария в P-09 нет. `removed_by_archive` остаётся окончательным результатом и не переводится в `cancelled` по причине отмены остатка.
 
 Изменена только Markdown-документация в ветке `docs/ux-audit-project`. Исходники, ORM, SQL/DDL, миграции, тесты, workflows, deployment и БД не изменялись и не запускались. UX-06 остаётся в работе; UX-07 не начат; реализация не разрешена.
+
+## 2026-11-22 — transaction/event gate reconciled with final P-09 workflow
+
+Продолжена сверка технических документов после уточнения владельца продукта о полном составе заявки до отправки.
+
+Исправлены два остаточных источника противоречий:
+- `UX-06-REMAINING-TECHNICAL-GATES.md`: прежний worklist содержал устаревшие допущения о частичной выдаче и отмене остатка. Он заменён актуальным списком: один полный manifest, один атомарный handover, item-level actual receipt, отдельные read-model, event/idempotency, security/deployment и audit-governance gates.
+- `UX-06-DB-SECURITY-TRANSACTION-ARCHITECTURE.md`: старый addendum ошибочно объявлял item-level partial issuance и отмену остатка целевой моделью, а также содержал `receive-all`/`shipment.received_all`. Он приведён к единому отправлению с полным manifest и item-level receipt; bulk receipt остаётся атомарным для выбранных фактически поступивших карт, с отдельным событием на карту.
+
+Технические gates, которые остаются открытыми и не являются новыми бизнес-вопросами:
+- integer event schema versions и machine-readable validators; command input version/canonicalization/hash version;
+- replay policy для детерминированных negative outcomes, HTTP mapping и фактические client retry horizons;
+- read-only DBA/infra preflight: effective grants, ownership, role memberships, default privileges, deployment identities и внешние readers/jobs;
+- AdminSecurityAudit R1–R4 retention/legal-hold governance;
+- реальный PostgreSQL catalog inventory, миграционный mapping/backfill/quarantine/idempotency и доказательства тестами/CI.
+
+Изменена только Markdown-документация в `docs/ux-audit-project`. PostgreSQL/pg_catalog, миграции, SQL/DDL, ORM, API/UI, тесты и CI в этом проходе не запускались и не менялись. UX-06 остаётся открытым; UX-07 и реализация заблокированы.
