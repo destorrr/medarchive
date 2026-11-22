@@ -10,7 +10,7 @@
 
 1. физическое хранение: Card → BoxCardMembership → BoxCycle → BoxPlacement;
 2. групповые заявки ЦО: ArchiveRequest parent + ArchiveRequestItem;
-3. единое отправление archive → central_office и атомарные handover/receive-all;
+3. one-to-many транспортные партии archive → central_office, per-batch handover и item/bulk receipt;
 4. защищённые PostgreSQL DB commands и единая транзакционная граница;
 5. разделение owner/migrator/runtime и постепенный отзыв runtime DML;
 6. append-only DomainEvent с typed/versioned контрактом и отдельный admin/security audit;
