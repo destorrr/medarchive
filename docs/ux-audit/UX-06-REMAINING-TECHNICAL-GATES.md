@@ -17,10 +17,10 @@
 |---|---|---|
 | External consumers and grants | Подтвердить cron/systemd, ETL/BI, read replicas, ручные SQL consumers, интеграции и effective grants | Нельзя безопасно менять event schema/payload/retention, пока неизвестны читатели и обходные права |
 | Deployment topology | Зафиксировать реальные runtime/migrator/backup/monitoring/maintenance identities, DB URLs и secret distribution | Нельзя окончательно проектировать grants, rotation и operational access на предположительной топологии |
-| Typed command/event catalog | P-09 batch/item event names and transaction semantics normalized. Still define exact event schema versions/validators, command input version/canonicalization, replayable negative outcomes, typed HTTP error mapping and final compatibility fixtures | Нужна однозначная DB/API/UI/test boundary до DDL |
+| Typed command/event catalog | P-09 single-shipment/item receipt event names and transaction semantics normalized. Still define exact event schema versions/validators, command input version/canonicalization, replayable negative outcomes, typed HTTP error mapping and final compatibility fixtures | Нужна однозначная DB/API/UI/test boundary до DDL |
 | Admin/security audit policy | AdminSecurityAudit R1–R4 retention/legal-hold schedule still requires organizational approval; typed store/schema/DB boundary and business-data export audit implementation remain. No audit-feed export, no separate cryptographic integrity feature, no raw IP/identity digests; bounded denial telemetry policy and drop-on-failure are approved | R1–R4 governance and schema/privilege boundary block production readiness |
 | Command ledger retention | Ordinary completed records: approved 90 calendar days; irreversible logistics/admin identities: permanent tombstones. Still verify actual client retry horizons and define bounded cleanup/backup-restore procedure | TTL is decided; operational cleanup safety remains open |
-| Migration/reconciliation | Read-only preflight фактических SQLAlchemy/Alembic таблиц; additive P-09 поля `shipments.request_id`, `archive_request_items.fulfillment_batch_id`, `shipment_cards.request_item_id/received_by/received_at`, `cards.custody_location_id`; расширение `partially_received` и замена shipment-wide guards 0002; deterministic legacy request→parent/item map; доказуемое сопоставление shipment/item; custody/receipt reconciliation; checksums, quarantine и idempotent rerun; отдельно legacy SQLite, viewer, incident, CardPlacement и admin event evidence | Нельзя безопасно выполнять backfill/cutover или destructive retirement без точного mapping и отчётов по неоднозначным данным |
+| Migration/reconciliation | Read-only preflight фактических SQLAlchemy/Alembic таблиц; additive P-09 fields for one-to-one parent↔shipment link, `shipment_cards.request_item_id/received_by/received_at`, `cards.custody_location_id`; extend `partially_received` and replace shipment-wide guards 0002; deterministic legacy request→parent/item map; prove one full manifest ↔ one shipment mapping; custody/receipt reconciliation; checksums, quarantine and idempotent rerun; separately legacy SQLite, viewer, incident, CardPlacement and admin event evidence | Нельзя безопасно выполнять backfill/cutover или destructive retirement без точного mapping и отчётов по неоднозначным данным |
 | Evidence matrix | Positive/negative role tests, DB grants, append-only, atomicity, concurrent replay, rollback, migration verification | Нельзя считать технические контракты реализуемыми без проверяемых критериев приёмки |
 
 ## 3. Утверждённая политика при недоступности audit store (2026-11-18)
@@ -97,7 +97,7 @@ The product decisions below are closed and must not be re-asked: the three activ
 
 The remaining UX-06 work is now primarily documentation and technical readiness:
 
-1. **Transport batch implementation contract:** one-to-many parent → fulfillment batches is the selected target model. Finish exact persisted columns/constraints, item-to-batch uniqueness, batch state projection, courier snapshot and migration/backfill design. This is technical specification work, not an open product decision.
+1. **Single P-09 shipment implementation contract:** one-to-one parent → at most one fulfillment shipment is the selected target model. Finish exact persisted columns/constraints, full-manifest guard, item-to-shipment linkage, shipment state projection, courier snapshot and migration/backfill design. This is technical specification work, not an open product decision.
 2. **Command contract normalization:** make all P-09 command sections agree on item-level issuance/receipt, partial fulfillment, per-card custody, bulk atomic receipt and partial cancellation. Resolve any obsolete full-receipt language, including historical text that is not clearly marked superseded.
 3. **Read surfaces:** finish synchronizing object detail, request timeline, archive/CO queues, dashboard counters and card/box details with the latest item states and privacy scope.
 4. **DB invariants:** validate DB-62…DB-70 against existing DB-01…DB-61, define exact state transitions and typed command signatures, and ensure guards preserve append-only history.
@@ -110,7 +110,7 @@ No further product question is currently required for the closed workflow rules 
 
 ## 2026-11-22 — technical reconciliation progress
 
-The foundational storage model, DB transaction architecture and command mapping have now been amended to supersede the obsolete P-09 full-handover/full-receipt model. The technical data model now specifies target relational links and additive migration/backfill rules for parent → batches, item → current batch and immutable ShipmentCard → request item, including composite parent-consistency FKs, manifest guards, quarantine of ambiguous legacy receipt/custody and idempotent reruns. The current required workflow is item-level partial issue and actual receipt, archive custody until CO confirms actual receipt, atomic bulk receipt of arrived cards, and cancellation of only unissued remainder after partial issue. Ordinary box receipt and bulk placement/movement rules are also stated in the command and invariant contracts.
+The foundational storage model, DB transaction architecture and command mapping have now been corrected to preserve the P-09 single full-shipment workflow: all items are processed before one complete manifest is created and handed over atomically; item-level receipt and archive custody until CO receipt remain. The technical data model now specifies target relational links and additive migration/backfill rules for one parent → one shipment and immutable ShipmentCard → request item, including composite parent-consistency FKs, full-manifest guards, quarantine of ambiguous legacy receipt/custody and idempotent reruns. Partial issuance, multiple shipments per parent and cancellation of an unissued remainder after handover are not part of the target workflow.
 
 Remaining tasks:
 1. Consolidate the old contradictory paragraphs in the main bodies of long technical documents so readers do not have to resolve addenda themselves.
@@ -143,7 +143,7 @@ Static review of `postgresql_dashboard.py` shows current counters are based on l
 - Archive P-09 work queue: parent status `submitted` + `processing`.
 - Archive navigation new-request badge: only parent status `submitted`.
 - CO P-09 list: only own parent requests, with parent creator/owner scope.
-- P-09 shipment counters: outstanding request items only; include `partially_received` batches and exclude already received items.
+- P-09 shipment counters: one fulfillment shipment per request; track shipment states `in_transit/partially_received/received` and outstanding item receipts; exclude items already received.
 - Ordinary incoming shipment counters: original manifest boxes counted once by individual receipt state; placement does not affect receipt count.
 - Shipment lists/counters: exact allowed route pairs and role direction, not any shipment touching a location.
 
@@ -252,7 +252,7 @@ Target adapter must map a closed DB result_code allowlist to stable HTTP status/
 
 ## 2026-11-22 — P-09 parent terminal-state projection
 
-Сквозная сверка подтвердила согласованность one-to-many parent → batches, item-to-batch uniqueness, batch state projection, item-level receipt/custody и DB-71…DB-73. Выявлен незакрытый контракт после отмены остатка при наличии уже выданных, но ещё не полученных карт:
+Сквозная сверка ранее ошибочно подтвердила one-to-many parent → batches. Это заключение superseded уточнением владельца продукта от 2026-11-22: одна заявка — не более одного полного fulfillment shipment; обработка всех позиций до создания shipment; один атомарный handover; item-level receipt/custody и DB-71…DB-73 должны отражать эту модель.
 
 - отменяются только невыданные items;
 - выданные items остаются `issued_pending_receipt` и должны быть доступны ЦО для item-level receipt;
@@ -263,14 +263,14 @@ Target adapter must map a closed DB result_code allowlist to stable HTTP status/
 
 ## 2026-11-22 — закрыт gate P-09 parent status после отмены остатка
 
-Сверка первичного решения P-09, технической модели, DB-22, команды отмены и UX-05 однозначно определяет lifecycle: после частичной выдачи отменяется только невыданный остаток, parent остаётся `processing` до receipt всех ранее выданных карт, затем становится `completed`. `cancelled` относится к полной отмене до первой физической выдачи. Выданные items продолжают item-level receipt; событие частичной отмены — `archive_request.remaining_items_cancelled`, а не `archive_request.cancelled`. Это больше не открытый технический gate. Остаются обычные readiness gates по DDL/migration, event schema validators, read models, grants и runtime evidence.
+Уточнение владельца продукта от 2026-11-22 устраняет сценарий частичной выдачи, на котором основывался прежний вывод: все позиции заявки обрабатываются до отправки, затем все `extracted` карты передаются одним отправлением и одной операцией handover. После handover отмена заявки запрещена; остаётся только item-level receipt фактически поступивших карт. Событие `archive_request.remaining_items_cancelled` и полномочия отмены остатка не применяются к этому процессу. Остаются обычные readiness gates по DDL/migration, event schema validators, read models, grants и runtime evidence.
 
 ## 2026-11-22 — actor scope отмены остатка P-09
 
-P-09 разрешает отмену невыданного остатка после частичной выдачи и роли `central_office`, и роли `archive`; отмена всей заявки до первой выдачи остаётся полномочием архива. Контракты синхронизированы на role/scope уровне: активный сотрудник ЦО в пределах локации-заявителя либо активный сотрудник архива с доступом к P-09. Неопределённость, ограничивать ли действие ЦО только автором заявки или разрешать всем активным сотрудникам той же локации, отмечена как узкая детализация actor scope для финальной спецификации; не менять утверждённое право роли ЦО на отмену остатка.
+Прежняя детализация полномочий ЦО и архива на отмену остатка после частичной выдачи superseded уточнением от 2026-11-22: частичной выдачи и отмены остатка после handover в P-09 нет. До handover всю заявку с обязательной причиной отменяет только уполномоченный сотрудник архива.
 
 Проверки авторизации для DB-17 должны включать позитивный сценарий отмены остатка активным сотрудником ЦО своей локации и архивным сотрудником с доступом к заявке, а также отказ для branch, admin и сотрудника ЦО другой локации. Это покрытие должно проверяться до реализации команды.
 
 ## 2026-11-22 — terminal outcome исключений при cancel remainder P-09
 
-При отмене невыданного остатка после частичной выдачи `not_found` сохраняется как уже terminal outcome. Для текущего item status `removed_by_archive` terminal projection не определена прямо: предлагаемое решение — перевести item в `cancelled`, сохранив исходное append-only событие/комментарий и факт возврата карты в коробку без переписывания физической истории. Требуется подтверждение владельца до реализации; DB-17 должен включать этот сценарий после фиксации правила. До отмены остатка восстановление `removed_by_archive` остаётся разрешённым по согласованным item-level условиям.
+Предложение переводить `removed_by_archive` в `cancelled` при отмене остатка снято: такого сценария в актуальном P-09 нет. `removed_by_archive` остаётся окончательным результатом обработки и сохраняет исходное событие/комментарий; восстановление результата допускается только до создания единственного fulfillment draft.
