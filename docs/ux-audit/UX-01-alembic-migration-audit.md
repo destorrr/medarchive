@@ -92,3 +92,14 @@
 Вывод: прежнее предположение о возможной развилке снято — граф линейный. Открытыми остаются подтверждение статуса bootstrap revision, реального DB head, drift и точная сверка ORM/DDL/triggers/indexes/grants. Переименование файла revision 0009 не требуется для устранения графовой проблемы и не должно предприниматься без отдельной оценки опубликованной истории.
 
 Не выполнялись подключение к PostgreSQL, `alembic history/current/check/upgrade`, DDL, миграции или тесты. Это read-only анализ Git-файлов, а не DB preflight.
+
+
+## 2026-11-22 — статическая сверка набора таблиц ORM и Alembic
+
+Сопоставлены декларации `__tablename__` в `src/medarchive/adapters/postgresql/models.py` с `CREATE TABLE` в initial revision.
+
+- ORM объявляет 16 таблиц.
+- Initial revision создаёт 15 таблиц; единственная таблица ORM, отсутствующая в initial revision, — `card_placements`. Она добавляется отдельной revision `0003_card_placements`, поэтому это ожидаемое расширение цепочки, а не отсутствующая миграция.
+- Revision `0011_login_throttles` создаёт `auth_login_throttles`, которой нет среди ORM `__tablename__`. Это отдельный SQL-managed объект; его наличие/схема должны проверяться миграционным inventory и catalog introspection, а не сравнением только ORM metadata.
+
+Это сравнение только по именам таблиц. Оно не доказывает совпадение колонок, типов, defaults, nullable, constraints, indexes или trigger behavior. Для этих объектов требуется пообъектная сверка с результатом PostgreSQL catalog introspection.
