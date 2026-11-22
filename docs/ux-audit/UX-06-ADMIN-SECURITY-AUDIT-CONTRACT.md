@@ -232,3 +232,34 @@ This is a product decision recorded in documentation only. No application/API/DB
 Target policy требует сохранить обязательный успешный login audit до выдачи session cookie; при невозможности commit audit запись сессия не выдаётся. Следовательно, текущая реализация не соответствует fail-closed target: транзакция authentication/throttle завершается без обязательного audit record, а cookie выдаётся после неё. Нужен единый transaction boundary, который фиксирует успешное authentication outcome и обязательный audit event до token/cookie issuance. При этом raw username/IP и их digests не включать в audit payload; throttle bucket остается отдельным механизмом.
 
 Logout сейчас только удаляет cookie; по target catalog logout — best-effort telemetry, поэтому отсутствие durable mandatory logout event не блокирует текущую операцию. Это статический source finding; runtime auth flow и тесты не запускались.
+
+
+## 2026-11-22 — reconciliation with the approved AdminSecurityAudit event catalog
+
+This section supersedes the older candidate taxonomy and unresolved-policy summaries in sections 3, 7, 12–15 wherever they conflict with the later owner decisions in `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md`. The event catalog is the current decision source; this document remains the static implementation-gap record.
+
+### Current mandatory records
+
+- Successful login: `authn.login_succeeded`; commit the mandatory record before issuing the session cookie. The current PostgreSQL path was statically found not to write this event (finding dated 2026-11-22).
+- Successful self-service password change: `authn.password_changed`, atomic with the password update.
+- Successful administrative credential reset: `admin.credential_reset`, atomic with the reset and successful invalidation of all active sessions for the target account.
+- Other approved admin/reference-data changes and P-07 corrections: mandatory typed AdminSecurityAudit records in the same transaction as the mutation; privileged business corrections also write the authoritative DomainEvent atomically.
+- No password, password hash, temporary password, token, reset secret or credential fingerprint may be included in audit payloads.
+
+### Explicit exclusions and bounded telemetry
+
+- Failed login attempts and login-throttle denials are not persisted as AdminSecurityAudit, DomainEvent or telemetry events. The throttle retains only its narrowly required internal state.
+- Ordinary session expiration and per-request rejection of expired/invalid sessions do not create events. Session termination caused by account administration is covered by the account action; no event per terminated session.
+- Explicit user logout is best-effort telemetry; telemetry failure must not delay credential clearing.
+- Selected high-risk authorization denials may produce bounded, best-effort aggregates only: group by controlled operation code + denial-reason code, fixed 15-minute windows, threshold five matching denials, maximum 100 aggregate events per application-wide hour, retention 30 calendar days. No actor, identity, IP or network correlation dimension. On telemetry failure, drop without retry or queue; never block/change the request. Passive technical health metrics are infrastructure-only, with no application UI, user notification or MedArchive audit of monitoring views.
+- Routine denials are not individually persisted. No blanket synchronous audit write for every 401/403.
+
+### Retention, integrity and export
+
+- AdminSecurityAudit retention periods remain unset pending a responsible legal/privacy/records owner and a versioned R1–R4 schedule. Until approved: no automatic deletion, no ad hoc deletion and no assumed indefinite retention.
+- A separate cryptographic integrity-verification feature is explicitly not required: no audit hash chain, MAC/signature, checkpoint, verification job, dashboard or related UI/API. This does not waive append-only controls, atomic writes, retention governance or backup/restore controls.
+- AdminSecurityAudit feed export is prohibited/out of scope. Admin-only feed and detail viewing remain read-only; opening, filtering, pagination and event-detail views are not logged. Separate business-data exports containing patient-identifying data remain governed by their own approved contracts.
+
+### Remaining implementation gaps
+
+Static review still finds the successful PostgreSQL login path issuing a cookie after its authentication/throttle transaction without the mandatory `authn.login_succeeded` record. This is a target mismatch, not a runtime test. The full password-change/reset/session-invalidation paths, exact audit schema and DB write boundary, typed payload validation, read permissions and production grants still require source-to-contract verification. No source, SQL, migration, test or deployment change is authorized by this documentation update.
