@@ -3689,3 +3689,15 @@ This was a documentation-only pass on branch docs/ux-audit-project. No source co
 ## 2026-11-22 — API error contract source audit
 
 Inspected PostgreSQL archive, Central Office, shipment and admin routers/services. Existing JSON endpoints map LookupError, ValueError and IntegrityError inconsistently to 404/422/409; HTML flows often surface raw ValueError text, while IntegrityError handling varies. No single typed error_code-to-HTTP/UI adapter exists. Added a target error-mapping gate: closed DB result_code allowlist, safe localized presentation, no SQL/constraint details, separate transient failures from replayable business outcomes, and retire D-03 incident-specific errors. No runtime requests/tests or source changes.
+
+## 2026-11-22 — сквозная сверка P-09 batches и статусов
+
+Проверены technical data model, DB command contracts, invariants DB-71…DB-73, route/state audit, readiness review и cross-document review.
+
+Подтверждена согласованность целевой one-to-many модели: parent P-09 → несколько fulfillment batches; item связан максимум с одной текущей активной/выданной batch; batch receipt является проекцией item-level receipts; custody карты остаётся у архива до receipt конкретной карты ЦО; bulk receipt атомарен; восстановление исключения проверяется по конкретному item; конкурентные handover/cancel/receipt сериализуются.
+
+Найден незакрытый технический контракт: после отмены невыданного остатка уже выданные items продолжают ожидать receipt ЦО, но матрица для parent `cancelled` задаёт только read-only и не определяет момент перехода parent в `cancelled`. Зафиксировано в cross-document review, remaining technical gates и route/state audit. Нельзя блокировать receipt ранее выданных карт из-за отмены остатка; parent не может считаться завершённым при наличии `issued_pending_receipt`.
+
+Историческое описание единственного fulfillment shipment и `ArchiveRequest.fulfillment_shipment_id` в cross-document review явно помечено как superseded; действующая целевая модель — one-to-many.
+
+Обновлены 4 уникальных Markdown-документа: `UX-06-CROSS-DOCUMENT-CONSISTENCY-REVIEW.md`, `UX-06-REMAINING-TECHNICAL-GATES.md`, `UX-06-SHIPMENT-ROUTE-AND-STATE-AUDIT.md`, `PROGRESS.md`. Изменения документационные; код, ORM, SQL/DDL, миграции, тесты, API/UI, deployment и БД не затрагивались. UX-06 остаётся открытым; UX-07 и реализация не начаты.
