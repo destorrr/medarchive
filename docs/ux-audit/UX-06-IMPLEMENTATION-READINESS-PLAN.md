@@ -36,8 +36,8 @@
 - Начало processing атомарно извлекает все подлежащие обработке карты.
 - Архив фиксирует по каждой позиции результат: отправка, removed_by_archive или not_found.
 - Архив может выдавать карты частями; ЦО подтверждает фактическое получение по каждой карте либо атомарным набором. Ответственность остаётся за архивом до receipt ЦО.
-- P-09: частичная выдача разрешена, receipt item-level; bulk receipt выбранных фактически поступивших карт атомарен; parent завершается после terminal всех items.
-- Handover каждой batch и отмена невыданного остатка сериализуются; выданные items не отменяются, невыданные можно отменить даже после handover другой batch.
+- P-09: все позиции заявки обрабатываются до создания первой fulfillment-партии; только после завершения обработки допускается отправка найденных карт одной или несколькими партиями. Receipt item-level; bulk receipt выбранных фактически поступивших карт атомарен; parent завершается после terminal всех items.
+- Handover каждой batch и отмена ещё не выданных `extracted` позиций сериализуются; `not_found` и `removed_by_archive` после завершения обработки не переписываются и не отменяются как остаток.
 
 ### 2.3 DB security
 - medarchive_owner — NOLOGIN, владелец объектов.
@@ -56,7 +56,7 @@
 | C. Storage transition | BoxCycle/membership/placement invariants, CardPlacement retirement | A, B, D | Нет новых самостоятельных CardPlacement; все архивные карты классифицированы |
 | D. DB security foundation | principals, ownership, schemas, default privileges, function security | Полный DML/read inventory, deployment inventory | Runtime/migrator credentials раздельны; effective ACL подтверждены |
 | E. Command boundary | SQL command API, idempotency, actor/scope, Unit of Work | B, D, G | Критичные операции доступны через стабильный command contract |
-| F. Request/shipment workflows | parent request, items, extraction, partial cancellation, one-to-many batches, per-batch handover, item/bulk receipt | B, C, E, G | P-06/P-09/D-02 invariants выполняются атомарно |
+| F. Request/shipment workflows | parent request, items, full processing before first batch, one-to-many batches, per-batch handover, item/bulk receipt, cancellation of unissued extracted items | B, C, E, G | P-06/P-09/D-02 invariants выполняются атомарно |
 | G. Audit/events | Typed DomainEvent, admin/security audit, consumers | B, D, E | Все записи согласованы с изменениями; нет произвольного runtime insert |
 | H. API/UI | endpoints, screens, dashboards, permissions, filters | B, C, F, G | UI отражает новый lifecycle и не вызывает legacy writes |
 | I. Cutover/hardening | per-aggregate revoke, negative tests, rollback rehearsal | A–H | Runtime DML отозван без скрытых обходных путей |
