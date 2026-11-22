@@ -209,3 +209,10 @@ The admin/security audit gate now records the source-level mismatch between appr
 ## 2026-11-22 — role-scoped read surfaces and object detail
 
 The remaining read-surface gate now explicitly includes the current /history and dashboard global operational feed paths for admin/legacy viewer, branch origin-based card history after handover, missing general card/box detail routes, admin inability to use the shipment detail reader, legacy per-card archive request pages, and incomplete search result identity fields. Target behavior remains: admin global object detail/history only, no global operational feed; branch card history stops at archive handover while own P-08 shipment timeline remains; viewer is removed from target; P-09 request detail is parent/item scoped. See UX-06-ROLE-SCOPED-HISTORY-SEARCH-AUDIT.md. Static review only.
+
+
+## 2026-11-22 — event/command schema versioning gate clarified
+
+The current target catalog has normalized P-09 event names and semantic payload descriptions, but no complete integer event versions or machine-validated per-event schemas. A proposed convention (not owner-approved implementation detail) is event_version 1 for each new normalized event's first schema, with explicit increments for incompatible changes. Historical events are immutable and unversioned where no version was recorded; no guessed backfill. Legacy shipment.created may be mapped read-only only when payload proves equivalence; exception events remain retired per D-03; historical admin.* remains read-only legacy evidence.
+
+Command result_version, command_version and event_version are separate. Shared command_id/correlation_id link all mandatory records from one command, including one item event per card in atomic bulk receipt. Still open: client key lifecycle, canonicalization/hash version, negative-outcome replay policy, complete validators/limits, HTTP error mapping, retry horizon and safe cleanup. See UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md.
