@@ -118,3 +118,17 @@ Object timelines must show item-level actor/time without exposing unrelated card
 ### Scope и граница
 
 Внешние event consumers по решению владельца продукта сейчас не проектируются. Это не снимает обязательную проверку deployment-level readers/jobs и DB credentials/grants перед изменением event contract. В этом проходе просмотрены только доступные исходники; production jobs и внешние SQL readers не подтверждены.
+
+
+## 2026-11-22 — event schema versioning and legacy reader contract
+
+The normalized P-09 event catalog currently supplies event names and semantic payload fields, but final integer versions and machine-readable validators are not yet defined. The ownership/idempotency audit now records a proposed convention: first schema for each new normalized event starts at event_version 1; incompatible payload changes increment the version; reject unsupported versions/unknown keys/oversized payloads. This is a design proposal, not a previously approved integer-version decision.
+
+Compatibility rules:
+- preserve historical event_type/payload unchanged; never backfill guessed event_version/command_id/correlation_id;
+- keep historical shipment.created unchanged; only a read-only adapter may present it as the draft-created concept when payload proves equivalence, while retaining original event identity/type;
+- never synthesize missing item receipt or custody facts;
+- retire D-03 exception event producers/readers instead of adding them to target allowlist;
+- retain historical admin.* DomainEvent as legacy evidence while routing new admin/security writes to AdminSecurityAudit.
+
+One command/correlation pair links all mandatory records emitted by a command; atomic bulk P-09 receipt emits one item receipt event per card under that shared pair. Result envelope version, command input version and event payload version are distinct version axes. Remaining command_id lifecycle, canonicalization/hash, replayable negative outcomes, exact validators, HTTP mapping and deployment consumer/grant preflight remain open gates.
