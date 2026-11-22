@@ -3808,3 +3808,16 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 - В transaction architecture оставался прежний общий порядок блокировок (parent → cards → boxes → shipment), который противоречил принятому P-09 исключению (parent → shipment → items → cards/memberships/boxes). §5.2 теперь явно разделяет общий authorization lock prefix и resource lock order по семействам команд; DB-73 дополнен тем же authorization prefix.
 
 Изменены только Markdown-документы: AdminSecurityAudit event catalog, DB security/transaction architecture, DB invariant/test matrix и этот progress log. Код, ORM, SQL/DDL, миграции, БД, тесты и CI не изменялись и не запускались. UX-06 остаётся открытым; UX-07 не начат.
+
+
+## 2026-11-22 — безопасный replay command ledger
+
+Сверка command contract и idempotency audit выявила некорректную ссылку на отсутствующий §11.4 и недостаточно определённую границу авторизации при replay. Добавлен единый контракт в UX-06-DB-COMMAND-CONTRACTS.md §1.4 и синхронизирован audit:
+
+- перед replay проверяются совпадение command type/version, исходного actor и серверного input hash; другой actor или изменённый вход не получают сохранённый результат;
+- исходный actor должен оставаться активным, а актуальное право чтения проверяется по текущим role/location memberships и scope для каждого возвращаемого объекта/чувствительного поля;
+- отказ в чтении не меняет и не удаляет committed ledger result; применяется безопасный forbidden/not_found согласно политике нераскрытия;
+- при успешной проверке возвращается точный сохранённый envelope без повторного исполнения, проверки устаревших бизнес-предусловий, повторной записи событий или пересчёта агрегата;
+- сбой инфраструктуры при replay не становится новым завершённым ledger outcome.
+
+Ссылка §11.4 заменена на §1.4. Изменены только Markdown-документы: DB command contracts, event/idempotency audit и progress. Остаётся открытым отдельный технический gate: какие детерминированные отрицательные outcomes фиксируются в ledger и какие откатываются; этот вопрос не решался данным уточнением. Код, ORM, SQL/DDL, миграции, БД, тесты и CI не изменялись и не запускались. UX-06 остаётся открытым; UX-07 не начат.
