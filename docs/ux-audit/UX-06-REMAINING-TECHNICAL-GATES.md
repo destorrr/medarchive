@@ -249,3 +249,15 @@ The event/command versioning convention and command_version addition remain tech
 Current PostgreSQL routers/services do not implement one stable typed error contract: admin JSON endpoints map LookupError/ValueError/IntegrityError to varying 404/422/409 responses; HTML workflow paths often render raw str(ValueError), and IntegrityError handling varies. Shipment detail has separate 403/404 behavior. Legacy incident errors remain in source but are excluded by D-03.
 
 Target adapter must map a closed DB result_code allowlist to stable HTTP status/body and safe localized UI text; never expose raw exception/SQL diagnostics. Distinguish validation, authorization, object non-disclosure, invalid state, conflict, idempotency-key reuse and transient infrastructure failure. Transient failures are not completed ledger outcomes. Static inspection only.
+
+## 2026-11-22 — P-09 parent terminal-state projection
+
+Сквозная сверка подтвердила согласованность one-to-many parent → batches, item-to-batch uniqueness, batch state projection, item-level receipt/custody и DB-71…DB-73. Выявлен незакрытый контракт после отмены остатка при наличии уже выданных, но ещё не полученных карт:
+
+- отменяются только невыданные items;
+- выданные items остаются `issued_pending_receipt` и должны быть доступны ЦО для item-level receipt;
+- матрица UI для parent `cancelled` сейчас описывает только read-only;
+- документы не фиксируют, когда именно parent переходит из `processing` в `cancelled` при ожидающих receipt.
+
+До реализации нужно зафиксировать точную parent state projection и синхронизировать command result, queue visibility, receipt authorization и timeline. Безопасный обязательный инвариант уже следует из принятого решения: parent не может считаться полностью завершённым, пока есть `issued_pending_receipt`; отмена остатка не отменяет и не блокирует receipt ранее выданных карт. Это технический gate, не новый вопрос о праве отмены остатка.
+
