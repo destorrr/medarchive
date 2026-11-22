@@ -65,7 +65,7 @@ The next Alembic revision adds database-enforced workflow protections:
 - active box membership cannot be edited while a box is assigned to a draft/in-transit shipment or placed on an archive shelf;
 - deferred constraint triggers validate that every active card in a box has the same physical location or transit shipment as its box;
 - deferred shipment checks validate non-empty manifests, exact box membership snapshots, object transit locations, complete receipt, and request-backed archive-to-central fulfillment;
-- archive requests are tied to one fulfillment shipment and must complete with that shipment's receipt;
+- **legacy baseline only:** archive requests are tied to one fulfillment shipment and complete with that shipment's receipt; this single-shipment/full-receipt contract is superseded by the approved UX-06 P-09 target below and must not be treated as the target design;
 - archive shelf placement is restricted to active, non-empty boxes physically located in the archive;
 - domain events reject UPDATE and DELETE; corrections must be appended as new events.
 
@@ -81,6 +81,19 @@ A card can return to the archive as a standalone item, not only inside a box. Th
 
 When the last active card is removed from a box, its usage cycle is closed. Reusing that physical box starts the next numbered cycle; previous membership rows and cycle records remain intact.
 
+
+## P-09 grouped requests and partial fulfillment — target design, not implemented
+
+The existing PostgreSQL ORM/guard baseline is legacy for P-09: `ArchiveRequest` currently represents one card, carries `fulfillment_shipment_id`, `Shipment` has no `partially_received` state, and `ShipmentCard` has no request-item link or per-card receipt metadata. The existing `Card.current_location_id/current_shipment_id` constraint also does not separately represent the organization retaining custody while a card is physically in transit.
+
+The approved UX-06 target is different and is documented in `docs/ux-audit/UX-06-TECHNICAL-DATA-MODEL.md`:
+- one grouped parent request → zero or more archive → central-office fulfillment batches;
+- each batch has a subset manifest of request items, an assigned courier and its own handover;
+- each manifest card has its own receipt actor/time; batch state includes `partially_received`;
+- physical transit and responsible custodian are separate facts. During archive → CO transit, the card points to its batch while `custody_location_id` remains archive; only actual item receipt transfers custody to central office;
+- cancellation after partial issue affects only unissued items; a card found later may be restored and sent in a later batch of the same parent if that item has not itself been issued/received.
+
+This section records the gap between current implementation and approved target; it does not claim the target is implemented. A future additive Alembic migration must preserve the existing per-card `archive_requests` table during compatibility (shadow parent table), add item/batch/receipt/custody relations, reconcile historical data and only cut over after read-only preflight. Do not edit historical Alembic revisions, run DDL, or enable autogenerate based only on this design. Runtime code, ORM mappings, SQL and tests remain unchanged until a separate implementation authorization.
 
 ## PostgreSQL authentication
 
