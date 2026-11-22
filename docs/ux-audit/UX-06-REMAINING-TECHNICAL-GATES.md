@@ -261,3 +261,6 @@ Target adapter must map a closed DB result_code allowlist to stable HTTP status/
 
 До реализации нужно зафиксировать точную parent state projection и синхронизировать command result, queue visibility, receipt authorization и timeline. Безопасный обязательный инвариант уже следует из принятого решения: parent не может считаться полностью завершённым, пока есть `issued_pending_receipt`; отмена остатка не отменяет и не блокирует receipt ранее выданных карт. Это технический gate, не новый вопрос о праве отмены остатка.
 
+## 2026-11-22 — закрыт gate P-09 parent status после отмены остатка
+
+Сверка первичного решения P-09, технической модели, DB-22, команды отмены и UX-05 однозначно определяет lifecycle: после частичной выдачи отменяется только невыданный остаток, parent остаётся `processing` до receipt всех ранее выданных карт, затем становится `completed`. `cancelled` относится к полной отмене до первой физической выдачи. Выданные items продолжают item-level receipt; событие частичной отмены — `archive_request.remaining_items_cancelled`, а не `archive_request.cancelled`. Это больше не открытый технический gate. Остаются обычные readiness gates по DDL/migration, event schema validators, read models, grants и runtime evidence.
