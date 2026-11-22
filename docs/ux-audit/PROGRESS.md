@@ -3644,3 +3644,8 @@ Static inspection of PostgreSQL auth/admin routes, services, dependencies and mo
 ## 2026-11-22 — role-scoped read and object-detail audit
 
 Refreshed source review of PostgreSQL dashboard/search/history, archive and Central Office routes confirms unresolved target gaps: admin/legacy viewer global operational history and recent movements, branch origin-based card history after archive handover, incomplete search result identity fields, absent general card/box detail timelines, admin blocked from current shipment detail reader, and legacy per-card archive request pages. The target and required read-surface boundaries are recorded in UX-06-ROLE-SCOPED-HISTORY-SEARCH-AUDIT.md. Static inspection only; no runtime queries/tests executed.
+
+
+## 2026-11-22 — event and command versioning pass
+
+Normalized the versioning proposal and legacy compatibility rules across the event ownership audit, consumer inventory and remaining gates. Clarified separate version axes (event payload, command input, command result), immutable historical events, read-only legacy mapping, D-03 exception retirement, and shared command/correlation identity for all mandatory records emitted by one command. The first-schema event_version=1 convention is explicitly a technical proposal, not an owner-approved decision. Remaining unresolved command-key lifecycle, canonical hash, replayable negative outcomes, exact validators, HTTP error mapping, retry horizon and cleanup/backup gates remain open. Documentation-only; no source/DB changes.
