@@ -3781,3 +3781,10 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 Дополнительно устранён конкурирующий список event strings в §6.2 `UX-06-DB-SECURITY-TRANSACTION-ARCHITECTURE.md`. Теперь документ ссылается на канонический `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md` и перечисляет нормализованные P-09 события: `shipment.draft_created`, `archive_request.cancelled`, `shipment.cancelled`, `shipment.handed_over`, item outcome/correction events, `archive_request.item_received_by_central_office` и `archive_request.completed`. Старые `.v1` примеры и `shipment.received_all` не должны трактоваться как утверждённые schema versions или альтернативные event names.
 
 Открытыми остаются integer `event_version`/machine-readable validators, `command_version` и canonicalization/hash contract, replay policy для negative outcomes, retry horizons/cleanup, typed HTTP mapping и external consumer/grant/deployment preflight. Новых продуктовых вопросов не выявлено.
+
+
+## 2026-11-22 — DB-73: race-proof P-09 draft/cancel/handover
+
+Уточнена проверяемая конкурентная модель P-09 в `UX-06-INVARIANTS-DB-TEST-MATRIX.md`. DB-73 теперь явно охватывает не только гонку whole-request cancel с handover, но и конкуренцию создания единственного draft shipment с отменой parent. Зафиксирован общий порядок блокировок `parent → shipment → items (стабильный порядок) → cards/memberships/boxes`, обязательная повторная проверка actor role/scope и состояния объектов после блокировки, а также атомарность whole-request cancel при уже существующем draft: возврат всех `extracted` карт, отмена draft и parent одной транзакцией. Добавлены негативные/конкурентные критерии: orphan draft для отменённой заявки невозможен; гонка cancel/handover завершается ровно одним из двух полных исходов; после handover отмена parent/остатка запрещена; повторные handover/receipt не создают повторных переходов/событий; ошибка возврата одной карты откатывает всю отмену.
+
+Изменение документальное. Код, ORM, SQL/DDL, миграции, БД, тесты и CI не запускались и не менялись. UX-06 остаётся открытым; UX-07 не начат.
