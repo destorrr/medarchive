@@ -163,6 +163,14 @@
 - Сохранить автора, timestamps, fulfilled_by, comments/reasons и исторические связи.
 - Историю изменения состава не реконструировать вымышленными событиями: явно пометить недоступную историческую детализацию.
 
+**P-09 transport batch backfill**
+- Additive schema only: introduce nullable `shipments.request_id`, `archive_request_items.fulfillment_batch_id`, `shipment_cards.request_item_id` and courier/receipt metadata only where absent. Keep legacy per-card request/shipment columns and constraints during compatibility.
+- Build deterministic mapping from every legacy per-card request UUID to exactly one parent + one item. Store this mapping in a unique migration map; preserve source IDs, actor/time, comments/reasons and DomainEvent history.
+- Create a fulfillment batch only where the legacy shipment ↔ request/card manifest relation is unambiguous. Do not merge shipment rows based on matching dates, courier names or similar card lists.
+- Do not infer item-level receipt from a legacy shipment-wide received status unless source evidence proves receipt of that specific card. Ambiguous shipment/item/custody rows go to a quarantine report and block cutover; no synthetic receipt/handover events.
+- Reconcile parent/item/batch/manifest counts, unique active card reservations, item-to-batch assignment, shipment route, card current location/custody, timestamps and actor references. Produce checksums and UUID-level trace samples.
+- Backfill must be idempotent: rerunning with the same migration batch/source UUIDs cannot create duplicate parent, item, batch, manifest row or event. Preserve legacy records read-only through the compatibility window; drop/rename is a separate approved retirement step.
+
 **Storage**
 - Не конвертировать CardPlacement в BoxPlacement автоматически.
 - Карты с CardPlacement без membership вынести в ручную сверку; размещение в коробку выполняет уполномоченный пользователь с новым событием.
