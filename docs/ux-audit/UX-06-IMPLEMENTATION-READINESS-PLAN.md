@@ -163,20 +163,21 @@
 - Сохранить автора, timestamps, fulfilled_by, comments/reasons и исторические связи.
 - Историю изменения состава не реконструировать вымышленными событиями: явно пометить недоступную историческую детализацию.
 
-**P-09 physical transit, custody and item receipt**
+**P-09 full shipment, physical transit, custody and item receipt**
 - The current `Card.current_location_id/current_shipment_id` pair describes location/transit, while current `custody_status` describes external custody and does not identify the responsible organization. Target schema must add a distinct `cards.custody_location_id` FK; do not overload `custody_status`.
-- For archive → CO handover, set the card's current shipment pointer to the specific batch but keep `custody_location_id = archive`. Only item receipt moves `custody_location_id` to central_office and clears the transit pointer.
-- Add `shipment_cards.request_item_id`, `received_by`, `received_at` for P-09 item-level linkage and receipt evidence. A batch transitions to `partially_received` after the first, but before the last, item receipt; shipment-level received fields are populated only after every manifest card is received.
-- Extend `shipments_status_check`, `ck_shipment_handover_time`, `ck_shipment_received_fields`, `ck_shipment_exception_fields`, handover/receipt CHECK constraints and deferred shipment guards together. Replace the legacy `medarchive_guard_shipment_update`, shipment consistency triggers and `medarchive_guard_archive_request` from revision `0002_workflow_guards` at the controlled P-09 cutover; they currently enforce shipment-wide transit/receipt and one `fulfillment_shipment_id`. Preserve ordinary box shipment semantics; do not globally impose P-09 partial receipt states on other routes.
+- Archive must complete processing of every request item before creating the only fulfillment shipment. The immutable manifest contains all and only `extracted` items; `not_found` and `removed_by_archive` are excluded.
+- Handover transfers the entire manifest in one atomic operation. Partial issue, multiple shipments per parent and processing remaining items after handover are prohibited.
+- On handover, each card in the full manifest gets the shipment transit pointer while `custody_location_id = archive`. Only item receipt moves `custody_location_id` to central_office and clears the transit pointer.
+- Add `shipment_cards.request_item_id`, `received_by`, `received_at` for P-09 item-level linkage and receipt evidence. The single shipment transitions to `partially_received` after the first, but before the last, item receipt; shipment-level received fields are populated only after every manifest card is received.
+- Extend `shipments_status_check`, `ck_shipment_handover_time`, `ck_shipment_received_fields`, `ck_shipment_exception_fields`, handover/receipt CHECK constraints and deferred shipment guards together. Replace the legacy `medarchive_guard_shipment_update`, shipment consistency triggers and `medarchive_guard_archive_request` from revision `0002_workflow_guards` at the controlled P-09 cutover. Preserve ordinary box shipment semantics.
 
-**P-09 transport batch backfill**
+**P-09 single-shipment backfill**
 - Additive schema only: current `archive_requests` is a per-card table, so create a shadow parent table and `archive_request_items`; introduce one-to-one parent↔shipment link (nullable UNIQUE `fulfillment_shipment_id` or authoritative UNIQUE `shipments.request_id`), `shipment_cards.request_item_id`, item receipt/custody metadata only where absent. Do not add `archive_request_items.fulfillment_batch_id`.
 - Build deterministic mapping from every legacy per-card request UUID to exactly one parent + one item. Store this mapping in a unique migration map; preserve source IDs, actor/time, comments/reasons and DomainEvent history.
-- Create a fulfillment batch only where the legacy shipment ↔ request/card manifest relation is unambiguous. Do not merge shipment rows based on matching dates, courier names or similar card lists.
+- Create one parent fulfillment shipment only where the legacy shipment ↔ request/card manifest relation is unambiguous and where it represents the full set of cards to be sent. Do not infer parent membership or merge shipment rows based on matching dates, courier names or similar card lists.
 - Do not infer item-level receipt from a legacy shipment-wide received status unless source evidence proves receipt of that specific card. Ambiguous shipment/item/custody rows go to a quarantine report and block cutover; no synthetic receipt/handover events.
-- Reconcile parent/item/batch/manifest counts, unique active card reservations, item-to-batch assignment, shipment route, card current location/custody, timestamps and actor references. Produce checksums and UUID-level trace samples.
-- Backfill must be idempotent: rerunning with the same migration batch/source UUIDs cannot create duplicate parent, item, batch, manifest row or event. Preserve legacy records read-only through the compatibility window; drop/rename is a separate approved retirement step.
-
+- Reconcile parent/item/single-shipment/manifest counts, unique active card reservations, item-to-shipment assignment, shipment route, card current location/custody, timestamps and actor references. Produce checksums and UUID-level trace samples.
+- Backfill must be idempotent: rerunning with the same migration batch/source UUIDs cannot create duplicate parent, item, shipment, manifest row or event. Preserve legacy records read-only through the compatibility window; drop/rename is a separate approved retirement step.
 **Storage**
 - Не конвертировать CardPlacement в BoxPlacement автоматически.
 - Карты с CardPlacement без membership вынести в ручную сверку; размещение в коробку выполняет уполномоченный пользователь с новым событием.
