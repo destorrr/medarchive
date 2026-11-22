@@ -103,3 +103,16 @@ DB-SEC-04 (owner NOLOGIN, migrator LOGIN, runtime LOGIN с разными creden
 - Не выполнялись PostgreSQL/SQL/pg_catalog, Alembic, pytest или CI.
 - Исходники, конфигурация, migrations, workflows и deployment не изменялись.
 - Документ фиксирует расхождения и проектные требования, но не является реализацией DB-SEC-01…04 и не разрешает cutover.
+
+
+## 2026-11-22 — refreshed repository-wide principals/grants scan
+
+Repeated a static scan of the current branch across the PostgreSQL initial SQL, Alembic env, every revision 0001–0011 present in the repository, Docker Compose and PostgreSQL CI workflow.
+
+- No executable CREATE ROLE/USER, ALTER ROLE, GRANT, REVOKE, ALTER DEFAULT PRIVILEGES, SET ROLE or SECURITY DEFINER provisioning was found in the inspected Alembic revisions or deployment files.
+- The only matching GRANT/REVOKE-related SQL in the initial schema/revision 0001 is a comment describing a future append-only intention; it is not an executed ACL statement.
+- Alembic CI runs the upgrade to head, but that does not establish separated owner/migrator/runtime principals.
+- Existing deployment audit remains valid: application, Alembic, bootstrap and backup paths are wired to the same MEDARCHIVE_DATABASE_URL in the inspected configuration; no separate migrator URL/runner or distinct backup principal is defined in the inspected files.
+- Product decision DB-SEC-04 already approves the target principal split (owner NOLOGIN, migrator LOGIN, runtime LOGIN); this is an implementation gap, not an unresolved product decision.
+
+No actual database was queried. Therefore current role membership, owners, effective privileges, PUBLIC/default grants, inherited grants, RLS, role attributes, secret distribution and deployed systemd/cron jobs remain unknown. Do not infer them from repository files. Read-only DBA preflight is required before any DDL, ACL change or event/ledger cutover.
