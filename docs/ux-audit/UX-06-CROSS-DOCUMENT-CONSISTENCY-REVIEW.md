@@ -1409,3 +1409,16 @@ This correction is documentation-only. No application, database, migration, test
 ### Граница проверки
 
 Проверка статическая, по документам в ветке `docs/ux-audit-project`. ORM, SQL/DDL, миграции, тесты, API/UI и БД не изменялись и не запускались. UX-06 остаётся открытым до закрытия parent terminal-state projection и остальных readiness gates.
+
+## 2026-11-22 — закрытие P-09 parent terminal-state projection
+
+Предыдущая запись о неопределённости статуса parent после отмены невыданного остатка снята после сверки с принятым P-09 §30–32, technical data model §§3.1/5.3, DB command contract §2.7, DB-22 и UX-05 queue semantics. Однозначная модель уже содержится в этих источниках:
+
+- `cancelled` — полная отмена draft/submitted либо отмена processing до первой физической выдачи;
+- после частичной выдачи отмена затрагивает только невыданные позиции и публикует `archive_request.remaining_items_cancelled`; parent остаётся `processing`, `cancelled_at/cancelled_by` не устанавливаются;
+- ранее выданные позиции остаются `issued_pending_receipt`; ЦО продолжает item-level receipt;
+- когда все позиции терминальны (получены ЦО, `not_found` или отменены как невыданный остаток), parent становится `completed` и публикуется `archive_request.completed`.
+
+Таким образом, после частичной выдачи родительская заявка не переходит в `cancelled`. Дополнительное продуктовое решение не требуется. Матрица route/state, command event semantics, dashboard queue и event consumer inventory синхронизированы. Также исправлено устаревшее утверждение о единственной fulfillment transport record: актуальна one-to-many модель parent → batches.
+
+Проверка статическая; исходники, ORM, SQL/DDL, миграции и тесты не менялись и не запускались.
