@@ -37,7 +37,7 @@
 - Архив фиксирует по каждой позиции результат: отправка, removed_by_archive или not_found.
 - Архив может выдавать карты частями; ЦО подтверждает фактическое получение по каждой карте либо атомарным набором. Ответственность остаётся за архивом до receipt ЦО.
 - P-09: частичная выдача разрешена, receipt item-level; bulk receipt выбранных фактически поступивших карт атомарен; parent завершается после terminal всех items.
-- Отмена до handover и handover сериализуются; после фактической передачи отмена недоступна.
+- Handover каждой batch и отмена невыданного остатка сериализуются; выданные items не отменяются, невыданные можно отменить даже после handover другой batch.
 
 ### 2.3 DB security
 - medarchive_owner — NOLOGIN, владелец объектов.
@@ -56,7 +56,7 @@
 | C. Storage transition | BoxCycle/membership/placement invariants, CardPlacement retirement | A, B, D | Нет новых самостоятельных CardPlacement; все архивные карты классифицированы |
 | D. DB security foundation | principals, ownership, schemas, default privileges, function security | Полный DML/read inventory, deployment inventory | Runtime/migrator credentials раздельны; effective ACL подтверждены |
 | E. Command boundary | SQL command API, idempotency, actor/scope, Unit of Work | B, D, G | Критичные операции доступны через стабильный command contract |
-| F. Request/shipment workflows | parent request, items, extraction, cancel, single handover, receive-all | B, C, E, G | P-06/P-09/D-02 инварианты выполняются атомарно |
+| F. Request/shipment workflows | parent request, items, extraction, partial cancellation, one-to-many batches, per-batch handover, item/bulk receipt | B, C, E, G | P-06/P-09/D-02 invariants выполняются атомарно |
 | G. Audit/events | Typed DomainEvent, admin/security audit, consumers | B, D, E | Все записи согласованы с изменениями; нет произвольного runtime insert |
 | H. API/UI | endpoints, screens, dashboards, permissions, filters | B, C, F, G | UI отражает новый lifecycle и не вызывает legacy writes |
 | I. Cutover/hardening | per-aggregate revoke, negative tests, rollback rehearsal | A–H | Runtime DML отозван без скрытых обходных путей |
@@ -270,7 +270,7 @@
 | Cancel до processing | parent cancelled, pending items cancelled, reason/event | часть состава осталась активной |
 | Cancel после processing | возврат всех extracted карт, terminal item statuses, parent cancelled, events | часть карт возвращена, часть оставлена извлечённой |
 | Handover batch | parent/batch/item locks, selected batch manifest, items issued_pending_receipt, archive custody unchanged, events | повторная выдача, item в двух batches, ошибочный parent reference |
-| Receive all | полный manifest validation, все карты/коробки перемещены, shipment received, items completed, parent completed при выполнении условий | частичная приёмка или completed parent при непринятом shipment |
+| P-09 item/bulk receipt | validate only selected actually-arrived items; update each item receipt/custody/location, batch projection, parent terminality and per-item events atomically | any non-arrived item accepted; partial mutation on bulk failure; premature batch/parent completion |
 | Regroup | lock всех коробок/карт, close old memberships/cycles, create new cycles/memberships, preserve placements, events | автоматическое снятие placement пустой коробки по общему trigger |
 | Admin correction | allowlisted correction, reason, before/after audit, actor/time | произвольный UPDATE без отдельной записи аудита |
 
@@ -283,7 +283,7 @@
 - archive card membership/extracted invariant;
 - no membership + extracted overlap;
 - no duplicate active request items across parents;
-- transport records support partial issue without forcing a full-parent manifest; exact grouping/storage model remains a technical design gate;
+- parent → batches one-to-many; each immutable batch manifest contains only selected items from one parent;
 - each transport batch contains only cards physically issued in that batch; parent item states remain independently tracked;
 - parent cannot complete before all terminal results and receipt;
 - after partial issue only the unissued remainder may be cancelled; issued items remain active until actual CO receipt;
@@ -306,7 +306,7 @@
 - cancel vs handover;
 - duplicate start processing;
 - duplicate handover;
-- duplicate receive-all;
+- duplicate item/bulk receipt; duplicate batch handover;
 - two requests competing for same card;
 - regroup vs shipment/request extraction;
 - concurrent membership and placement mutation;
