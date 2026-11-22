@@ -3611,3 +3611,12 @@ UX-06 остаётся **в работе**. Продуктовые ответы 
 Проверен `src/medarchive/routers/postgresql_dashboard.py` и сопоставлен с принятыми правилами очередей и P-09. Текущая реализация считает legacy per-card `ArchiveRequest.new/in_progress`, использует shipment status только `in_transit` и широкую проверку маршрута через from/to location. Target read models должны быть отдельными: архивная очередь P-09 (`submitted + processing`), badge новых заявок (`submitted` only), список собственных заявок ЦО, очередь отправлений по точным разрешённым route pairs, box-level receipt counters по неизменяемому манифесту и P-09 item-level outstanding receipt counters с учётом `partially_received`.
 
 Зафиксировано в readiness gap review и remaining technical gates. Исходники, SQL/DDL, ORM, миграции и тесты не менялись; это статическое сравнение текущего кода с утверждённой целевой моделью.
+
+
+## 2026-11-22 — AdminSecurityAudit и DB privilege static pass
+
+Проверены event catalog/access policy, DB-SEC decisions, admin service/router, DomainEvent ORM, Alembic revisions и draft initial SQL. Текущий admin service по-прежнему пишет admin.* в общий DomainEvent; отдельной AdminSecurityAudit ORM/table нет в просмотренной модели. /admin/audit уже server-side ограничен admin, но читает legacy DomainEvent, а не целевой отдельный журнал. Текущие admin payloads включают username/full_name, courier phone и before/after snapshots, что шире целевого минимального event-specific allowlist.
+
+Migration 0002 создаёт append-only UPDATE/DELETE trigger для DomainEvent; это не доказывает ограничение INSERT или защиту от table owner/superuser. Статический поиск миграций/draft SQL не обнаружил исполняемых GRANT/REVOKE/CREATE ROLE/USER/default privileges/SECURITY DEFINER bootstrap; только комментарий о REVOKE. DB-SEC-01…04 предусматривают отдельные runtime/migrator/infra principals и DBA bootstrap. Эффективные grants/owners можно установить только read-only preflight реальной PostgreSQL.
+
+Target decisions подтверждены: admin-only audit feed/details, без audit-feed export и без логирования обычного чтения; raw IP/identity digests не собирать; retention R1–R4 не утверждён и остаётся governance blocker. Код/ORM/DDL/migrations/tests не менялись, DB и CI не запускались.
