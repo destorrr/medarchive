@@ -308,7 +308,7 @@ This addendum supersedes the earlier full-manifest/full-receipt model in §§3�
 
 ### P-09 item-level operations
 
-The parent archive request contains multiple card items. Archive item outcomes, physical issue, actual CO receipt, and custody must be represented as distinct facts. Partial issue is allowed; an unissued item remains pending and may be issued later in the same request. A not_found item requires a closed-list reason code and optional comment; it does not write off the card or invent a new location. After partial issue, CO may cancel only the remaining unissued items.
+The parent archive request contains multiple card items. Archive must finish processing every item before creating the single fulfillment shipment; the full manifest includes all and only `extracted` items. Partial issue, multiple shipments per parent and processing remaining items after handover are prohibited. A `not_found` item requires a closed-list reason code and optional comment; it does not write off the card or invent a new location. `removed_by_archive` is also a final processing outcome and is not converted to `cancelled` by remainder cancellation, because no such post-handover remainder operation exists. Before handover, only archive may cancel the whole request; after handover cancellation is prohibited. Item-level actual CO receipt and archive custody until each receipt remain distinct facts.
 
 The database command boundary must provide:
 - an item-level archive issue/dispatch command;
