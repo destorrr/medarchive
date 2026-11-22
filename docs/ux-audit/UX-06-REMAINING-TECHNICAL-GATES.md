@@ -204,3 +204,8 @@ The PostgreSQL successful-login path remains a confirmed static implementation g
 ## 2026-11-22 — password lifecycle implementation gap added
 
 The admin/security audit gate now records the source-level mismatch between approved password lifecycle decisions and current PostgreSQL routes/services: missing self-service change, generic admin user-update password reset, missing self-reset prohibition and administrator re-authentication, missing forced-change state/limited login mode, incomplete session semantics, and legacy DomainEvent/raw-payload admin audit UI. See `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. Static inspection only; runtime/DB/tests not run.
+
+
+## 2026-11-22 — role-scoped read surfaces and object detail
+
+The remaining read-surface gate now explicitly includes the current /history and dashboard global operational feed paths for admin/legacy viewer, branch origin-based card history after handover, missing general card/box detail routes, admin inability to use the shipment detail reader, legacy per-card archive request pages, and incomplete search result identity fields. Target behavior remains: admin global object detail/history only, no global operational feed; branch card history stops at archive handover while own P-08 shipment timeline remains; viewer is removed from target; P-09 request detail is parent/item scoped. See UX-06-ROLE-SCOPED-HISTORY-SEARCH-AUDIT.md. Static review only.
