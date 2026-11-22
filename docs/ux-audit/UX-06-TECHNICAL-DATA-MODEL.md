@@ -135,73 +135,73 @@ Box (1)
 
 **Важно:** обычный partial index не может проверять статус родителя через JOIN. Поэтому уникальность активной заявки на карту должна выражаться состоянием позиции, либо отдельным денормализованным признаком с DB trigger. Нельзя проектировать индекс по условию, которое требует чтения родительской таблицы. Поэтому `reservation_active` — денормализованный признак на позиции, поддерживаемый только защищёнными DB-командами/trigger: включается при создании активной позиции; выключается для draft tombstone и для всех позиций при терминализации родителя (`completed`/`cancelled`). Deferred consistency trigger проверяет соответствие признака статусу родителя и tombstone. `removed_by_archive` и `not_found` при родителе `submitted`/`processing` сохраняют резервирование, даже если карта физически находится в коробке или не локализована.
 
-### 3.4. Связь заявки с транспортными партиями
+### 3.4. Связь заявки с единственным транспортным отправлением
 
-**Техническое решение от 2026-11-22:** связь P-09 parent → fulfillment batches — one-to-many. Каждая партия имеет `request_id`, отдельный неизменяемый manifest и обязательный courier FK/snapshot. Каждая позиция получает nullable `fulfillment_batch_id`; после физической выдачи её состояние `issued_pending_receipt`. Несколько партий могут последовательно/параллельно обслуживать одну заявку, но **первая партия создаётся только после полного завершения обработки всех позиций**; последующие партии включают только уже обработанные позиции `extracted`. Результаты обработки после создания первой партии неизменяемы. Не использовать единственный `ArchiveRequest.fulfillment_shipment_id`. Состав партии проверяется DB guards: все items принадлежат одному parent, имеют `extracted` и готовы к выдаче, повторное включение запрещено.
+**Техническое решение:** P-09 parent связан максимум с одним fulfillment shipment (one-to-one, 0..1 на стороне заявки до создания). В целевой модели используется `ArchiveRequest.fulfillment_shipment_id` как nullable UNIQUE FK; обратный `Shipment.request_id` может быть UNIQUE FK либо вычисляемой/нехранимой связью — выбрать один authoritative вариант при финализации DDL. Отправление создаётся только после полного завершения обработки всех позиций и содержит все позиции `extracted`. Позиции `not_found` и `removed_by_archive` в manifest не включаются. Отправка подмножества карт, несколько отправлений по одной заявке и продолжение обработки после отправки запрещены.
 
-### 3.5. Транспортная партия P-09 (`Shipment` fulfillment batch)
+### 3.5. Единственное fulfillment-отправление P-09 (`Shipment`)
 
-Для P-09 используется существующий агрегат `Shipment` в роли отдельной транспортной партии. Целевая связь: `ArchiveRequest 1 → N Shipment`; каждая такая запись имеет `request_id` и маршрут `archive → central_office`. Обычные box shipments не имеют `request_id` и продолжают использовать свой существующий жизненный цикл.
+Для P-09 используется существующий агрегат `Shipment` в роли единственного отправления по заявке. Целевая связь: `ArchiveRequest 1 → 0..1 Shipment`; маршрут — `archive → central_office`. Обычные box shipments не имеют связи с P-09 и продолжают использовать собственный жизненный цикл.
 
-Рекомендуемые поля/ограничения партии:
+Рекомендуемые поля/ограничения:
 
 | Поле | Назначение / правило |
 |---|---|
-| `id` | UUID PK, идентификатор партии |
-| `request_id` | FK на P-09 parent, NOT NULL для fulfillment batch |
+| `id` | UUID PK, идентификатор отправления |
+| `request_id` | UNIQUE FK на P-09 parent; NULL для обычных отправлений |
 | `status` | `draft`, `in_transit`, `partially_received`, `received`, `cancelled` |
 | `created_by`, `created_at` | Автор и время создания draft |
-| `handed_over_by`, `handed_over_at` | Автор и время фактической выдачи партии |
-| `received_at` | Заполняется, когда все карты конкретной партии фактически подтверждены ЦО |
-| `courier_id` | Обязательный FK на активного курьера при создании партии |
+| `handed_over_by`, `handed_over_at` | Автор и время единственного фактического handover |
+| `received_at` | Заполняется, когда все карты manifest фактически подтверждены ЦО |
+| `courier_id` | Обязательный FK на активного курьера при создании draft |
 | `courier_name_snapshot` | Историческое отображаемое ФИО курьера на момент назначения |
-| `cancelled_by`, `cancelled_at`, `cancellation_reason` | Actor/time/reason для отмены draft партии; обязательная причина — согласно общему контракту отмены draft shipment |
+| `cancelled_by`, `cancelled_at`, `cancellation_reason` | Actor/time/reason отмены draft только вместе с отменой parent до handover |
 | `created_at`, `updated_at` | Системные даты |
 
-**Проекция состояния партии:**
-- `draft`: манифест выбранных карт создан, handover ещё не выполнен.
-- `in_transit`: handover выполнен, ни одна карта этой партии ещё не подтверждена ЦО.
-- `partially_received`: подтверждена ЦО хотя бы одна, но не все карты партии.
-- `received`: фактическое получение ЦО подтверждено для каждой карты в манифесте этой партии.
-- `cancelled`: draft отменён до handover; партия остаётся в истории, физическая выдача не считается состоявшейся.
+**Проекция состояния отправления:**
+- `draft`: полный manifest всех карт `extracted` создан, handover ещё не выполнен.
+- `in_transit`: единственный handover выполнен, ни одна карта ещё не подтверждена ЦО.
+- `partially_received`: ЦО подтвердил хотя бы одну, но не все карты manifest.
+- `received`: фактическое получение ЦО подтверждено для каждой карты manifest.
+- `cancelled`: draft отменён только в составе отмены parent до handover; отправление остаётся в истории.
 
-Состояние `received` партии означает только, что все её карты получили item-level receipt. Оно **не завершает P-09 parent**, если другие уже обработанные позиции `extracted` ещё не включены в партию/не отменены либо выданные позиции не получили receipt. Необработанных позиций к этому этапу быть не может: обработка всех позиций завершена до создания первой партии.
+Состояние `received` отправления означает, что все карты полного manifest получили item-level receipt. Поскольку все остальные позиции уже имеют окончательные результаты `not_found` или `removed_by_archive`, получение полного manifest позволяет завершить P-09 parent.
 
-**Манифест и связи:**
-- Для каждой выбранной карты создаётся `ShipmentCard` и связь с `ArchiveRequestItem.fulfillment_batch_id`; обе связи должны указывать на одну и ту же batch.
-- Уникальность `ArchiveRequestItem.fulfillment_batch_id` и `ShipmentCard.card_id`/активного item link защищает от повторной выдачи карты в нескольких партиях.
-- Состав манифеста фиксируется при создании draft и не меняется после создания. Ошибочный draft отменяется и создаётся новая партия с корректным набором; исходная история остаётся.
-- После handover запрещено менять состав и курьера. Фактическое receipt изменяет состояние item и проекцию партии, но не manifest.
-- Parent остаётся `processing`, пока все request items не получили terminal outcome. Handover партии не меняет custody; receipt каждой карты меняет её учётную локацию/custody на ЦО.
+**Manifest и связи:**
+- Для каждой позиции `extracted` создаётся ровно одна `ShipmentCard` с `request_item_id`; составной FK/guard проверяет, что позиция и карта принадлежат parent, связанному с этим единственным shipment.
+- UNIQUE по `request_item_id` и `card_id` в `ShipmentCard` запрещает повторное включение позиции/карты в другое отправление.
+- Manifest содержит все и только позиции `extracted` данного parent; частичный manifest запрещён. Состав фиксируется при создании draft и далее неизменяем.
+- Ошибочный draft отменяется только вместе с отменой всей заявки; новое отправление по той же заявке не создаётся.
+- После handover запрещено менять manifest и курьера. Item-level receipt меняет состояние конкретной позиции и проекцию shipment, но не manifest.
+- Parent остаётся `processing`, пока все карты manifest не получили receipt. Handover не меняет custody; receipt каждой карты меняет её учётную локацию/custody на ЦО.
 
 ### 3.6. Целевые persisted-связи, индексы и ограничения P-09
 
 Этот раздел фиксирует рекомендуемую целевую реляционную форму. Имена колонок должны быть сверены с фактическими SQLAlchemy-моделями и текущими Alembic revisions на read-only preflight; до этой сверки DDL не создаётся.
 
-**1. Parent → batches**
-- `shipments.request_id UUID NULL REFERENCES archive_requests(id) ON DELETE RESTRICT`. NULL означает обычное отправление; NOT NULL — fulfillment batch P-09.
-- Удалить из целевой модели предположение об уникальности `shipments.request_id`: несколько shipment rows могут ссылаться на один parent.
-- Создать составную уникальность `UNIQUE (id, request_id)` на `shipments` для последующей проверки согласованности parent/item.
-- Индекс очереди: `(request_id, created_at, id)` с условием `request_id IS NOT NULL`. Не создавать UNIQUE index по request_id.
+**1. Parent ↔ единственное shipment**
+- `archive_requests.fulfillment_shipment_id UUID NULL UNIQUE REFERENCES shipments(id) ON DELETE RESTRICT` (имя рабочее; проверить фактическую DDL). NULL до создания draft; заполнено после создания единственного fulfillment shipment.
+- `shipments.request_id UUID NULL UNIQUE REFERENCES archive_requests(id) ON DELETE RESTRICT`; NULL означает обычное отправление, NOT NULL — fulfillment P-09. Две ссылки должны быть согласованы deferred guard; при выбранном варианте можно оставить одну FK как authoritative, вторую не хранить.
+- Уникальность по request_id запрещает два fulfillment shipments на один parent.
 
-**2. Item → current batch**
-- `archive_request_items.fulfillment_batch_id UUID NULL` — текущая активная/выданная batch для позиции. Для составного FK manifest consistency обеспечить `UNIQUE (id, request_id, card_id)` на item (либо эквивалентный ключ, проверенный по фактической DDL).
-- Уникальность назначения обеспечивается самой FK-колонкой на item (одна строка item может ссылаться максимум на одну текущую batch); связь дополнительно защищается составным FK `(fulfillment_batch_id, request_id) → shipments(id, request_id)`. Это не позволяет связать item с batch другой заявки.
-- После отмены draft партии ссылка item очищается только в той же транзакции, в которой batch переводится в `cancelled`; историческая связь остаётся в неизменяемом manifest. После handover ссылка не очищается.
-- Индексы: `(fulfillment_batch_id)` для выборки состава партии; partial index на `request_id` для активных/не tombstone items, если подтверждён планом запросов и фактической селективностью.
+**2. Item ↔ immutable manifest**
+- Не добавлять `archive_request_items.fulfillment_batch_id`. Связь item/shipment задаётся через `shipment_cards.request_item_id`.
+- `shipment_cards.request_item_id UUID NULL REFERENCES archive_request_items(id) ON DELETE RESTRICT`; для P-09 NOT NULL, для обычных отправлений NULL. UNIQUE по `request_item_id` запрещает включить позицию в другое отправление.
+- Составной FK/constraint trigger проверяет, что `shipment_cards.shipment_id` — единственный shipment данного parent, `request_item_id` принадлежит этому parent и `shipment_cards.card_id = archive_request_items.card_id`.
+- Manifest guard требует равенства множества manifest items множеству всех items parent со статусом `extracted` на момент создания draft; subset/superset запрещены.
+- Индексы: `(shipment_id, request_item_id)` для манифеста и UNIQUE `request_item_id` для защиты от повторного включения.
 
 **3. Immutable manifest**
-- `shipment_cards` сохраняет связь `shipment_id → shipments.id`; для P-09 дополнительно вводится `request_item_id` FK на `archive_request_items.id` и уникальность `(shipment_id, request_item_id)`.
-- Для P-09 `request_item_id` обязателен; для обычных отправлений допускается NULL. Добавить составной FK/constraint trigger, проверяющий совпадение `shipment_cards.shipment_id`, `shipments.request_id`, `request_item_id` и `archive_request_items.request_id`. Один item не может одновременно присутствовать в нескольких неотменённых manifests.
-- Manifest фиксируется при создании draft. Изменения состава после создания запрещены; отменённый draft остаётся в истории. Новая партия для той же позиции допускается только после атомарной отмены предыдущего draft и очистки current batch pointer.
-- Не хранить вторую независимую копию card_id в request item manifest, если она уже однозначно определяется через `request_item_id → card_id`; если существующая `shipment_cards.card_id` сохраняется для совместимости, DB guard обязан проверять её равенство `request_item.card_id`.
+- `shipment_cards` сохраняет связь `shipment_id → shipments.id`; для P-09 `request_item_id` обязателен, для обычных отправлений допускается NULL.
+- Изменение/удаление строк manifest после создания draft запрещено; отмена draft возможна только в одной транзакции с отменой parent до handover.
+- Если `shipment_cards.card_id` сохраняется для совместимости, DB guard проверяет равенство `request_item.card_id`.
 
 **4. Согласованность статусов и custody**
-- Допустимые batch states: `draft`, `in_transit`, `partially_received`, `received`, `cancelled`. `cancelled` допустим только до handover; `received` — только когда каждая карта manifest имеет item receipt.
-- Item `issued_pending_receipt` требует batch `in_transit` или `partially_received`, manifest membership и неизменяемый факт handover. Custody карты при этом остаётся у архива.
-- Item `completed` после receipt требует batch handover, фактического item receipt, `cards.current_location_id = central_office` и custody ЦО.
-- Batch state — проекция item receipts, но persisted status обновляется в той же транзакции, что и receipt; периодическая задача не является источником истины.
-- Parent `completed` только когда все позиции получили терминальный исход: `completed`, `not_found` или `cancelled`. Позиции `pending`, `extracted`, `issued_pending_receipt` и иные неокончательные состояния блокируют завершение.
+- Допустимые P-09 shipment states: `draft`, `in_transit`, `partially_received`, `received`, `cancelled`. `partially_received` отражает item-level receipt части manifest; `cancelled` допустим только до handover и вместе с отменой parent.
+- Item `issued_pending_receipt` требует shipment `in_transit` или `partially_received`, manifest membership и неизменяемый факт единого handover. Custody карты при этом остаётся у архива.
+- Item `completed` после receipt требует shipment handover, фактического item receipt, `cards.current_location_id = central_office` и custody ЦО.
+- Shipment state — проекция item receipts, но persisted status обновляется в той же транзакции, что и receipt; периодическая задача не является источником истины.
+- Parent `completed` только когда все позиции получили терминальный исход: отправленные карты — `completed` после item receipt, остальные — `not_found` или `removed_by_archive`; при отмене до handover извлечённые позиции становятся `cancelled`. Позиции `pending`, `extracted` и `issued_pending_receipt` блокируют завершение.
 
 **5. Разделение физического перемещения и учётной ответственности**
 
@@ -209,9 +209,9 @@ Box (1)
 
 Целевая модель должна добавить отдельный FK `cards.custody_location_id → locations.id` (NOT NULL после backfill и reconciliation):
 - в обычном стационарном состоянии `custody_location_id = current_location_id`;
-- при handover P-09 карта получает `current_shipment_id = batch.id`, `current_location_id = NULL`, но `custody_location_id` остаётся archive;
+- при handover единственного P-09 shipment карта получает `current_shipment_id = shipment.id`, `current_location_id = NULL`, но `custody_location_id` остаётся archive;
 - после item receipt ЦО `current_shipment_id = NULL`, `current_location_id = central_office`, `custody_location_id = central_office`;
-- перевод custody в ЦО разрешён только item-level receipt конкретной карты, не batch handover и не receipt другой карты;
+- перевод custody в ЦО разрешён только item-level receipt конкретной карты, не общий handover и не receipt другой карты;
 - существующие внешние custody-сценарии не меняют семантику; правила совместимости `custody_location_id` с `custody_status` задаются отдельным CHECK/trigger и миграционным mapping.
 
 Это отдельное измерение ответственности, не замена `current_location_id/current_shipment_id`. Для коробочных маршрутов сохраняются уже согласованные правила custody; новое поле не должно менять их без отдельной проверки каждого маршрута.
@@ -221,16 +221,16 @@ Box (1)
 Сверка фактического ORM на ветке показала, что текущий `Shipment.status` допускает `draft/in_transit/received/exception/cancelled`, а `ShipmentCard` содержит только `shipment_id/card_id/box_id`. Целевая миграция должна:
 - расширить допустимые shipment states значением `partially_received` только для P-09 fulfillment; обычные box shipments сохраняют собственные допустимые переходы;
 - добавить в `shipment_cards` nullable `request_item_id` и item-level `received_by`, `received_at`; для P-09 эти поля обязательны по факту receipt, для других маршрутов остаются NULL;
-- добавить в `shipments` `request_id` (nullable), `courier_name_snapshot` и необходимые actor/time поля handover/receipt, если их нет после проверки фактического DDL;
-- статус `shipments.received` и shipment-level `received_by/received_at` фиксировать только при receipt всех карт данной P-09 batch; до этого после первого item receipt статус `partially_received`, до первого receipt — `in_transit`;
+- добавить в `shipments` `request_id` (nullable UNIQUE), `courier_name_snapshot` и необходимые actor/time поля handover/receipt, если их нет после проверки фактического DDL;
+- статус `shipments.received` и shipment-level `received_by/received_at` фиксировать только при receipt всех карт единственного P-09 manifest; до этого после первого item receipt статус `partially_received`, до первого receipt — `in_transit`;
 - не использовать shipment-level receipt как замену item receipt. Источником item факта являются `shipment_cards.received_by/received_at` и отдельный DomainEvent для каждой карты.
 
 Текущие CHECK constraints `shipments_status_check`, `ck_shipment_handover_time`, `ck_shipment_received_fields` и deferred shipment guards требуют согласованного расширения; нельзя просто добавить enum value, оставив старые constraints, которые запрещают `partially_received` или требуют shipment-wide receipt metadata.
 
-**5. Защита и конкурентность**
-- Создание batch: lock parent, затем выбранные items/cards в стабильном UUID-порядке; повторно проверить parent `processing`, item `extracted`, card physical state, reservation и отсутствие другой активной batch.
-- Handover и cancel draft/remaining: один и тот же lock order parent → items/cards → batch/manifest; это сериализует конкурирующие команды и не допускает двойной выдачи или отмены уже выданной карты.
-- Receipt: lock parent → batch → items/cards в стабильном порядке; bulk receipt all-or-nothing.
+**7. Защита и конкурентность**
+- Создание единственного shipment: lock parent, затем все items/cards в стабильном UUID-порядке; повторно проверить parent `processing`, окончательный outcome всех items и точное соответствие manifest множеству items `extracted`.
+- Handover и cancel parent: один и тот же lock order parent → items/cards → shipment/manifest; это сериализует конкурирующие команды и исключает одновременно зафиксированные handover и отмену.
+- Receipt: lock parent → shipment → items/cards в стабильном порядке; bulk receipt all-or-nothing.
 - CHECK отвечает только за локальные значения/metadata; межтабличные условия реализуются составными FK и deferred constraint triggers. Не полагаться на обычный CHECK с подзапросами или на partial index, которому требуется JOIN.
 
 ### 3.7. План аддитивной миграции и backfill P-09
