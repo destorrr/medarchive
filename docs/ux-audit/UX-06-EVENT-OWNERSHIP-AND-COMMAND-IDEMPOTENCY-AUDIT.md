@@ -163,15 +163,9 @@
 
 ## 8. Решения и остаточные вопросы
 
-Техническая рекомендация аудита: принять command ledger с уникальным command_id, server-side canonical input hash и versioned result payload; DomainEvent и admin/security audit связывать общими command_id/correlation_id, но оставить разными authoritative records по назначению.
+Базовая архитектура command ledger, уникальность `command_id`, серверная проверка входа, сохранение и точный replay versioned result envelope, связь записей общими `command_id/correlation_id` и разделение authoritative DomainEvent/AdminSecurityAudit/ledger подтверждены последующими решениями и уточнениями ниже. Этот ранний список открытых вопросов является историческим и не должен трактоваться как повторное открытие уже утверждённых решений.
 
-Это рекомендация в рамках согласованной архитектуры DB-SEC-02/03, а не разрешение на реализацию. До SQL API нужно ещё определить:
-- точный canonicalization/hash contract для каждого типа команды;
-- какие детерминированные negative outcomes сохраняются в ledger;
-- retention/архивирование ledger и допустимость удаления;
-- точный каталог event_type/version и миграционный адаптер для уже существующих consumers;
-- полный inventory всех внутренних и внешних consumers;
-- конкретную схему admin/security audit и её read permissions.
+Текущие незакрытые технические вопросы перечислены в актуальном разделе «Still unresolved» ниже: canonical serialization/hash details, replayable deterministic negative outcomes, точные input/event/result validators и versions, client retry horizons, bounded cleanup/backup-restore safety, HTTP mapping и operational consumer/grant inventory. Срок обычного ledger retention утверждён отдельно: 90 календарных дней после завершения; irreversible logistics/admin command identities сохраняются бессрочно. Это не разрешает реализацию.
 
 ## 9. Граница
 
