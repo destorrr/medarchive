@@ -410,7 +410,7 @@ This addendum supersedes earlier UX-05 statements that P-09 remains open only un
 
 - The archive work queue includes parent requests in submitted and processing states while any actionable or nonterminal item remains.
 - A request remains in processing when some cards are already issued but their actual receipt by CO is not yet confirmed, when some cards remain pending issue, or when other items are still being processed.
-- The request leaves the work queue only when all items have terminal outcomes (received by CO, not_found, or cancelled as part of the unissued remainder) and the parent request is completed/cancelled according to the state machine.
+- The request leaves the work queue only when all items have terminal outcomes (received by CO, not_found, or cancelled as part of the unissued remainder). After partial issue, cancelling the unissued remainder does not set the parent to `cancelled`: it remains `processing` while any issued item awaits CO receipt, then becomes `completed` after the last outstanding receipt. Parent `cancelled` is reserved for whole-request cancellation before any physical issue.
 - The general new-request counter continues to count only submitted requests. Opening a request does not decrement it; transition to processing does.
 - The archive queue row shows request number, creation date, CO initiator, card count and parent status; patient names/card numbers remain excluded from queue rows.
 - The physical outgoing transport/dispatch view is separate from the parent P-09 work queue and must not imply custody has transferred to CO before actual item receipt.
