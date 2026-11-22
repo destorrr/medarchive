@@ -3555,3 +3555,18 @@ UX-06 остаётся **в работе**. Продуктовые ответы 
 Повторно прочитаны и проверены 12 ключевых документов UX-06/UX-05: продуктовые решения, техническая модель, DB command contracts/mapping, invariants, object detail/timeline, event catalog, consumer inventory, dashboard, cross-document review, remaining gates и progress. По целевым формулировкам не осталось совпадений с устаревшими правилами полной P-09 receipt, единственного shipment на parent или запрета отмены остатка после любого handover. Старые исторические записи сохранены с явной пометкой superseded. Cross-document matrix обновлена ссылками на DB-71…DB-73.
 
 Проверка была документальной и read-only. Это не означает, что SQL/ORM/API реализованы или протестированы. UX-06 остаётся открытым до завершения технических gates и полного финального аудита.
+
+## 2026-11-22 — техническая схема БД и миграционная модель P-09
+
+В продолжение one-to-many модели уточнена целевая реляционная структура (проект, не DDL):
+- `shipments.request_id` — nullable FK на P-09 parent, без UNIQUE по request_id; одна заявка может иметь несколько партий.
+- `archive_request_items.fulfillment_batch_id` — nullable указатель на текущую активную/выданную партию; составной FK с request_id защищает от batch другой заявки.
+- `shipment_cards.request_item_id` — связь immutable manifest с конкретной позицией; deferred guard сверяет item, card, parent и batch.
+- Для parent/batch предусмотрены составная уникальность (id, request_id), non-unique индекс по request_id, индексы item/batch и deferred guards; точные имена/типы должны быть сверены с фактическими ORM/Alembic моделями на read-only preflight.
+- Описаны lock order и транзакционные границы для create batch, handover, cancel remainder, item/bulk receipt.
+- Добавлен аддитивный migration/backfill план: baseline и preflight; новые nullable поля; deterministic legacy request → parent/item mapping; доказуемое сопоставление manifest; custody/receipt reconciliation; quarantine неоднозначных строк; checksums и идемпотентный повтор; destructive retirement отдельным gate.
+- DB-71…DB-73 нормализованы в одном месте матрицы. DB-23 уточнён: карту, найденную позднее, разрешено восстановить и выдать следующей batch той же P-09, если сама позиция ещё не выдавалась/не получала receipt; наличие других партий не блокирует её восстановление.
+
+Синхронизированы `UX-06-TECHNICAL-DATA-MODEL.md`, `UX-06-DB-COMMAND-CONTRACTS.md`, `UX-06-INVARIANTS-DB-TEST-MATRIX.md`, `UX-06-IMPLEMENTATION-READINESS-PLAN.md` и `UX-06-REMAINING-TECHNICAL-GATES.md`.
+
+**Ограничение:** фактические SQLAlchemy модели, Alembic revisions и production-like данные в этом проходе не инспектировались и не изменялись. Поэтому имена/типы колонок и backfill mapping остаются целевой спецификацией до read-only preflight; миграции, DDL, ORM и тесты не запускались.
