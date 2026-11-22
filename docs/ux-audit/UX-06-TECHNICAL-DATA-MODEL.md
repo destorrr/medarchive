@@ -185,7 +185,7 @@ Box (1)
 - Индекс очереди: `(request_id, created_at, id)` с условием `request_id IS NOT NULL`. Не создавать UNIQUE index по request_id.
 
 **2. Item → current batch**
-- `archive_request_items.fulfillment_batch_id UUID NULL` — текущая активная/выданная batch для позиции.
+- `archive_request_items.fulfillment_batch_id UUID NULL` — текущая активная/выданная batch для позиции. Для составного FK manifest consistency обеспечить `UNIQUE (id, request_id, card_id)` на item (либо эквивалентный ключ, проверенный по фактической DDL).
 - Уникальность назначения обеспечивается самой FK-колонкой на item (одна строка item может ссылаться максимум на одну текущую batch); связь дополнительно защищается составным FK `(fulfillment_batch_id, request_id) → shipments(id, request_id)`. Это не позволяет связать item с batch другой заявки.
 - После отмены draft партии ссылка item очищается только в той же транзакции, в которой batch переводится в `cancelled`; историческая связь остаётся в неизменяемом manifest. После handover ссылка не очищается.
 - Индексы: `(fulfillment_batch_id)` для выборки состава партии; partial index на `request_id` для активных/не tombstone items, если подтверждён планом запросов и фактической селективностью.
