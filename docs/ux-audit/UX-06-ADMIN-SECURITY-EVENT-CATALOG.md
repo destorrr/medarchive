@@ -846,13 +846,12 @@ Target event contract proposal (event strings below are the normalized names to 
 
 | Event type | Aggregate/target | Required minimal payload | Transaction boundary |
 |---|---|---|---|
-| `shipment.draft_created` | Fulfillment batch / shipment | `request_id`, `shipment_id`, selected `request_item_ids`, `actor_user_id`, `occurred_at`, courier reference and historical name snapshot | Batch + subset manifest + item links + event |
-| `shipment.handed_over` | Fulfillment batch / shipment | `request_id`, `shipment_id`, `request_item_ids`, `actor_user_id`, `occurred_at` | Batch draft→in_transit + selected items→issued_pending_receipt + event |
+| `shipment.draft_created` | Fulfillment shipment | `request_id`, `shipment_id`, all `extracted` `request_item_ids`, `actor_user_id`, `occurred_at`, courier reference and historical name snapshot | Shipment + complete manifest + item links + event |
+| `shipment.handed_over` | Fulfillment shipment | `request_id`, `shipment_id`, all manifest `request_item_ids`, `actor_user_id`, `occurred_at` | Shipment draft→in_transit + all manifest items→issued_pending_receipt + event |
 | `archive_request.item_marked_not_found` | Request item | `request_id`, `item_id`, `card_id`, `reason_code`, `actor_user_id`, `occurred_at`; optional bounded comment only if provided | Item result + event |
 | `archive_request.item_result_corrected` | Request item | `request_id`, `item_id`, `card_id`, `previous_status`, `new_status`, `actor_user_id`, `occurred_at`, closed membership reference where relevant | Physical membership/placement correction + item result + event |
 | `archive_request.item_removed_by_archive` | Request item | `request_id`, `item_id`, `card_id`, `actor_user_id`, `occurred_at`, mandatory first-resolution comment | Card return + item result + event |
 | `archive_request.item_received_by_central_office` | Request item | `request_id`, `item_id`, `card_id`, `shipment_id`, `actor_user_id`, `occurred_at` | Item receipt + custody/location transfer to CO + event |
-| `archive_request.remaining_items_cancelled` | Not part of the target event catalog; P-09 has no partial-issue remainder cancellation after full-manifest handover. |
 | `archive_request.completed` | Parent request | `request_id`, terminal item outcome counts, `occurred_at` | Final terminal item outcome + parent completion + event |
 
 For atomic bulk receipt, emit one `archive_request.item_received_by_central_office` event per received card in the same transaction; a shared command/correlation ID links the events. Do not create a single event that implies receipt of all cards in a batch or parent. Shipment state (`in_transit` / `partially_received` / `received`) is a projection over its own manifest items and their receipt events.
