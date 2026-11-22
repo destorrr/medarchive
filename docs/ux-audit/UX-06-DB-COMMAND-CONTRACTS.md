@@ -233,6 +233,13 @@ DB boundary обязан проверять:
 
 **Событие:** `archive_request.item_result_corrected` с item reference, `previous_status`, `new_status`, actor/time и ссылкой на закрытое membership; отдельное объяснение не требуется.
 
+### 2.6b Завершение обработки P-09 без отправления
+
+После фиксации результата последней позиции система пересчитывает терминальность parent в той же транзакции:
+- если все позиции имеют окончательные результаты `not_found` и/или `removed_by_archive`, а позиций `extracted` нет, parent автоматически переходит `processing → completed`; fulfillment shipment не создаётся;
+- если хотя бы одна позиция остаётся `extracted`, parent остаётся `processing` и требует создания единственного полного fulfillment draft со всеми позициями `extracted`;
+- после handover parent остаётся `processing` до item-level receipt всех карт manifest; после receipt последней карты parent переходит `completed`;
+- `completed` публикуется событием `archive_request.completed`; завершённые parent/items неизменяемы.
 ### 2.7 `request_cancel`
 
 **Actor и причина зависят от состояния:**
