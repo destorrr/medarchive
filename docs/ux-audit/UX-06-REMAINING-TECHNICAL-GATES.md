@@ -148,3 +148,32 @@ Static review of `postgresql_dashboard.py` shows current counters are based on l
 - Shipment lists/counters: exact allowed route pairs and role direction, not any shipment touching a location.
 
 Separate target read models and tests are required. Legacy dashboard SQL is not a valid implementation specification for target queues.
+
+
+## 2026-11-22 — статическая проверка AdminSecurityAudit и DB principals
+
+Проверены целевой event catalog, access policy, DB-SEC decisions, PostgreSQL admin service/router, ORM DomainEvent, Alembic revisions и draft initial SQL.
+
+### Подтверждённые target decisions
+
+- Глобальная лента и детали AdminSecurityAudit доступны только активной роли admin; прямые URL/API должны иметь server-side guard. Просмотр ленты/деталей не журналируется. Экспорт самой audit-ленты полностью исключён.
+- DomainEvent остаётся журналом бизнес-фактов; AdminSecurityAudit — отдельным authoritative store для привилегированных/security действий. Для команды, затрагивающей бизнес-агрегат и требующей оба события, оба события и изменение должны фиксироваться атомарно.
+- Не собирать raw IP, IP digest, attempted username/identity digest в initial security audit/telemetry. Массовый поиск карт не журналируется; успешные бизнес-экспорты персональных данных и qualifying reports/manifests остаются в scope.
+- Организация не утвердила сроки хранения R1–R4; legal/privacy/records approval — блокирующий pre-production governance gate, без предположительного TTL.
+
+### Статические implementation gaps
+
+1. PostgreSQLAdminService._audit_admin_change() по-прежнему добавляет admin.* в DomainEvent и делает flush(). Отдельной ORM-модели/таблицы AdminSecurityAudit в просмотренной модели нет. Router commits происходят после вызова service, поэтому текущая запись DomainEvent попадает в ту же session/transaction как часть admin mutation, но это не реализует требуемое разделение журналов.
+2. Текущие admin payloads шире target allowlist: user events включают username/full_name и branch reference; courier events включают full_name/phone; branch/shelf updates включают before/after values. Target catalog требует минимальные typed fields/changed-field names и запрещает произвольные model snapshots/секреты/PII. Требуется event-by-event payload mapping, а не копирование текущих JSON payload.
+3. /admin/audit защищён require_pg_role("admin"), но читает общий DomainEvent с event_type LIKE 'admin.%'. Для target это должен быть read-only typed AdminSecurityAudit reader; legacy admin.* остаются историческими evidence, не переписываются.
+4. DB migration содержит append-only trigger на UPDATE/DELETE domain_events. Это защищает от обычного изменения/удаления строк, но само по себе не доказывает ограничение INSERT, ownership separation или невозможность обхода суперпользователем/владельцем таблицы. Эффективные права и owners не проверялись.
+5. Статический поиск по Alembic revisions и draft initial SQL нашёл только комментарий о REVOKE UPDATE/DELETE; исполняемых GRANT/REVOKE, CREATE ROLE/USER, default privileges или SECURITY DEFINER bootstrap в просмотренных миграциях не найдено. DB-SEC-01…04 прямо оставляют bootstrap principals/grants контролируемой DBA/infra процедурой. Следовательно, матрица фактических principals/grants не может быть выведена из репозитория.
+
+### Остаточные security gates
+
+- Специфицировать отдельную таблицу/ORM и DB command API AdminSecurityAudit, включая actor trust, event envelope, typed payload schemas и атомарные ссылки на DomainEvent/command ledger.
+- Сопоставить каждый текущий admin producer с утверждённым event catalog и безопасным payload allowlist; отдельно определить судьбу legacy admin.* read path.
+- Подготовить матрицу runtime/migrator/backup/monitoring/maintenance principals и grants по schema/table/sequence/function, затем сверить её с реальными pg_roles, pg_auth_members, information_schema/pg_catalog, ownership и default privileges на целевой БД.
+- Подтвердить активную роль, server-side audit read authorization и запрет audit-feed export тестами; фактические grants/RLS и DBA threat model остаются внешним preflight.
+
+Проверка статическая. PostgreSQL, pg_catalog, SQL, Alembic, pytest и CI не запускались; application source/ORM/DDL/migrations не менялись.
