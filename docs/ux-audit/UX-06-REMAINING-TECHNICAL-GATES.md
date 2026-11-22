@@ -17,7 +17,7 @@
 |---|---|---|
 | External consumers and grants | Подтвердить cron/systemd, ETL/BI, read replicas, ручные SQL consumers, интеграции и effective grants | Нельзя безопасно менять event schema/payload/retention, пока неизвестны читатели и обходные права |
 | Deployment topology | Зафиксировать реальные runtime/migrator/backup/monitoring/maintenance identities, DB URLs и secret distribution | Нельзя окончательно проектировать grants, rotation и operational access на предположительной топологии |
-| Typed command/event catalog | Завершить schemas, versions, event types, guards, outcomes и API mapping для P-04/P-07 и остальных critical workflows | Нужна однозначная DB/API/UI/test boundary до DDL |
+| Typed command/event catalog | P-09 batch/item event types, command boundaries and transaction semantics normalized in UX-06. Still define exact integer schema versions, machine-validated payload schemas, typed API error mapping and remaining P-04/P-07 contracts | Нужна однозначная DB/API/UI/test boundary до DDL |
 | Admin/security audit policy | Retention/legal hold, IP/identity digest, HMAC key lifecycle, privileged-read scope for business-data exports, business-export access logging, tamper evidence, outage behavior | Без политики нельзя проектировать retention, индексы, key handling и безопасный failover |
 | Command ledger retention | Составить retry horizon для browser clients, workers, scheduled jobs и integrations; определить reversible/irreversible command catalog | TTL до этого может разрешить повторное исполнение старого command_id |
 | Migration/reconciliation | Legacy SQLite, viewer, incident, CardPlacement и admin event evidence; mapping/checksums/reconciliation/rollback | Нельзя безопасно планировать destructive retirement или cutover |
