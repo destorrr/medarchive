@@ -220,24 +220,16 @@ DB command должна повторно проверять инварианты
 
 ### 6.2 Typed event contract
 
-Утвердить каталог событий и версионированные payload schema, например:
+Использовать единый канонический каталог `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md`; не создавать конкурирующий список event strings в этом документе. Для P-09 нормализованы:
 
-- `archive_request.created.v1`
-- `archive_request.submitted.v1`
-- `archive_request.items_changed.v1`
-- `archive_request.processing_started.v1`
-- `archive_request.item_removed_by_archive.v1`
-- `archive_request.item_not_found.v1`
-- `archive_request.cancelled.v1`
-- `archive_request.handed_over.v1`
-- `archive_request.completed.v1`
-- `shipment.handed_over.v1`
-- `archive_request.item_received_by_central_office` (one event per card; shipment `received` is a projection, not a single all-cards event)
-- `box.cycle_repacked.v1`
-- `admin.correction_applied.v1`
+- `shipment.draft_created` — создание единственного shipment с полным manifest после обработки всех позиций;
+- `archive_request.cancelled` и `shipment.cancelled` — отмена всей заявки и её draft shipment до handover;
+- `shipment.handed_over` — атомарная передача полного manifest;
+- `archive_request.item_marked_not_found`, `archive_request.item_removed_by_archive`, `archive_request.item_result_corrected` — результаты обработки и их исправления до shipment draft;
+- `archive_request.item_received_by_central_office` — отдельное событие на каждую фактически полученную карту, в том числе при атомарном bulk receipt;
+- `archive_request.completed` — завершение parent после terminal outcomes всех позиций и receipt всех отправленных карт.
 
-Названия предварительные. Событие должно иметь один стабильный aggregate owner; одно бизнес-действие может записывать несколько событий, но все они создаются в одной транзакции с общей command_id/correlation_id. Не дублировать чувствительные данные пациента в payload, если достаточно ссылок на объект и минимального снимка факта.
-
+Actor/time/command/correlation metadata принадлежат общему event envelope, а не дублируются в JSONB payload. Integer `event_version` и machine-readable validators остаются техническим gate; окончательные версии нельзя выводить из суффиксов `.v1` в старых примерах. Событие должно иметь один стабильный aggregate owner; одно бизнес-действие может записывать несколько событий, но все они создаются в одной транзакции с общей `command_id`/`correlation_id`. Не дублировать чувствительные данные пациента в payload, если достаточно ссылок на объект и минимального снимка факта.
 ### 6.3 Разделение с admin/security audit
 
 DomainEvent — операционная история карты/коробки/заявки/отправления, доступная участникам объекта по D-08/P-08/P-16 и соответствующему scope.
