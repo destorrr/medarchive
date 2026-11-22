@@ -444,6 +444,8 @@ The PII presentation rules for shipment/request queues, shipment details, manife
 
 При переходе `submitted → processing` все позиции атомарно получают `extracted`; отдельное действие «Найдена» не показывается. Для `removed_by_archive` комментарий обязателен при первой фиксации; при повторной фиксации после исправления новый комментарий не требуется. `not_found` можно исправить на `extracted`, если карта фактически обнаружена и извлечена. Все согласованные повторные исправления доступны до создания fulfillment-черновика и фиксируются в истории.
 
+Если после полной обработки все позиции имеют результаты `not_found` и/или `removed_by_archive`, отправление не создаётся; parent автоматически переходит в `completed` после фиксации последнего результата.
+
 Архив завершает обработку всех позиций до создания единственного fulfillment-отправления. Manifest содержит все и только позиции `extracted`; `not_found` и `removed_by_archive` в него не входят. Handover выполняется одной атомарной операцией для всего manifest. Статусы отправления: `draft`, `in_transit`, `partially_received`, `received`, `cancelled`; `partially_received` отражает поштучное receipt части карт после общего handover, а `received` — receipt всех карт manifest. После handover отмена заявки запрещена. Parent становится `completed` после receipt всех карт manifest; позиции `not_found` и `removed_by_archive` уже терминальны. Учётная ответственность остаётся у архива до item-level receipt ЦО.
 
 ### 45.2. Fulfillment-отправление archive → CO по P-09
