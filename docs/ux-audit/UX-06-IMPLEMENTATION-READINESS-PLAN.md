@@ -163,6 +163,12 @@
 - Сохранить автора, timestamps, fulfilled_by, comments/reasons и исторические связи.
 - Историю изменения состава не реконструировать вымышленными событиями: явно пометить недоступную историческую детализацию.
 
+**P-09 physical transit, custody and item receipt**
+- The current `Card.current_location_id/current_shipment_id` pair describes location/transit, while current `custody_status` describes external custody and does not identify the responsible organization. Target schema must add a distinct `cards.custody_location_id` FK; do not overload `custody_status`.
+- For archive → CO handover, set the card's current shipment pointer to the specific batch but keep `custody_location_id = archive`. Only item receipt moves `custody_location_id` to central_office and clears the transit pointer.
+- Add `shipment_cards.request_item_id`, `received_by`, `received_at` for P-09 item-level linkage and receipt evidence. A batch transitions to `partially_received` after the first, but before the last, item receipt; shipment-level received fields are populated only after every manifest card is received.
+- Extend `shipments_status_check`, handover/receipt CHECK constraints and deferred shipment guards together. Preserve ordinary box shipment semantics; do not globally impose P-09 partial receipt states on other routes.
+
 **P-09 transport batch backfill**
 - Additive schema only: introduce nullable `shipments.request_id`, `archive_request_items.fulfillment_batch_id`, `shipment_cards.request_item_id` and courier/receipt metadata only where absent. Keep legacy per-card request/shipment columns and constraints during compatibility.
 - Build deterministic mapping from every legacy per-card request UUID to exactly one parent + one item. Store this mapping in a unique migration map; preserve source IDs, actor/time, comments/reasons and DomainEvent history.
