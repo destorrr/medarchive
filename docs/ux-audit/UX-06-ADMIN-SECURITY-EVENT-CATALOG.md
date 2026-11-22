@@ -842,13 +842,22 @@ Owner decision (2026-11-21): when an account is deactivated or otherwise adminis
 
 P-09 has a one-to-many parent → fulfillment batch model. Each batch has its own immutable subset manifest, courier assignment, draft/handover events and status projection. A parent may have multiple batches; a batch does not imply that every request item has been issued. The target business event model must preserve independent facts and actor/time for each request item.
 
-Candidate event family (final event type strings and payload schemas remain a technical contract task):
-- archive request item issued/physically dispatched;
-- archive request item actual receipt confirmed by CO;
-- archive request item marked not_found with mandatory reason code;
-- archive request remaining unissued items cancelled;
-- archive request parent completed when all items are terminal.
+Target event contract proposal (event strings below are the normalized names to use in the UX-06 target model; final integer schema versions and exact DB column names remain implementation details):
 
+| Event type | Aggregate/target | Required minimal payload | Transaction boundary |
+|---|---|---|---|
+| `shipment.draft_created` | Fulfillment batch / shipment | `request_id`, `shipment_id`, selected `request_item_ids`, `actor_user_id`, `occurred_at`, courier reference and historical name snapshot | Batch + subset manifest + item links + event |
+| `shipment.handed_over` | Fulfillment batch / shipment | `request_id`, `shipment_id`, `request_item_ids`, `actor_user_id`, `occurred_at` | Batch draft→in_transit + selected items→issued_pending_receipt + event |
+| `archive_request.item_marked_not_found` | Request item | `request_id`, `item_id`, `card_id`, `reason_code`, `actor_user_id`, `occurred_at`; optional bounded comment only if provided | Item result + event |
+| `archive_request.item_result_corrected` | Request item | `request_id`, `item_id`, `card_id`, `previous_status`, `new_status`, `actor_user_id`, `occurred_at`, closed membership reference where relevant | Physical membership/placement correction + item result + event |
+| `archive_request.item_removed_by_archive` | Request item | `request_id`, `item_id`, `card_id`, `actor_user_id`, `occurred_at`, mandatory first-resolution comment | Card return + item result + event |
+| `archive_request.item_received_by_central_office` | Request item | `request_id`, `item_id`, `card_id`, `shipment_id`, `actor_user_id`, `occurred_at` | Item receipt + custody/location transfer to CO + event |
+| `archive_request.remaining_items_cancelled` | Parent request and selected items | `request_id`, cancelled `item_ids`, `actor_user_id`, `occurred_at`, mandatory `reason_code` | Return of unissued cards + cancellation of only unissued items + event |
+| `archive_request.completed` | Parent request | `request_id`, terminal item outcome counts, `occurred_at` | Final terminal item outcome + parent completion + event |
+
+For atomic bulk receipt, emit one `archive_request.item_received_by_central_office` event per received card in the same transaction; a shared command/correlation ID links the events. Do not create a single event that implies receipt of all cards in a batch or parent. Shipment state (`in_transit` / `partially_received` / `received`) is a projection over its own manifest items and their receipt events.
+
+All payloads use aggregate IDs, actor/time and controlled reason codes. Do not duplicate patient names, phone numbers, birth dates or other patient PII. `card_id`/item identifiers are sufficient to resolve an authorized detail view; payload access remains subject to the event-read scope. The event type is closed and versioned; consumers must reject unknown versions safely.
 An atomic bulk CO receipt may emit one command-level correlation and an item-level receipt event for each card, all in the same transaction. Each event identifies the request item/card, actor and timestamp; do not duplicate patient PII in payload where aggregate IDs and minimal outcome metadata suffice. Custody transfer to CO occurs only on the item actual-receipt event. Courier possession or dispatch alone does not transfer accountable custody.
 
 Ordinary incoming box shipments use a distinct box-level event per individually received box. Each event records shipment, box, actor and actual receipt time; that box's custody transfers to archive in the same transaction. The shipment-level state/counters are projections over the original manifest and individual receipt/discrepancy outcomes. Box placement is a separate event and may occur before the rest of the shipment is fully received.
