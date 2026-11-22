@@ -120,3 +120,12 @@ Remaining tasks:
 5. Finish security, grants, audit-retention and deployment gates, then run the final static cross-document review.
 
 No further product clarification is currently necessary for these already approved rules. UX-06 remains open; UX-07 and implementation remain blocked.
+
+
+## 2026-11-22 — результат статической инвентаризации Alembic
+
+Завершена проверка файловой цепочки всех Alembic revisions: граф линейный, единственная файловая head — `0011_login_throttles`. Похожие префиксы файлов `0007_*` не означают две ветви: один файл содержит revision `0007_transition_meta`, второй — revision `0009_external_org_custody`, следующий за `0008_shipment_integrity`.
+
+Initial revision исполняет встроенную замороженную копию SQL, которая сама помечена draft/not production migration; отдельный `db/postgresql/001_initial_schema.sql` также draft. `migrations/env.py` использует `target_metadata = None`, поэтому ORM diff не автоматизирован. Файловая head не доказывает фактический head работающей БД.
+
+**Снят вопрос о графовой развилке.** Остаточный DB preflight конкретизирован: получить read-only `alembic_version`; introspect PostgreSQL catalogs для таблиц/колонок/types/defaults/nullability, PK/FK/unique/CHECK/indexes, функций/триггеров и grants; сверить результат с ORM и каждой применённой revision; определить schema drift и bootstrap status. До доступа к реальной БД эти пункты остаются неподтверждёнными.
