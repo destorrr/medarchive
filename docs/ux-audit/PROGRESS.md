@@ -3595,3 +3595,12 @@ UX-06 остаётся **в работе**. Продуктовые ответы 
 Файловая head — `0011_login_throttles`; фактическая DB head не установлена. Initial revision исполняет frozen SQL, помеченный в комментариях draft/not production migration. `target_metadata = None` означает отсутствие автоматического ORM metadata diff в Alembic.
 
 Следующий безопасный шаг — read-only подключение к целевой PostgreSQL и получение `alembic_version` плюс catalog inventory (columns/types/defaults/nullability, constraints, indexes, triggers/functions, effective grants), затем сверка с ORM и миграциями. Подключения к БД, Alembic CLI, SQL, миграции и тесты не выполнялись. Application source/ORM/DDL/migrations/tests не менялись.
+
+
+## 2026-11-22 — event producer/consumer compatibility pass
+
+Повторно проверены PostgreSQL DomainEvent ORM и конкретные router/service readers/producers. Зафиксированы внутренние readers: dashboard recent movements, dashboard object history, shipment detail, admin audit page и legacy exception-resolution detail. Последний связан с исключённым процессом «Инциденты» D-03 и должен быть retired, не перенесён в target.
+
+Обнаружены разрывы target/legacy: текущий shipment producer пишет `shipment.created`, target P-09 catalog требует `shipment.draft_created`; legacy shipment service всё ещё производит exception events, исключённые D-03; admin service продолжает писать `admin.*` в общий DomainEvent вместо отдельного AdminSecurityAudit. ORM DomainEvent не содержит event_version/command_id/correlation_id. Исторические события нельзя переименовывать или переписывать; нужен compatibility mapping и non-destructive migration.
+
+Обновлены consumer inventory и event ownership/idempotency audit. Внешние consumers сейчас не проектируются по решению владельца продукта; фактические deployment readers/jobs и effective grants остаются обязательным gate. Код, ORM, DDL, миграции, тесты и deployment не менялись.
