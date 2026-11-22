@@ -3634,3 +3634,8 @@ Logout сейчас только удаляет cookie; по target catalog logo
 ## 2026-11-22 — AdminSecurityAudit policy reconciliation
 
 Reconciled the older audit-contract summary with the later approved event catalog. Current exclusions, bounded denial telemetry limits, no-export decision, no separate integrity-verification feature and retention-governance gate are now stated in the contract and remaining-gates documents. The successful PostgreSQL login audit gap remains open. Documentation-only; no application or database implementation was changed.
+
+
+## 2026-11-22 — password lifecycle source audit
+
+Static inspection of PostgreSQL auth/admin routes, services, dependencies and models found that self-service password change and the approved temporary-password/forced-change flow are absent; admin reset remains embedded in generic user update, uses legacy `admin.user_updated` DomainEvent, does not block self-reset or require administrator re-authentication, and has no forced-change state. Password-hash token fingerprinting invalidates old tokens but does not implement the target self-change session-preservation semantics. The admin audit page still reads legacy `admin.%` DomainEvent rows and renders raw payload JSON. Findings and target command boundaries are recorded in `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. Documentation-only, static review.
