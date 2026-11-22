@@ -3639,3 +3639,8 @@ Reconciled the older audit-contract summary with the later approved event catalo
 ## 2026-11-22 — password lifecycle source audit
 
 Static inspection of PostgreSQL auth/admin routes, services, dependencies and models found that self-service password change and the approved temporary-password/forced-change flow are absent; admin reset remains embedded in generic user update, uses legacy `admin.user_updated` DomainEvent, does not block self-reset or require administrator re-authentication, and has no forced-change state. Password-hash token fingerprinting invalidates old tokens but does not implement the target self-change session-preservation semantics. The admin audit page still reads legacy `admin.%` DomainEvent rows and renders raw payload JSON. Findings and target command boundaries are recorded in `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. Documentation-only, static review.
+
+
+## 2026-11-22 — role-scoped read and object-detail audit
+
+Refreshed source review of PostgreSQL dashboard/search/history, archive and Central Office routes confirms unresolved target gaps: admin/legacy viewer global operational history and recent movements, branch origin-based card history after archive handover, incomplete search result identity fields, absent general card/box detail timelines, admin blocked from current shipment detail reader, and legacy per-card archive request pages. The target and required read-surface boundaries are recorded in UX-06-ROLE-SCOPED-HISTORY-SEARCH-AUDIT.md. Static inspection only; no runtime queries/tests executed.
