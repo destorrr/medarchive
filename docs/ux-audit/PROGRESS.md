@@ -3649,3 +3649,8 @@ Refreshed source review of PostgreSQL dashboard/search/history, archive and Cent
 ## 2026-11-22 — event and command versioning pass
 
 Normalized the versioning proposal and legacy compatibility rules across the event ownership audit, consumer inventory and remaining gates. Clarified separate version axes (event payload, command input, command result), immutable historical events, read-only legacy mapping, D-03 exception retirement, and shared command/correlation identity for all mandatory records emitted by one command. The first-schema event_version=1 convention is explicitly a technical proposal, not an owner-approved decision. Remaining unresolved command-key lifecycle, canonical hash, replayable negative outcomes, exact validators, HTTP error mapping, retry horizon and cleanup/backup gates remain open. Documentation-only; no source/DB changes.
+
+
+## 2026-11-22 — envelope/payload and version-axis consistency
+
+Clarified that common actor/time/command/correlation/outcome/target metadata belongs to the event envelope and must not be duplicated in JSONB event payloads. Separated command_version, result_version and event_version; the current command input omits command_version, and adding it is documented only as a technical proposal pending approval. No source or schema changes.
