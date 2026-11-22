@@ -3684,3 +3684,8 @@ Updated documents in this pass:
 - PROGRESS.md
 
 This was a documentation-only pass on branch docs/ux-audit-project. No source code, ORM, SQL/DDL, migrations, tests, CI or deployment files were changed. No live PostgreSQL, pytest, CI or production environment was accessed. UX-06 remains open; UX-07 and implementation remain blocked.
+
+
+## 2026-11-22 — API error contract source audit
+
+Inspected PostgreSQL archive, Central Office, shipment and admin routers/services. Existing JSON endpoints map LookupError, ValueError and IntegrityError inconsistently to 404/422/409; HTML flows often surface raw ValueError text, while IntegrityError handling varies. No single typed error_code-to-HTTP/UI adapter exists. Added a target error-mapping gate: closed DB result_code allowlist, safe localized presentation, no SQL/constraint details, separate transient failures from replayable business outcomes, and retire D-03 incident-specific errors. No runtime requests/tests or source changes.
