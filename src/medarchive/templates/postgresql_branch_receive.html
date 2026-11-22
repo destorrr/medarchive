@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header operation-page-header receipt-page-header">
+    <div>
+        <p class="eyebrow">Логистика филиала</p>
+        <h1>Приёмка отправлений</h1>
+        <p class="page-description">Проверяйте поступающие из центрального офиса отправления и фиксируйте приёмку без частичного подтверждения.</p>
+    </div>
+</header>
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success" role="status">{{ success }}</div>{% endif %}
+
+<section class="card operation-panel receipt-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Ожидают приёмки</p>
+            <h2>Отправления в ваш филиал</h2>
+            <p class="page-description">Сверяйте весь манифест до подтверждения. Отправление принимается только целиком.</p>
+        </div>
+        <span class="badge badge-in_transit">{% if incoming %}{{ incoming|length }} в пути{% else %}Нет ожидающих{% endif %}</span>
+    </div>
+    {% if incoming %}
+    <div class="table-wrap receipt-table-wrap">
+        <table class="data operation-data-table receipt-table">
+            <thead><tr><th>Отправление</th><th>Маршрут и курьер</th><th>Состав</th><th>Передано</th><th>Приёмка</th></tr></thead>
+            <tbody>
+            {% for shipment in incoming %}
+            <tr>
+                <td><strong class="receipt-shipment-number">{{ shipment.number }}</strong></td>
+                <td><span class="receipt-source">{{ shipment.source }}</span><span class="receipt-secondary">{{ shipment.courier }}</span></td>
+                <td>
+                    <span class="receipt-count">{{ shipment.box_count }} коробок · {{ shipment.card_count }} карт</span>
+                    <details class="manifest-details">
+                        <summary>Открыть манифест</summary>
+                        <div class="manifest-content">
+                            {% for box in shipment.boxes %}
+                            <div class="manifest-group">
+                                <strong>Коробка {{ box.box_number }}</strong>
+                                <ul>{% for card in box.cards %}<li><span>{{ card.card_number }}</span> · {{ card.full_name }}</li>{% endfor %}</ul>
+                            </div>
+                            {% endfor %}
+                            {% if shipment.standalone_cards %}
+                            <div class="manifest-group">
+                                <strong>Отдельные карты</strong>
+                                <ul>{% for card in shipment.standalone_cards %}<li><span>{{ card.card_number }}</span> · {{ card.full_name }}</li>{% endfor %}</ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </details>
+                </td>
+                <td class="receipt-date">{{ shipment.handed_over_at }}</td>
+                <td>
+                    <form method="post" action="/branch/receive/confirm" class="receipt-confirm-form">
+                        <input type="hidden" name="shipment_id" value="{{ shipment.id }}">
+                        <label class="receipt-check"><input type="checkbox" name="confirmed" value="true" required> Полный состав проверен, расхождений нет</label>
+                        <button class="btn btn-primary" type="submit">Принять целиком</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state receipt-empty">
+        <span class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z"/><circle cx="7.5" cy="18" r="1.5"/><circle cx="17.5" cy="18" r="1.5"/></svg>
+        </span>
+        <strong>Нет отправлений, ожидающих приёмки</strong>
+        <span>Когда курьер передаст отправление вашему подразделению, оно появится здесь вместе с манифестом.</span>
+    </div>
+    {% endif %}
+</section>
+
+<section class="card operation-panel receipt-panel review-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Требуется проверка</p>
+            <h2>Инциденты при доставке</h2>
+            <p class="page-description">Приёмка заблокирована до проверки полного состава и документирования результата.</p>
+        </div>
+        <span class="badge badge-pending_return">{% if incidents %}{{ incidents|length }} инцидентов{% else %}Нет инцидентов{% endif %}</span>
+    </div>
+    {% if incidents %}
+    <div class="receipt-incident-list">
+        {% for shipment in incidents %}
+        <article class="receipt-incident">
+            <div class="receipt-incident-header">
+                <div><strong class="receipt-shipment-number">{{ shipment.number }}</strong><span class="receipt-secondary">{{ shipment.source }} · {{ shipment.courier }}</span></div>
+                <span class="badge badge-pending_return">Приёмка заблокирована</span>
+            </div>
+            <div class="receipt-incident-meta">
+                <div><span>Причина</span><strong>{{ shipment.exception_note }}</strong></div>
+                <div><span>Зарегистрирован</span><strong>{{ shipment.exception_at }}</strong></div>
+                <div><span>Состав</span><strong>{{ shipment.box_count }} коробок · {{ shipment.card_count }} карт</strong></div>
+            </div>
+            <details class="manifest-details incident-manifest">
+                <summary>Проверить полный манифест</summary>
+                <div class="manifest-content">
+                    {% for box in shipment.boxes %}
+                    <div class="manifest-group">
+                        <strong>Коробка {{ box.box_number }}</strong>
+                        <ul>{% for card in box.cards %}<li><span>{{ card.card_number }}</span> · {{ card.full_name }}</li>{% endfor %}</ul>
+                    </div>
+                    {% endfor %}
+                    {% if shipment.standalone_cards %}
+                    <div class="manifest-group">
+                        <strong>Отдельные карты</strong>
+                        <ul>{% for card in shipment.standalone_cards %}<li><span>{{ card.card_number }}</span> · {{ card.full_name }}</li>{% endfor %}</ul>
+                    </div>
+                    {% endif %}
+                </div>
+            </details>
+            <form method="post" action="/branch/receive/resolve" class="receipt-resolve-form">
+                <input type="hidden" name="shipment_id" value="{{ shipment.id }}">
+                <div class="form-group">
+                    <label for="resolution-{{ shipment.id }}">Результат проверки</label>
+                    <textarea id="resolution-{{ shipment.id }}" name="resolution_note" maxlength="2000" rows="3" required placeholder="Опишите, что сверено и почему отправление можно принять"></textarea>
+                </div>
+                <div class="receipt-resolve-footer">
+                    <label class="receipt-check"><input type="checkbox" name="confirmed" value="true" required> Проверил полный состав, расхождений нет</label>
+                    <button class="btn btn-primary" type="submit">Зафиксировать проверку и принять</button>
+                </div>
+            </form>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state receipt-empty compact-empty">
+        <strong>Нет инцидентов, ожидающих проверки</strong>
+        <span>Если при доставке будет зарегистрировано расхождение, сведения появятся в этом разделе.</span>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

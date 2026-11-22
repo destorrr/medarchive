@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Пользователи — Администрирование{% endblock %}
+{% block content %}
+<header class="page-header admin-page-header">
+    <div>
+        <p class="eyebrow"><a href="/admin">Администрирование</a> / Доступ</p>
+        <h1>Пользователи и роли</h1>
+        <p class="page-description">Создание учётных записей, назначение полномочий и управление доступом сотрудников.</p>
+    </div>
+    <span class="badge badge-neutral">{{ users|length }} учётных записей</span>
+</header>
+
+<section class="card admin-form-panel">
+    <div class="panel-heading">
+        <div><p class="eyebrow">Новая учётная запись</p><h2>Добавить пользователя</h2><p class="page-description">Для роли «Филиал» обязательно укажите действующий филиал.</p></div>
+    </div>
+    <form class="admin-create-grid" method="post" action="/admin/users">
+        <div class="form-group"><label for="new-username">Логин</label><input id="new-username" type="text" name="username" maxlength="128" autocomplete="off" required></div>
+        <div class="form-group"><label for="new-full-name">ФИО сотрудника</label><input id="new-full-name" type="text" name="full_name" maxlength="255" required></div>
+        <div class="form-group"><label for="new-password">Пароль</label><input id="new-password" type="password" name="password" minlength="4" autocomplete="new-password" required><span class="field-hint">Не менее 4 символов</span></div>
+        <div class="form-group"><label for="new-role">Роль</label><select id="new-role" name="role" required><option value="" disabled selected>Выберите роль</option>{% for r in role_options %}<option value="{{ r.value }}">{{ r.label }}</option>{% endfor %}</select></div>
+        <div class="form-group"><label for="new-branch">Филиал</label><select id="new-branch" name="branch_id"><option value="">— Без филиала —</option>{% for b in branches %}{% if b.is_active %}<option value="{{ b.id }}">{{ b.code }} — {{ b.name }}</option>{% endif %}{% endfor %}</select></div>
+        <div class="admin-form-submit"><button type="submit" class="btn btn-primary">Создать пользователя</button></div>
+    </form>
+</section>
+
+<section class="card admin-table-panel">
+    <div class="panel-heading"><div><p class="eyebrow">Действующие и заблокированные</p><h2>Список пользователей</h2><p class="page-description">Изменения вступают в силу после сохранения. Пароль меняется только если заполнено соответствующее поле.</p></div></div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Таблица пользователей; прокручивается по горизонтали">
+        <table class="data admin-users-table">
+            <thead><tr><th>Сотрудник</th><th>Роль</th><th>Филиал</th><th>Статус и управление</th></tr></thead>
+            <tbody>
+            {% for u in users %}
+                <tr>
+                    <td><div class="admin-user-identity"><strong>{{ u.full_name }}</strong><span>@{{ u.username }}</span><small>Создан: {{ u.created_at.strftime("%d.%m.%Y") if u.created_at else "—" }}</small></div></td>
+                    <td><select aria-label="Роль пользователя {{ u.username }}" name="role" form="user-{{ u.id }}">{% for r in role_options %}<option value="{{ r.value }}" {% if r.value == u.role %}selected{% endif %}>{{ r.label }}</option>{% endfor %}</select></td>
+                    <td><select aria-label="Филиал пользователя {{ u.username }}" name="branch_id" form="user-{{ u.id }}"><option value="">— Без филиала —</option>{% for b in branches %}{% if b.is_active or b.id == u.branch_id %}<option value="{{ b.id }}" {% if b.id == u.branch_id %}selected{% endif %}>{{ b.code }} — {{ b.name }}{% if not b.is_active %} (отключён){% endif %}</option>{% endif %}{% endfor %}</select></td>
+                    <td>
+                        <form id="user-{{ u.id }}" class="admin-user-edit-form" method="post" action="/admin/users/{{ u.id }}/edit">
+                            <input aria-label="ФИО пользователя {{ u.username }}" type="hidden" name="full_name" value="{{ u.full_name }}">
+                            <input type="password" name="password" placeholder="Новый пароль" minlength="4" autocomplete="new-password" aria-label="Новый пароль для {{ u.username }}">
+                            <div class="admin-user-controls">
+                                {% if u.id == user.id %}
+                                <input type="hidden" name="is_active" value="true"><span class="badge badge-info">Ваша учётная запись</span>
+                                {% else %}
+                                <label class="admin-active-toggle"><input type="checkbox" name="is_active" value="true" {% if u.is_active %}checked{% endif %}> Активен</label>
+                                {% endif %}
+                                <button type="submit" class="btn btn-secondary btn-sm">Сохранить</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4"><div class="empty-state"><strong>Пользователей пока нет</strong><span>Создайте первую учётную запись с помощью формы выше.</span></div></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

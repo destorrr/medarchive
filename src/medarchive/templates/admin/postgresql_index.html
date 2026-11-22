@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Администрирование — МедАрхив{% endblock %}
+{% block content %}
+<header class="page-header admin-page-header">
+    <div>
+        <p class="eyebrow">Системные настройки</p>
+        <h1>Администрирование</h1>
+        <p class="page-description">Управление доступом, справочниками и контролем операций медицинского архива.</p>
+    </div>
+    <span class="badge badge-neutral">Только для администратора</span>
+</header>
+
+<section class="admin-overview-grid" aria-label="Разделы администрирования">
+    <a class="admin-module-card" href="/admin/users">
+        <span class="admin-module-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 20v-1.5a4.5 4.5 0 0 0-4.5-4.5h-3A4.5 4.5 0 0 0 4 18.5V20M10 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM17 11a3 3 0 1 0 0-6M17 14h1a4 4 0 0 1 4 4v2"/></svg></span>
+        <span class="admin-module-copy"><strong>Пользователи и роли</strong><span>Учётные записи, назначение филиалов, блокировка и восстановление доступа</span></span>
+        <span class="admin-module-arrow" aria-hidden="true">→</span>
+    </a>
+    <a class="admin-module-card" href="/admin/branches">
+        <span class="admin-module-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M8 9h.01M12 9h.01M16 9h.01"/></svg></span>
+        <span class="admin-module-copy"><strong>Филиалы</strong><span>Коды, названия и доступность площадок организации</span></span>
+        <span class="admin-module-arrow" aria-hidden="true">→</span>
+    </a>
+    <a class="admin-module-card" href="/admin/couriers">
+        <span class="admin-module-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h11v11H3zM14 11h4l3 3v4h-7zM7 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg></span>
+        <span class="admin-module-copy"><strong>Курьеры</strong><span>Справочник сотрудников доставки и их активность</span></span>
+        <span class="admin-module-arrow" aria-hidden="true">→</span>
+    </a>
+    <a class="admin-module-card" href="/admin/sections">
+        <span class="admin-module-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 5h18v14H3zM3 10h18M3 15h18M9 5v14M16 5v14"/></svg></span>
+        <span class="admin-module-copy"><strong>Архивные секции и полки</strong><span>Структура хранения и доступность мест размещения</span></span>
+        <span class="admin-module-arrow" aria-hidden="true">→</span>
+    </a>
+    <a class="admin-module-card" href="/admin/incidents">
+        <span class="admin-module-icon admin-module-icon-warning" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3ZM12 9v5M12 17.5h.01"/></svg></span>
+        <span class="admin-module-copy"><strong>Инциденты отправлений</strong><span>Просмотр расхождений, сообщений и результатов разбирательства</span></span>
+        <span class="admin-module-arrow" aria-hidden="true">→</span>
+    </a>
+    <a class="admin-module-card" href="/admin/audit">
+        <span class="admin-module-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/></svg></span>
+        <span class="admin-module-copy"><strong>Журнал административных действий</strong><span>Неизменяемая история изменений настроек и учётных записей</span></span>
+        <span class="admin-module-arrow" aria-hidden="true">→</span>
+    </a>
+</section>
+{% endblock %}

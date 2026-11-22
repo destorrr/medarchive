@@ -40,8 +40,11 @@ class TestTransfer:
         await _login(client)
         r = await client.get("/transfer")
         assert r.status_code == 200
-        assert ".form-group { margin-bottom: 16px" in r.text
-        assert ".form-group select { width: 100%" in r.text
+        assert "/static/app.css" in r.text
+        css = await client.get("/static/app.css")
+        assert css.status_code == 200
+        assert ".form-group { margin-bottom: 16px" in css.text
+        assert ".form-group select" in css.text
 
     async def test_transfer_page_renders(self, client):
         await _login(client)

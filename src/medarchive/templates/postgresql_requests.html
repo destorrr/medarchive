@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header operation-page-header archive-request-header">
+    <div>
+        <p class="eyebrow">Архивный контур · Центральный офис</p>
+        <h1>Очередь заявок</h1>
+        <p class="page-description">Проверьте местонахождение запрошенных карт и передайте найденные позиции в центральный офис отдельными картами, без транспортных коробок.</p>
+    </div>
+    <div class="archive-request-header-meta">
+        <span class="badge badge-info">Только архив</span>
+        <span class="archive-request-total">{{ requests|length }} активных</span>
+    </div>
+</header>
+
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+{% if success %}<div class="flash flash-success" role="status">{{ success }}</div>{% endif %}
+
+{% if requests %}
+<section class="card operation-panel archive-request-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Контроль исполнения</p>
+            <h2>Активные заявки ЦО</h2>
+            <p class="page-description">Отметьте только карты, которые готовы к выдаче. Карты на полках и в коробках сначала необходимо извлечь.</p>
+        </div>
+        <span class="badge badge-neutral">{{ requests|length }} позиций</span>
+    </div>
+
+    <div class="table-wrap archive-request-table-wrap">
+            <table class="data archive-request-table">
+                <thead>
+                    <tr>
+                        <th class="archive-request-select-column">Выбрать</th>
+                        <th>Медицинская карта</th>
+                        <th>Кто запросил</th>
+                        <th>Состояние заявки</th>
+                        <th>Местонахождение и действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in requests %}
+                    <tr>
+                        <td>
+                            {% if item.request.status == "new" and not item.box and not item.card_placement %}
+                            <input type="checkbox" name="card_ids" value="{{ item.card.id }}" form="fulfill-form" aria-label="Выбрать карту {{ item.card.card_number }}">
+                            {% elif item.request.status == "new" %}
+                            <span class="request-not-ready">Недоступна</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>
+                            <strong class="archive-request-card-number">{{ item.card.card_number }}</strong>
+                            <span class="archive-request-secondary">{{ item.card.full_name }}</span>
+                        </td>
+                        <td>
+                            <span class="archive-request-requester">{{ item.requester.full_name or item.requester.username }}</span>
+                            <span class="archive-request-secondary">{{ item.request.created_at.strftime("%d.%m.%Y %H:%M") if item.request.created_at else "—" }}</span>
+                        </td>
+                        <td>
+                            {% if item.request.status == "new" %}
+                            <span class="badge badge-warning">Ожидает выдачи</span>
+                            {% else %}
+                            <span class="badge badge-info">Передана курьеру</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.request.status == "in_progress" %}
+                            <span class="request-location-state">Отправлена в ЦО, ожидает приёмки</span>
+                            {% elif item.box %}
+                                <span class="request-location-state">В коробке {{ item.box.box_number }}</span>
+                                {% if item.box_placement %}
+                                <span class="archive-request-secondary">Коробка размещена на полке</span>
+                                <a class="request-inline-link" href="/placement">Перейти к размещению</a>
+                                {% else %}
+                                <form method="post" action="/requests/unpack-card" class="request-row-action">
+                                    <input type="hidden" name="box_id" value="{{ item.box.id }}">
+                                    <input type="hidden" name="card_id" value="{{ item.card.id }}">
+                                    <button class="btn btn-secondary btn-sm" type="submit">Извлечь из коробки</button>
+                                </form>
+                                {% endif %}
+                            {% elif item.card_placement %}
+                                <span class="request-location-state">На архивной полке</span>
+                                <form method="post" action="/placement/remove-card" class="request-row-action">
+                                    <input type="hidden" name="card_id" value="{{ item.card.id }}">
+                                    <button class="btn btn-secondary btn-sm" type="submit">Снять с полки</button>
+                                </form>
+                            {% else %}
+                            <span class="request-location-state">Отдельно в архиве</span>
+                            <span class="archive-request-secondary">Готова к выдаче</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    <form id="fulfill-form" method="post" action="/requests/fulfill" class="archive-request-fulfillment-form">
+        <div class="archive-request-dispatch">
+            <div class="form-group">
+                <label for="courier_id">Курьер для отправления в ЦО</label>
+                <select id="courier_id" name="courier_id" required>
+                    <option value="">Выберите курьера</option>
+                    {% for courier in couriers %}
+                    <option value="{{ courier.id }}">{{ courier.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="archive-request-dispatch-footer">
+                <p class="form-help">В отправление попадут только отмеченные карты, доступные для выдачи. Коробки из архива в ЦО не отправляются.</p>
+                <button class="btn btn-primary" type="submit">Передать выбранные карты в ЦО без коробки</button>
+            </div>
+        </div>
+    </form>
+</section>
+
+<section class="card operation-panel archive-request-not-found-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Результат проверки</p>
+            <h2>Карта не найдена</h2>
+            <p class="page-description">Закрывайте заявку только после проверки архивного места. Для каждой заявки требуется пояснение.</p>
+        </div>
+    </div>
+    <div class="archive-request-not-found-list">
+        {% for item in requests %}
+            {% if item.request.status == "new" %}
+            <form method="post" action="/requests/not-found" class="archive-request-not-found-form">
+                <input type="hidden" name="request_id" value="{{ item.request.id }}">
+                <div class="archive-request-not-found-card">
+                    <strong>{{ item.card.card_number }}</strong>
+                    <span>{{ item.card.full_name }}</span>
+                </div>
+                <label class="sr-only" for="not-found-note-{{ item.request.id }}">Пояснение для карты {{ item.card.card_number }}</label>
+                <input id="not-found-note-{{ item.request.id }}" name="note" placeholder="Пояснение по результату поиска" required>
+                <button class="btn btn-secondary" type="submit">Закрыть: не найдена</button>
+            </form>
+            {% endif %}
+        {% endfor %}
+    </div>
+</section>
+{% else %}
+<section class="card operation-panel archive-request-empty">
+    <div class="empty-state">
+        <strong>Активных заявок нет</strong>
+        <span>Новые запросы центрального офиса появятся здесь после их создания.</span>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

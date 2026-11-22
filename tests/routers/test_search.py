@@ -96,6 +96,9 @@ class TestSearchPage:
         assert r.status_code == 200
         assert "Поиск" in r.text
         assert 'name="query"' in r.text
+        assert '<label class="search-field-label" for="search-q">' in r.text
+        assert 'aria-live="polite"' in r.text
+        assert "Поиск карт и коробок" in r.text
 
     async def test_search_by_name_finds_card_with_label_and_place(self, search_client):
         """GET /search?query=иванов (строчными!) → карта, бейдж «Размещена»,
@@ -368,3 +371,21 @@ class TestHighlightHelper:
     def test_highlight_empty_query_returns_escaped_text(self):
         from medarchive.routers.dashboard import highlight_match
         assert str(highlight_match("<b>x</b>", "")) == "&lt;b&gt;x&lt;/b&gt;"
+
+
+class TestSearchRoleBoundary:
+    async def test_branch_role_cannot_access_search_page_or_fragment(self, search_client):
+        """Филиал не получает доступ ни к странице поиска, ни к HTMX-фрагменту."""
+        await _login(search_client, username="branch1")
+        page = await search_client.get("/search")
+        fragment = await search_client.get("/search/results", params={"query": "иванов"})
+        assert page.status_code == 403
+        assert fragment.status_code == 403
+
+    async def test_search_page_uses_local_styles_and_no_inline_style_block(self, search_client):
+        """Страница поиска опирается на общий локальный CSS, а не inline style."""
+        await _login(search_client)
+        r = await search_client.get("/search")
+        assert r.status_code == 200
+        assert "/static/app.css" in r.text
+        assert "<style" not in r.text.lower()

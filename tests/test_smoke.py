@@ -22,6 +22,77 @@ async def app_client(test_config, db):
 
 
 class TestSmoke:
+    async def test_local_frontend_assets_are_served_without_cdn(self, app_client):
+        css = await app_client.get("/static/app.css")
+        htmx = await app_client.get("/static/htmx.min.js")
+        app_js = await app_client.get("/static/app.js")
+        assert css.status_code == 200
+        assert "var(--color-primary)" in css.text
+        assert htmx.status_code == 200
+        assert app_js.status_code == 200
+        assert "ArrowRight" in app_js.text
+        assert "scrollTo" in app_js.text
+        assert 'target.closest("input, textarea, select, button' in app_js.text
+        assert "event.ctrlKey" in app_js.text
+        assert "htmx" in htmx.text[:500].lower()
+
+    async def test_shared_template_uses_local_assets(self, app_client):
+        login = await app_client.post(
+            "/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+        response = await app_client.get("/dashboard")
+        assert response.status_code == 200
+        assert "/static/app.css" in response.text
+        assert "/static/htmx.min.js" in response.text
+        assert "/static/app.js" in response.text
+        assert "К основному содержимому" in response.text
+        assert "class=\"nav-icon\"" in response.text
+        assert "unpkg.com" not in response.text
+
+    async def test_templates_and_assets_are_independent_of_working_directory(
+        self, app_client, monkeypatch, tmp_path
+    ):
+        login = await app_client.post(
+            "/login",
+            data={"username": "admin", "password": "admin123"},
+            follow_redirects=False,
+        )
+        assert login.status_code == 303
+
+        # Simulate a process launched after its working directory has changed.
+        monkeypatch.chdir(tmp_path)
+        dashboard = await app_client.get("/dashboard")
+        login_page = await app_client.get("/login")
+        css = await app_client.get("/static/app.css")
+        htmx = await app_client.get("/static/htmx.min.js")
+        app_js = await app_client.get("/static/app.js")
+
+        assert dashboard.status_code == 200
+        assert login_page.status_code == 200
+        assert css.status_code == 200
+        assert htmx.status_code == 200
+        assert app_js.status_code == 200
+        assert "ArrowLeft" in app_js.text
+        assert "login-card" in login_page.text
+        assert 'rel="stylesheet" href="/static/app.css"' in login_page.text
+        assert "<style" not in login_page.text
+        assert 'autocomplete="username"' in login_page.text
+        assert 'autocomplete="current-password"' in login_page.text
+        assert ":focus-visible" in css.text
+        assert "input:focus-visible, select:focus-visible, textarea:focus-visible" in css.text
+        assert "outline: 3px solid rgb(49 95 189 / 32%)" in css.text
+        assert "@media (max-width: 680px)" in css.text
+        assert "prefers-reduced-motion: reduce" in css.text
+        assert "--color-subtle: #667085" in css.text
+
+    async def test_root_redirects_to_login(self, app_client):
+        r = await app_client.get("/", follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers["location"] == "/login"
+
     async def test_login_to_dashboard_flow(self, app_client):
         """Полный цикл: GET /login → POST login → GET /dashboard → logout."""
         # 1. Login page renders
@@ -46,7 +117,7 @@ class TestSmoke:
         assert "администратор" in r.text.lower()
 
         # 4. Logout
-        r = await app_client.get("/logout", follow_redirects=False)
+        r = await app_client.post("/logout", follow_redirects=False)
         assert r.status_code == 303
         assert r.headers["location"] == "/login"
 

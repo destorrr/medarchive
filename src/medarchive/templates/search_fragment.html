@@ -7,7 +7,7 @@
 {% if not query %}
 <div class="card" id="state-empty">
     <div class="empty-state">
-        <div class="icon">🔎</div>
+        <span class="empty-state-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg></span>
         <p>Введите ФИО пациента или номер коробки, чтобы найти карту и её место хранения.</p>
         <p class="hint">Например: <b>Иванов</b> или <b>B-0010</b></p>
     </div>
@@ -15,7 +15,7 @@
 {% elif not cards and not boxes %}
 <div class="card" id="state-noresults">
     <div class="empty-state">
-        <div class="icon">😕</div>
+        <span class="empty-state-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 14.5s1.2-1.5 3.5-1.5 3.5 1.5 3.5 1.5M9 9h.01M15 9h.01"></path></svg></span>
         <p>По запросу «{{ query }}» ничего не найдено.</p>
         <p class="hint">Проверьте написание или попробуйте часть ФИО / номера.</p>
     </div>

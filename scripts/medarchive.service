@@ -1,21 +1,27 @@
 [Unit]
 Description=МедАрхив — система управления архивом медицинских карт
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
 User=medarchive
 Group=medarchive
 WorkingDirectory=/opt/medarchive
-Environment=MEDARCHIVE_SECRET_KEY=CHANGE_ME
-Environment=MEDARCHIVE_DB_PATH=/var/lib/medarchive/medarchive.db
+EnvironmentFile=/etc/medarchive/medarchive.env
+Environment=MEDARCHIVE_POSTGRES_ENABLED=true
+Environment=MEDARCHIVE_AUTH_BACKEND=postgresql
+Environment=MEDARCHIVE_ENVIRONMENT=production
+UMask=0077
 ExecStart=/opt/medarchive/.venv/bin/uvicorn medarchive.main:create_app --factory --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
 
-# Безопасность
+# Service hardening
 NoNewPrivileges=yes
 PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/medarchive
 
 [Install]
 WantedBy=multi-user.target

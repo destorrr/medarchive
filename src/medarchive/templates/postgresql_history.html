@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="page-header operation-page-header history-page-header">
+    <div>
+        <p class="eyebrow">Контроль и аудит</p>
+        <h1>Журнал движений</h1>
+        <p class="page-description">Хронология операций с медицинскими картами и коробками. Записи журнала сохраняются без возможности редактирования.</p>
+    </div>
+    <div class="history-header-meta">
+        <span class="badge badge-info">История операций</span>
+        <span class="history-total">{{ total_events }} событий</span>
+    </div>
+</header>
+
+<section class="card operation-panel history-panel">
+    <div class="panel-heading">
+        <div>
+            <p class="eyebrow">Последовательность событий</p>
+            <h2>Операционный журнал</h2>
+            <p class="page-description">Сначала отображаются наиболее новые записи. История доступна в пределах прав вашей роли.</p>
+        </div>
+        <span class="badge badge-neutral">Страница {{ page }}</span>
+    </div>
+
+    {% if history_items %}
+    <div class="table-wrap history-table-wrap">
+        <table class="data history-table">
+            <thead>
+                <tr>
+                    <th>Дата и время</th>
+                    <th>Объект</th>
+                    <th>Операция</th>
+                    <th>Откуда</th>
+                    <th>Куда</th>
+                    <th>Сотрудник</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in history_items %}
+                <tr>
+                    <td class="history-date">{{ item.timestamp.strftime('%d.%m.%Y %H:%M:%S') if item.timestamp else '—' }}</td>
+                    <td><strong class="history-subject">{{ item.subject }}</strong></td>
+                    <td><span class="history-action">{{ item.action }}</span></td>
+                    <td>{{ item.from_location or '—' }}</td>
+                    <td>{{ item.to_location or '—' }}</td>
+                    <td>{{ item.actor or '—' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state history-empty">
+        <span class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v15H4zM8 3v4M16 3v4M4 10h16M8 14h3M8 17h6"/></svg>
+        </span>
+        <strong>В журнале пока нет событий</strong>
+        <span>Операции с картами и коробками появятся здесь после выполнения.</span>
+    </div>
+    {% endif %}
+
+    <footer class="history-pagination">
+        <span class="history-pagination-info">Всего событий: {{ total_events }} · Страница {{ page }}</span>
+        <nav class="history-pagination-actions" aria-label="Страницы журнала">
+            {% if has_previous %}<a class="btn btn-secondary" href="/history?page={{ page - 1 }}">Новее</a>{% endif %}
+            {% if has_next %}<a class="btn btn-secondary" href="/history?page={{ page + 1 }}">Старее</a>{% endif %}
+        </nav>
+    </footer>
+</section>
+{% endblock %}

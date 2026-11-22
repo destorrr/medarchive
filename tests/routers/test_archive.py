@@ -137,9 +137,11 @@ class TestArchiveRouter:
         assert "Все коробки размещены" in r.text
         assert "Новых коробок, ожидающих размещения, нет." in r.text
         assert "Коробки появляются здесь после приёмки на странице „Приёмка“." in r.text
-        # стили флешей (base.html)
-        assert ".flash-success" in r.text
-        assert ".flash-error" in r.text
+        # Общие стили вынесены в локальный CSS, который отдаёт приложение.
+        css = await archive_client.get("/static/app.css")
+        assert css.status_code == 200
+        assert ".flash-success" in css.text
+        assert ".flash-error" in css.text
 
     async def test_placement_lists_received_boxes(self, archive_client, db):
         """GET /placement с принятой коробкой → карточка «Ожидают размещения (N)»,

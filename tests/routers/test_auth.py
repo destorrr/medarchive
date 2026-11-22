@@ -44,6 +44,11 @@ class TestAuthRouter:
         r = await client.post("/login", data={"username": "test_branch", "password": "test123"}, follow_redirects=False)
         assert r.status_code == 303
         assert r.headers["location"] == "/dashboard"
+        cookie = r.headers["set-cookie"].lower()
+        assert "httponly" in cookie
+        assert "samesite=lax" in cookie
+        assert "path=/" in cookie
+        assert "max-age=43200" in cookie
 
     async def test_login_wrong_password(self, client):
         r = await client.post("/login", data={"username": "test_branch", "password": "wrong"})
@@ -53,11 +58,121 @@ class TestAuthRouter:
     async def test_logout_clears_session(self, client):
         # Login first
         await client.post("/login", data={"username": "test_branch", "password": "test123"})
-        r = await client.get("/logout", follow_redirects=False)
+        r = await client.post("/logout", follow_redirects=False)
         assert r.status_code == 303
         assert r.headers["location"] == "/login"
+        assert "session" in r.headers.get("set-cookie", "").lower()
+        assert "max-age=0" in r.headers.get("set-cookie", "").lower()
+
+    async def test_logout_get_is_not_supported(self, client):
+        r = await client.get("/logout", follow_redirects=False)
+        assert r.status_code == 405
 
     async def test_protected_page_redirects_to_login(self, client):
         r = await client.get("/dashboard", follow_redirects=False)
         assert r.status_code == 303
         assert "/login" in r.headers["location"]
+
+    async def test_logout_rejects_cross_origin_post(self, client):
+        r = await client.post(
+            "/logout",
+            headers={"origin": "https://attacker.example"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 403
+
+    async def test_logout_rejects_cross_site_fetch_metadata(self, client):
+        r = await client.post(
+            "/logout",
+            headers={"sec-fetch-site": "cross-site"},
+            follow_redirects=False,
+        )
+        assert r.status_code == 403
+
+    async def test_logout_accepts_same_origin_post(self, client):
+        r = await client.post(
+            "/logout",
+            headers={
+                "origin": "http://test",
+                "sec-fetch-site": "same-origin",
+            },
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+
+    async def test_postgresql_login_returns_retry_after_when_throttled(self, monkeypatch):
+        from types import SimpleNamespace
+        from starlette.requests import Request
+
+        from medarchive.config import Config
+        from medarchive.routers import auth as auth_router
+        from medarchive.services.auth_service import AuthService
+
+        class AsyncContext:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+        class FakeSession(AsyncContext):
+            def begin(self):
+                return AsyncContext()
+
+        class FakeDatabase:
+            def session_factory(self):
+                return FakeSession()
+
+        class FakeThrottle:
+            def __init__(self, _session, _secret):
+                pass
+
+            async def lock_buckets(self, _username, _client_ip):
+                return None
+
+            async def retry_after(self, _username, _client_ip):
+                return 60
+
+        class FakeTemplates:
+            def TemplateResponse(self, _request, _name, _context, status_code=200, headers=None):
+                return SimpleNamespace(status_code=status_code, headers=headers or {})
+
+        async def fake_get_pg_database():
+            return FakeDatabase()
+
+        monkeypatch.setattr(auth_router, "get_pg_database", fake_get_pg_database)
+        monkeypatch.setattr(
+            "medarchive.services.postgresql_login_throttle.PostgreSQLLoginThrottle",
+            FakeThrottle,
+        )
+
+        config = Config(
+            auth_backend="postgresql",
+            postgres_enabled=True,
+            secret_key="test-secret",
+            environment="test",
+        )
+        app = SimpleNamespace(
+            state=SimpleNamespace(config=config, templates=FakeTemplates())
+        )
+        request = Request({
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/login",
+            "raw_path": b"/login",
+            "query_string": b"",
+            "headers": [],
+            "client": ("192.0.2.44", 12345),
+            "server": ("test", 80),
+            "app": app,
+        })
+
+        response = await auth_router.login(
+            request, "staff", "incorrect", AuthService("test-secret")
+        )
+
+        assert response.status_code == 429
+        assert response.headers["Retry-After"] == "60"
