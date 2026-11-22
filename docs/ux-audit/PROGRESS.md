@@ -3775,3 +3775,9 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 - реальный PostgreSQL catalog inventory, миграционный mapping/backfill/quarantine/idempotency и доказательства тестами/CI.
 
 Изменена только Markdown-документация в `docs/ux-audit-project`. PostgreSQL/pg_catalog, миграции, SQL/DDL, ORM, API/UI, тесты и CI в этом проходе не запускались и не менялись. UX-06 остаётся открытым; UX-07 и реализация заблокированы.
+
+## 2026-11-22 — canonical P-09 event names aligned
+
+Дополнительно устранён конкурирующий список event strings в §6.2 `UX-06-DB-SECURITY-TRANSACTION-ARCHITECTURE.md`. Теперь документ ссылается на канонический `UX-06-ADMIN-SECURITY-EVENT-CATALOG.md` и перечисляет нормализованные P-09 события: `shipment.draft_created`, `archive_request.cancelled`, `shipment.cancelled`, `shipment.handed_over`, item outcome/correction events, `archive_request.item_received_by_central_office` и `archive_request.completed`. Старые `.v1` примеры и `shipment.received_all` не должны трактоваться как утверждённые schema versions или альтернативные event names.
+
+Открытыми остаются integer `event_version`/machine-readable validators, `command_version` и canonicalization/hash contract, replay policy для negative outcomes, retry horizons/cleanup, typed HTTP mapping и external consumer/grant/deployment preflight. Новых продуктовых вопросов не выявлено.
