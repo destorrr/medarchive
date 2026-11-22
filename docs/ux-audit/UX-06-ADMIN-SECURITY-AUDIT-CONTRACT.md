@@ -224,3 +224,11 @@ Target contract:
 - Audit retention/legal hold and integrity remain separate governance/technical gates; absence of audit-feed export does not remove or shorten audit retention requirements.
 
 This is a product decision recorded in documentation only. No application/API/DB/DDL/migration/test/deployment change is authorized.
+
+## 2026-11-22 — успешный вход: обязательный audit event отсутствует в текущем PostgreSQL path
+
+Статически проверены src/medarchive/routers/auth.py и src/medarchive/services/postgresql_auth_service.py. Для PostgreSQL login пароль и активность пользователя проверяются внутри pg_session.begin(); login throttle обновляется/очищается в этой же транзакции. После выхода из транзакции router создаёт session token и устанавливает cookie. В этом пути не обнаружена запись authn.login_succeeded / auth.login_succeeded в AdminSecurityAudit или DomainEvent.
+
+Target policy требует сохранить обязательный успешный login audit до выдачи session cookie; при невозможности commit audit запись сессия не выдаётся. Следовательно, текущая реализация не соответствует fail-closed target: транзакция authentication/throttle завершается без обязательного audit record, а cookie выдаётся после неё. Нужен единый transaction boundary, который фиксирует успешное authentication outcome и обязательный audit event до token/cookie issuance. При этом raw username/IP и их digests не включать в audit payload; throttle bucket остается отдельным механизмом.
+
+Logout сейчас только удаляет cookie; по target catalog logout — best-effort telemetry, поэтому отсутствие durable mandatory logout event не блокирует текущую операцию. Это статический source finding; runtime auth flow и тесты не запускались.
