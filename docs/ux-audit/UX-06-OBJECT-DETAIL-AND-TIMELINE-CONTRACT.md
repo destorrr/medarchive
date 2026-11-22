@@ -136,7 +136,7 @@ These findings are static source inspection only. No HTTP requests, PostgreSQL q
 | Branch opens its own shipment after completion | Manifest and shipment timeline allowed |
 | Archive opens request it is handling | Request and permitted item outcomes allowed |
 | Request author opens own P-09 draft | Draft detail and item list allowed; other Central Office employees denied |
-| Any employee of the requesting Central Office location opens submitted/processing/historical P-09 | Full request detail, item list, outcomes and complete request-scoped event timeline (actors, timestamps and recorded reasons/comments) allowed; unrelated card history and mutation denied |
+| Any employee of the requesting Central Office location opens submitted/processing/historical P-09 | Full request detail, item list, outcomes and complete request-scoped event timeline (actors, timestamps and recorded reasons/comments) allowed; unrelated card history and item-set edits denied. After partial issue, cancellation of only unissued remainder is allowed within this location; whole-request cancellation and cancellation of issued items are denied to CO |
 | Central Office employee opens P-09 belonging to another location | Denied/not-found |
 | Central Office opens its own request | All items and outcomes for that request allowed |
 | Sender/receiver opens completed own shipment | Full manifest, including card number and patient name, allowed |
