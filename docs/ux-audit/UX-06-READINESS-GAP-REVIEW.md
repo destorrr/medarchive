@@ -131,3 +131,12 @@ Read-only review of `src/medarchive/routers/postgresql_dashboard.py` (dashboard 
 5. Current dashboard history resolves request aggregates through the legacy per-card `ArchiveRequest` and its single `fulfillment_shipment_id`. The target projection must resolve parent request, item, and all linked fulfillment batches; batch completion cannot imply parent completion.
 
 These are static source-to-target discrepancies, not proof of incorrect production behavior: the target P-09 schema is not implemented. Before implementation, derive separate SQL/read-model definitions and test fixtures for (a) archive active P-09 queue, (b) archive new-request badge, (c) CO own-request list, (d) sender/receiver shipment queues, (e) box-level receipt counters, and (f) item-level P-09 receipt counters. Apply role/scope filtering before counting, pagination or aggregation; avoid exposing patient PII in queue rows.
+
+
+## 2026-11-22 — AdminSecurityAudit implementation readiness gap
+
+Статическая проверка admin service/router и ORM подтверждает: текущие административные изменения пишут admin.* в общий DomainEvent; отдельной AdminSecurityAudit модели/таблицы в ORM нет. Admin audit page уже ограничена require_pg_role("admin"), однако читает общий журнал по префиксу. Текущие payload содержат username/full_name, courier phone и before/after snapshots, тогда как утверждённый target catalog требует отдельный типизированный журнал и минимизированные event-specific payloads.
+
+Append-only trigger DomainEvent защищает UPDATE/DELETE, но не устанавливает эффективные INSERT privileges и не решает угрозу table owner/superuser. В файловых Alembic revisions/draft SQL исполняемые grants/roles/bootstrap не обнаружены; DB-SEC требует отдельную DBA/infra настройку principals. Реальные grants, owners и RLS остаются неподтверждёнными до read-only preflight целевой PostgreSQL.
+
+Нельзя считать audit implementation готовой только потому, что текущий admin mutation и legacy DomainEvent flush находятся в одной ORM session: отсутствует отдельный AdminSecurityAudit authoritative store и typed payload contract. Retention schedule также не утверждён организацией и блокирует production governance.
