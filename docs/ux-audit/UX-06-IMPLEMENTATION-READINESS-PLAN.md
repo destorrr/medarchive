@@ -218,8 +218,8 @@
 
 **5C. Отправления**
 - one-to-one fulfillment shipment на parent;
-- каждая партия содержит только выбранные ready-to-issue items;
-- отдельный handover для каждой партии;
+- единственный manifest содержит все и только позиции `extracted` после полной обработки всех items;
+- один атомарный handover всего manifest;
 - item-level receipt и атомарный bulk receipt только реально поступивших карт;
 - завершение parent только после terminal исхода всех позиций.
 
@@ -284,8 +284,8 @@
 | Remove item | возврат карты в коробку, новое/активное membership, item removed_by_archive, comment/event | item удалён, карта осталась без хранения |
 | Cancel до processing | parent cancelled, pending items cancelled, reason/event | часть состава осталась активной |
 | Cancel после processing | возврат всех extracted карт, terminal item statuses, parent cancelled, events | часть карт возвращена, часть оставлена извлечённой |
-| Handover единственного shipment | parent/shipment/all manifest items locks, full manifest, all items issued_pending_receipt, archive custody unchanged, events | повторный handover, неполный manifest, ошибочный parent reference | parent/batch/item locks, selected batch manifest, items issued_pending_receipt, archive custody unchanged, events | повторная выдача, item в двух batches, ошибочный parent reference |
-| P-09 item/bulk receipt | validate only selected actually-arrived items; update each item receipt/custody/location, batch projection, parent terminality and per-item events atomically | any non-arrived item accepted; partial mutation on bulk failure; premature batch/parent completion |
+| Handover единственного shipment | parent/shipment/all manifest item locks, full manifest, all items issued_pending_receipt, archive custody unchanged, events | повторный handover, неполный manifest, ошибочный parent reference |
+| P-09 item/bulk receipt | validate only selected actually-arrived items; update each item receipt/custody/location, single-shipment projection, parent terminality and per-item events atomically | any non-arrived item accepted; partial mutation on bulk failure; premature shipment/parent completion |
 | Regroup | lock всех коробок/карт, close old memberships/cycles, create new cycles/memberships, preserve placements, events | автоматическое снятие placement пустой коробки по общему trigger |
 | Admin correction | allowlisted correction, reason, before/after audit, actor/time | произвольный UPDATE без отдельной записи аудита |
 
@@ -299,9 +299,9 @@
 - no membership + extracted overlap;
 - no duplicate active request items across parents;
 - parent → one fulfillment shipment; its immutable manifest contains all and only `extracted` items of that parent;
-- each transport batch contains only cards physically issued in that batch; parent item states remain independently tracked;
+- the single transport manifest contains every `extracted` card; all cards are handed over together; item-level receipt remains independently tracked;
 - parent cannot complete before all terminal results and receipt;
-- after partial issue only the unissued remainder may be cancelled; issued items remain active until actual CO receipt;
+- after the single handover, cancellation is prohibited; sent items remain active until actual CO receipt;
 - terminal results and audit metadata immutable;
 - no direct location mutation outside workflow.
 
