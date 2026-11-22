@@ -186,3 +186,16 @@
 ## 11. Утверждённый срок хранения command ledger (2026-11-21)
 
 Владелец продукта утвердил срок хранения записей идемпотентности обычных команд — 90 календарных дней после завершения команды; по истечении срока запись может быть очищена. Для необратимых логистических и административных операций command identity/tombstone сохраняется бессрочно. Очистка обычных ledger records не удаляет authoritative business records, DomainEvent или отдельные audit records. До реализации остаются проверка максимальных retry horizons фактических клиентов/jobs, проектирование ограниченной безопасной cleanup-процедуры и проверка взаимодействия с backup/restore. Решение о сроке принято; реализация/DDL не разрешены.
+
+
+## 2026-11-22 — конкретизированы event compatibility gaps
+
+Повторная сверка ORM, producers и внутренних readers выявила следующие конкретные переходные разрывы:
+
+1. Текущий producer отправления пишет `shipment.created`, тогда как целевой P-09 catalog нормализует создание черновика как `shipment.draft_created`. Исторические строки не переименовывать; новый contract вводить с явным compatibility mapping.
+2. Текущий shipment service всё ещё производит `shipment.exception_registered` и `shipment.exception_resolved`, а admin page читает `shipment.exception_resolved`. Решение D-03 исключает старый процесс «Инциденты» и эти типы из target catalog. Остаточный producer/reader — legacy code retirement gap, а не основание включать события в новый allowlist.
+3. `PostgreSQLAdminService._audit_admin_change` пишет `admin.*` в общий DomainEvent; целевая модель требует отдельный AdminSecurityAudit. Перенос должен быть non-destructive: исторические admin.* остаются доступными как legacy evidence, новые действия пишутся в отдельный audit record атомарно с изменением.
+4. ORM DomainEvent не имеет `event_version`, `command_id`, `correlation_id`; текущий payload JSONB сам по себе не образует версионированный контракт.
+5. Подтверждённые внутренние readers: dashboard recent movements, dashboard object history, shipment detail, admin audit page и legacy exception-resolution detail. Последний исключается по D-03. Backup не является consumer; внешние consumers не входят в текущий product scope, но deployment inventory обязателен перед cutover.
+
+До реализации остаются: закрытый allowlist target event types, целые версии payload schemas и validators, mapping legacy→target для чтения, политика показа payload по allowlist, перевод admin/security audit, retirement exception reader/producers, а также подтверждение фактических deployment readers/grants. Это документационная спецификация, не разрешение менять ORM/DDL/services.
