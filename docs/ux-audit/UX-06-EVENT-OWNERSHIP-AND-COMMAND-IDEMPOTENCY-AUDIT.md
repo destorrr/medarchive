@@ -212,3 +212,47 @@
 - Статический поиск всех Alembic revisions и draft initial SQL: исполняемых GRANT/REVOKE, CREATE ROLE/USER, ALTER ROLE, default privileges или SECURITY DEFINER bootstrap не найдено; встречается только SQL-комментарий о планируемом REVOKE. DB-SEC-01…04 требуют отдельные runtime/migrator/infrastructure principals и контролируемую DBA настройку. Фактические grants/owners не установлены.
 
 Не переписывать исторические admin.* DomainEvent; target migration должна сохранить их как legacy evidence и перевести новые producers/readers без потери истории. Реализация не разрешена.
+
+
+## 2026-11-22 — event and command versioning contract normalized (design proposal)
+
+This pass separates decisions already approved from the remaining implementation design. It does not claim that the current ORM or database supports these fields.
+
+### Required event envelope for new writes
+
+For each new target DomainEvent and AdminSecurityAudit record, the target envelope must carry:
+- immutable event identifier;
+- closed `event_type` allowlist;
+- integer `event_version` for that event type's payload schema;
+- aggregate type and aggregate ID;
+- actor ID and database-recorded occurrence timestamp;
+- `command_id` and `correlation_id`;
+- strictly validated, bounded, event-specific payload.
+
+The event catalog currently defines normalized P-09 names and required semantic fields, but does not yet provide complete machine-readable schemas or integer versions. Proposed baseline: first production schema for each newly introduced normalized event starts at `event_version = 1`; increment only when the payload contract changes incompatibly. Additive optional fields are permitted only when validators and all readers explicitly support them; unknown event types, unsupported versions, unknown payload keys and over-limit payloads are rejected at write boundary and rendered safely by readers. This is a technical proposal, not an owner-approved version assignment or implementation authorization.
+
+### Historical compatibility
+
+- Do not rewrite historical DomainEvent rows to add guessed versions, command IDs or correlation IDs.
+- Do not rename historical `shipment.created` rows to `shipment.draft_created`; preserve original type and payload.
+- Read compatibility must be explicit and read-only: legacy event types may be translated to a normalized presentation only where the old payload proves the semantic mapping. Preserve source event ID/type and mark the presentation as legacy; never synthesize missing item receipts, custody transitions, command IDs or actor/time facts.
+- `shipment.exception_registered` and `shipment.exception_resolved` remain excluded from target allowlist under D-03; retire their producer/reader with the legacy incident surface rather than mapping them into new events.
+- Historical `admin.*` DomainEvent rows remain legacy evidence; new admin/security writes use separate AdminSecurityAudit.
+
+### Command envelope and replay boundary
+
+The approved public DB-command result envelope is already versioned by `result_version` (baseline 1). Keep it distinct from input `command_version` and event `event_version`. A command execution uses one command_id and correlation_id; every mandatory event/audit record emitted by that command carries the same pair. Bulk P-09 receipt remains one command with one item-level receipt event per card.
+
+The ledger must store the exact committed result envelope and replay it without recomputing aggregate state. Replay still rechecks current actor activity and authorization to read any sensitive fields before returning the saved result. Ordinary command ledger records expire 90 calendar days after completion; irreversible logistics/admin command identities remain permanent. Neither cleanup nor tombstone retention may delete DomainEvent, AdminSecurityAudit or authoritative aggregate history.
+
+### Still unresolved; do not silently decide in implementation
+
+1. UUID generation/client lifecycle for command_id and correlation_id, including retry behavior across tabs, browser reloads and client timeouts.
+2. Canonical input serialization and hash algorithm/version (the older audit proposal mentions SHA-256, but canonicalization details were not owner-approved).
+3. Which deterministic negative outcomes are committed/replayable versus rolled back; transient infrastructure failures must never be stored as completed outcomes.
+4. Complete per-event integer schema versions, JSON schema/validator definitions, payload size/depth limits and compatibility test fixtures.
+5. Complete per-command input schema/version, canonical hash allowlist and stable result_payload schema/version.
+6. Exact HTTP mapping from DB result_code to status/body, including conflict, forbidden, validation and idempotency-key reuse.
+7. Maximum retry horizon of actual clients/jobs and safe bounded ledger cleanup/backup-restore interaction.
+
+External event delivery, outbox, offsets and webhook consumers remain out of product scope. Before event schema change or purge, deployment-level jobs/readers and effective DB grants still require read-only operational confirmation.
