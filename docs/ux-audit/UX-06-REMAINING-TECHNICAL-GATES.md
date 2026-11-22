@@ -129,3 +129,8 @@ No further product clarification is currently necessary for these already approv
 Initial revision исполняет встроенную замороженную копию SQL, которая сама помечена draft/not production migration; отдельный `db/postgresql/001_initial_schema.sql` также draft. `migrations/env.py` использует `target_metadata = None`, поэтому ORM diff не автоматизирован. Файловая head не доказывает фактический head работающей БД.
 
 **Снят вопрос о графовой развилке.** Остаточный DB preflight конкретизирован: получить read-only `alembic_version`; introspect PostgreSQL catalogs для таблиц/колонок/types/defaults/nullability, PK/FK/unique/CHECK/indexes, функций/триггеров и grants; сверить результат с ORM и каждой применённой revision; определить schema drift и bootstrap status. До доступа к реальной БД эти пункты остаются неподтверждёнными.
+
+
+## 2026-11-22 — статическая сверка покрытия таблиц ORM и миграций
+
+По именам таблиц ORM (16) сопоставлена с initial Alembic revision (15): единственное добавление после baseline — `card_placements` в revision `0003_card_placements`. `auth_login_throttles` создаётся revision `0011_login_throttles`, но не объявлена ORM-моделью и должна проверяться как SQL-managed объект. Это только проверка имён таблиц; сравнение колонок/ограничений/индексов/триггеров остаётся открытым и требует PostgreSQL catalog inventory.
