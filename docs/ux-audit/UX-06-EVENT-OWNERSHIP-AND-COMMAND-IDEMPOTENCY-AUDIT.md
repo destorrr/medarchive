@@ -199,3 +199,16 @@
 5. Подтверждённые внутренние readers: dashboard recent movements, dashboard object history, shipment detail, admin audit page и legacy exception-resolution detail. Последний исключается по D-03. Backup не является consumer; внешние consumers не входят в текущий product scope, но deployment inventory обязателен перед cutover.
 
 До реализации остаются: закрытый allowlist target event types, целые версии payload schemas и validators, mapping legacy→target для чтения, политика показа payload по allowlist, перевод admin/security audit, retirement exception reader/producers, а также подтверждение фактических deployment readers/grants. Это документационная спецификация, не разрешение менять ORM/DDL/services.
+
+
+## 2026-11-22 — AdminSecurityAudit: producer, payload и DB privilege reconciliation
+
+Дополнен статический аудит по postgresql_admin_service.py, postgresql_admin_pages.py, models.py, migration 0002_workflow_guards.py, initial SQL и DB-SEC policy.
+
+- Текущий _audit_admin_change() пишет admin.* в общий DomainEvent и выполняет flush; admin router затем выполняет session.commit(). Это даёт общую транзакционную границу текущей admin mutation и legacy event, но не отдельный AdminSecurityAudit authoritative record.
+- Текущие payload включают username/full_name, branch IDs, courier full_name/phone и before/after snapshots. Они не соответствуют целевому минимальному typed allowlist. Нужны отдельные схемы по event type; не переносить существующие payload как есть.
+- /admin/audit имеет server-side require_pg_role("admin"), но читает DomainEvent (admin.%). Target reader должен читать отдельный AdminSecurityAudit; admin-only доступ сохраняется, audit-feed export отсутствует.
+- В ORM DomainEvent отсутствуют version/command/correlation поля. Миграция 0002 создаёт UPDATE/DELETE trigger append-only, но он не определяет INSERT privileges и не защищает от владельца/суперпользователя.
+- Статический поиск всех Alembic revisions и draft initial SQL: исполняемых GRANT/REVOKE, CREATE ROLE/USER, ALTER ROLE, default privileges или SECURITY DEFINER bootstrap не найдено; встречается только SQL-комментарий о планируемом REVOKE. DB-SEC-01…04 требуют отдельные runtime/migrator/infrastructure principals и контролируемую DBA настройку. Фактические grants/owners не установлены.
+
+Не переписывать исторические admin.* DomainEvent; target migration должна сохранить их как legacy evidence и перевести новые producers/readers без потери истории. Реализация не разрешена.
