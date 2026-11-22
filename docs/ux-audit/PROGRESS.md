@@ -3846,3 +3846,9 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 - В `UX-06-DB-COMMAND-CONTRACTS.md` §1.2 разделены новая команда и committed replay: повтор существующего command_id переходит в §1.4, не выполняя бизнес-шаги/события повторно. Конкурентная регистрация ожидает commit/rollback исходной транзакции; committed in_progress без recovery-протокола не допускается.
 - В §1.4 отмечен технический gate сериализации replay read authorization с конкурентной деактивацией/отзывом membership. Проверка должна соответствовать principal/membership lock protocol §1.3, но не должна заново выполнять бизнес-команду.
 - Только документация. ORM, SQL, migrations, runtime, tests и CI не менялись. UX-06 открыт, UX-07 не начат.
+
+
+### 2026-11-22 — UX-06: синхронизация command ledger и principal lock protocol
+- В `UX-06-EVENT-OWNERSHIP-AND-COMMAND-IDEMPOTENCY-AUDIT.md` §6.1 отделена предварительная проверка формата envelope от проверки текущих mutation-полномочий новой команды; committed replay проверяет только актуальные права чтения сохранённого результата (§6.1a), без повторной mutation authorization.
+- Для новых команд явно добавлен обязательный principal/membership lock prefix и повторная проверка active/role/scope перед блокировкой бизнес-агрегата; P-09 применяет parent → shipment → items → cards/memberships/boxes после auth prefix.
+- Гонка replay read authorization с отзывом прав требует транзакционного решения; этот технический gate не закрыт. Документационные изменения без кода/SQL/миграций/тестов/CI. UX-06 открыт.
