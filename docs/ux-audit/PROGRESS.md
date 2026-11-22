@@ -3586,3 +3586,12 @@ UX-06 остаётся **в работе**. Продуктовые ответы 
 В техническую модель и readiness добавлено требование отдельного `cards.custody_location_id`, item receipt в `shipment_cards`, расширения status/check/trigger contract, shadow parent table на период совместимости и отдельного cutover для legacy guards. `docs/development/postgresql.md` теперь явно помечает текущий single-shipment/full-receipt baseline как legacy, а one-to-many P-09 — как целевой, ещё не реализованный workflow.
 
 Фактический Alembic head, initial DDL, production-like данные, effective grants и полный deployment inventory всё ещё не проверены. Никакие исходники, ORM, миграции, SQL/DDL или тесты не изменялись и не запускались.
+
+
+## 2026-11-22 — завершена статическая проверка Alembic-графа
+
+Прочитаны все 11 revision-файлов, их revision/down_revision, initial revision SQL, отдельный draft SQL, `alembic.ini` и `migrations/env.py`. Граф миграций линейный: `0001_initial` → `0002_workflow_guards` → `0003_card_placements` → `0004_receipt_manifest_guard` → `0005_card_external_custody` → `0006_external_custody_at_other` → `0007_transition_meta` → `0008_shipment_integrity` → `0009_external_org_custody` → `0010_archive_fulfill` → `0011_login_throttles`. Два файла с префиксом 0007 не образуют fork: второй содержит revision ID 0009.
+
+Файловая head — `0011_login_throttles`; фактическая DB head не установлена. Initial revision исполняет frozen SQL, помеченный в комментариях draft/not production migration. `target_metadata = None` означает отсутствие автоматического ORM metadata diff в Alembic.
+
+Следующий безопасный шаг — read-only подключение к целевой PostgreSQL и получение `alembic_version` плюс catalog inventory (columns/types/defaults/nullability, constraints, indexes, triggers/functions, effective grants), затем сверка с ORM и миграциями. Подключения к БД, Alembic CLI, SQL, миграции и тесты не выполнялись. Application source/ORM/DDL/migrations/tests не менялись.
