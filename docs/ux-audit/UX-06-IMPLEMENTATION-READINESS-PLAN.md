@@ -283,7 +283,7 @@
 | Remove item | возврат карты в коробку, новое/активное membership, item removed_by_archive, comment/event | item удалён, карта осталась без хранения |
 | Cancel до processing | parent cancelled, pending items cancelled, reason/event | часть состава осталась активной |
 | Cancel после processing | возврат всех extracted карт, terminal item statuses, parent cancelled, events | часть карт возвращена, часть оставлена извлечённой |
-| Handover batch | parent/batch/item locks, selected batch manifest, items issued_pending_receipt, archive custody unchanged, events | повторная выдача, item в двух batches, ошибочный parent reference |
+| Handover единственного shipment | parent/shipment/all manifest items locks, full manifest, all items issued_pending_receipt, archive custody unchanged, events | повторный handover, неполный manifest, ошибочный parent reference | parent/batch/item locks, selected batch manifest, items issued_pending_receipt, archive custody unchanged, events | повторная выдача, item в двух batches, ошибочный parent reference |
 | P-09 item/bulk receipt | validate only selected actually-arrived items; update each item receipt/custody/location, batch projection, parent terminality and per-item events atomically | any non-arrived item accepted; partial mutation on bulk failure; premature batch/parent completion |
 | Regroup | lock всех коробок/карт, close old memberships/cycles, create new cycles/memberships, preserve placements, events | автоматическое снятие placement пустой коробки по общему trigger |
 | Admin correction | allowlisted correction, reason, before/after audit, actor/time | произвольный UPDATE без отдельной записи аудита |
@@ -320,7 +320,7 @@
 - cancel vs handover;
 - duplicate start processing;
 - duplicate handover;
-- duplicate item/bulk receipt; duplicate batch handover;
+- duplicate item/bulk receipt; duplicate shipment handover;
 - two requests competing for same card;
 - regroup vs shipment/request extraction;
 - concurrent membership and placement mutation;
