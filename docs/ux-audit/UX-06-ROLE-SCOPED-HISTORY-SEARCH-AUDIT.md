@@ -67,3 +67,23 @@ postgresql_search_results также явно допускает viewer в requi
 ## 8. D-06 decision update — 2026-11-21
 
 The owner confirmed that MedArchive has not entered operation and contains no user or operational data. No viewer-account migration, actor-reference preservation, or legacy ACL compatibility work is required. The `viewer` role is removed entirely from the target model and future implementation across schema/ORM, API, admin UI, guards, templates/navigation, and tests. The target roles are `admin`, `branch`, `central_office`, and `archive`; no viewer permissions are automatically reassigned. Legacy viewer search/history/dashboard paths identified in this audit are prototype remnants to remove during implementation. This supersedes the earlier recommendation to perform account preflight/mapping. Implementation remains separately gated.
+
+
+## 2026-11-22 — refreshed static review of search, history and object-detail read paths
+
+Rechecked the current branch source postgresql_dashboard.py, postgresql_archive.py, postgresql_central_office.py and the object-detail contract. No runtime HTTP requests or database queries were executed.
+
+### Current source findings
+
+- **Global operational history:** GET /history builds a DomainEvent query. The event filter is added only for branch/archive/central_office; admin and legacy viewer therefore retain an unscoped operational event query. This conflicts with D-07 × D-16: admin global access belongs to object details and AdminSecurityAudit, not a global operational feed. Viewer is removed entirely from the target roles; its current path is prototype residue.
+- **Branch history after handover:** the branch-visible card set is based on Card.origin_branch_id, so a branch can remain eligible for card events after custody/location has moved to archive. This conflicts with D-08. Shipment manifest/timeline access for the branch's own shipment remains a separate P-08 permission and must not be removed with card history.
+- **Dashboard recent movements:** current event query is unfiltered for admin/viewer; operational location filtering is applied only to branch/archive/central_office. Target admin dashboard must not expose a global operational movement feed.
+- **Search result DTO:** current card search matches card number or full name, but the reviewed result object exposes full name/status/placement rather than the target result identity set, including card number and birth date/phone as separately approved. The input scope remains FIO-only per the approved search interaction; result-field policy and server-side authorization must be reconciled with the PII read contract before implementation.
+- **Object detail coverage:** the reviewed PostgreSQL router set still has no general card-detail or box-detail/history route. Search result fragments do not provide a usable object-detail navigation path. The shipment detail route is the only confirmed full object timeline, but its reader currently excludes admin and relies on operational location context; admin cannot use it as the global object-detail surface required by D-07.
+- **Archive request surface:** current archive UI and routes still query legacy per-card ArchiveRequest; they are not the target parent/item P-09 request detail/timeline.
+
+### Required target read surfaces
+
+Implement distinct server-authorized detail/timeline paths for card, box, shipment and parent archive request. Apply role, location, custody, shipment participation and field-level rules in query construction before counts, pagination or serialization. Admin gets global object details without a synthetic operational Location, but no global operational event feed. Branch card history stops at archive handover; its own shipment manifest/timeline remains available under P-08. Remove viewer from schema/ORM/API/UI/guards/tests rather than migrating accounts; the owner confirmed the prototype has no operational data or viewer accounts.
+
+This is a static source-to-target mismatch. It does not establish production exposure or actual response contents.
