@@ -199,3 +199,8 @@ The event catalog now contains later owner decisions that supersede older candid
 - AdminSecurityAudit retention durations remain a blocking governance gate: no automatic/ad hoc deletion until a versioned R1–R4 schedule is approved; no guessed or indefinite duration.
 
 The PostgreSQL successful-login path remains a confirmed static implementation gap: mandatory success audit is absent before cookie issuance. Password lifecycle and exact DB/audit boundary remain to be checked. This does not constitute runtime verification or implementation authorization.
+
+
+## 2026-11-22 — password lifecycle implementation gap added
+
+The admin/security audit gate now records the source-level mismatch between approved password lifecycle decisions and current PostgreSQL routes/services: missing self-service change, generic admin user-update password reset, missing self-reset prohibition and administrator re-authentication, missing forced-change state/limited login mode, incomplete session semantics, and legacy DomainEvent/raw-payload admin audit UI. See `UX-06-ADMIN-SECURITY-AUDIT-CONTRACT.md`. Static inspection only; runtime/DB/tests not run.
