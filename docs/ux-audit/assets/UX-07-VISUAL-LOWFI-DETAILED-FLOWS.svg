@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="3953" viewBox="0 0 1160 3953">
+<rect width="100%" height="100%" fill="#f3f5f7"/>
+<text x="30" y="40" font-family="Arial, sans-serif" font-size="25" fill="#223044" font-weight="bold">МедАрхив · UX-07 · обновлённые графические low-fi экраны</text>
+<rect x="20" y="60" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="60" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="93" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">Q1 · Филиал / Карты</text>
+<text x="925" y="93" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">ФИЛИАЛ</text>
+<rect x="20" y="112" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="163" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="217" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Карты</text>
+<text x="39" y="271" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="325" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="155" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Карты</text>
+<rect x="917" y="128" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="152" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Сканер готов</text>
+<rect x="245" y="185" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="229" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">Сканируйте QR следующей карты</text>
+<text x="273" y="270" font-family="Arial, sans-serif" font-size="16" fill="#526477" >Поиск существующей или создание новой без подтверждения</text>
+<rect x="245" y="341" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="375" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">Последний скан: карта создана</text>
+<rect x="245" y="410" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="438" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Поиск по ФИО  ·  Создать вручную</text>
+<rect x="20" y="492" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="492" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="525" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">Q2 · Филиал / Коробка</text>
+<text x="925" y="525" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">ФИЛИАЛ</text>
+<rect x="20" y="544" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="595" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="649" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Коробки</text>
+<text x="39" y="703" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="757" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="587" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Коробки / BX-125</text>
+<rect x="917" y="560" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="584" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Сканер готов</text>
+<rect x="245" y="617" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="661" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">Сканируйте QR для коробки BX-125</text>
+<text x="273" y="702" font-family="Arial, sans-serif" font-size="16" fill="#526477" >Карта создаётся при необходимости и добавляется атомарно</text>
+<rect x="245" y="773" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="807" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">В коробке: 24 карты · Последний скан: добавлена</text>
+<rect x="245" y="842" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="870" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Состав  ·  Поиск по ФИО  ·  Создать вручную</text>
+<rect x="20" y="924" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="924" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="957" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">R1 · Архив / Приёмка</text>
+<text x="925" y="957" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">АРХИВ</text>
+<rect x="20" y="976" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="1027" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="1081" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Приёмка</text>
+<text x="39" y="1135" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="1189" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="1019" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Приёмка / Отправление</text>
+<rect x="917" y="992" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="1016" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Частично принято</text>
+<rect x="245" y="1049" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="1093" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">Приёмка коробок по одной</text>
+<text x="273" y="1134" font-family="Arial, sans-serif" font-size="16" fill="#526477" >BX-01 принята   ·   BX-02 принята   ·   BX-03 ожидается</text>
+<rect x="245" y="1205" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="1239" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">Принято 2 из 5 · BX-03: подтвердить приёмку</text>
+<rect x="245" y="1274" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="1302" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Расхождения  ·  История  ·  Размещение отдельно</text>
+<rect x="20" y="1356" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="1356" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="1389" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">R2 · Архив / После приёмки</text>
+<text x="925" y="1389" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">АРХИВ</text>
+<rect x="20" y="1408" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="1459" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="1513" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Приёмка</text>
+<text x="39" y="1567" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="1621" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="1451" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Приёмка / BX-03</text>
+<rect x="917" y="1424" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="1448" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Принята</text>
+<rect x="245" y="1481" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="1525" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">Коробка BX-03 получена архивом</text>
+<text x="273" y="1566" font-family="Arial, sans-serif" font-size="16" fill="#526477" >Приёмка не означает размещение на полке</text>
+<rect x="245" y="1637" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="1671" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">Принято 3 из 5 коробок</text>
+<rect x="245" y="1706" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="1734" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Принять следующую  ·  Разместить BX-03</text>
+<rect x="20" y="1788" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="1788" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="1821" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">G1 · Архив / Перегруппировка</text>
+<text x="925" y="1821" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">АРХИВ</text>
+<rect x="20" y="1840" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="1891" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="1945" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Хранение</text>
+<text x="39" y="1999" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="2053" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="1883" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Хранение / BX-001</text>
+<rect x="917" y="1856" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="1880" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Проверка состава</text>
+<rect x="245" y="1913" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="1957" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">Перенести карты в другую коробку</text>
+<text x="273" y="1998" font-family="Arial, sans-serif" font-size="16" fill="#526477" >Источник BX-001 (12) → Цель BX-002 (8)</text>
+<rect x="245" y="2069" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="2103" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">Выбраны 2 карты · После: 10 → 10</text>
+<rect x="245" y="2138" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="2166" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Подтвердить перенос · Полки не меняются</text>
+<rect x="20" y="2220" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="2220" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="2253" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">G2 · Архив / Пустая коробка</text>
+<text x="925" y="2253" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">АРХИВ</text>
+<rect x="20" y="2272" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="2323" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="2377" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Хранение</text>
+<text x="39" y="2431" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="2485" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="2315" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Хранение / BX-001</text>
+<rect x="917" y="2288" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="2312" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Требует внимания</text>
+<rect x="245" y="2345" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="2389" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">После переноса коробка опустела</text>
+<text x="273" y="2430" font-family="Arial, sans-serif" font-size="16" fill="#526477" >BoxCycle завершён; коробка остаётся на полке</text>
+<rect x="245" y="2501" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="2535" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">Полка A-01 · 0 карт · Размещение сохранено</text>
+<rect x="245" y="2570" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="2598" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Оставить на полке  ·  Снять с полки отдельно</text>
+<rect x="20" y="2652" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="2652" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="2685" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">P1 · Архив / Заявка ЦО</text>
+<text x="925" y="2685" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">АРХИВ</text>
+<rect x="20" y="2704" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="2755" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="2809" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Заявки ЦО</text>
+<text x="39" y="2863" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="2917" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="2747" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Заявки ЦО / №…</text>
+<rect x="917" y="2720" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="2744" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Обработка</text>
+<rect x="245" y="2777" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="2821" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">Все позиции должны иметь результат</text>
+<text x="273" y="2862" font-family="Arial, sans-serif" font-size="16" fill="#526477" >extracted: 3 · not_found: 1 · removed_by_archive: 1</text>
+<rect x="245" y="2933" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="2967" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">Обработано 5 из 5 · Нельзя отправить часть</text>
+<rect x="245" y="3002" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="3030" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Подготовить одно отправление</text>
+<rect x="20" y="3084" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="3084" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="3117" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">P2 · Архив / Передача</text>
+<text x="925" y="3117" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">АРХИВ</text>
+<rect x="20" y="3136" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="3187" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="3241" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Заявки ЦО</text>
+<text x="39" y="3295" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="3349" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="3179" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Заявки ЦО / Отправление</text>
+<rect x="917" y="3152" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="3176" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Черновик</text>
+<rect x="245" y="3209" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="3253" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">Единый манифест всех extracted</text>
+<text x="273" y="3294" font-family="Arial, sans-serif" font-size="16" fill="#526477" >3 карты в манифесте; выбрать подмножество нельзя</text>
+<rect x="245" y="3365" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="3399" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">Курьер: выбран · Передача всех карт одной операцией</text>
+<rect x="245" y="3434" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="3462" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Подтвердить полную передачу</text>
+<rect x="20" y="3516" width="1120" height="410" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<rect x="20" y="3516" width="1120" height="52" rx="10" fill="#e7edf2" stroke="#d7dfe6"/>
+<text x="40" y="3549" font-family="Arial, sans-serif" font-size="20" fill="#233449" font-weight="bold">P3 · ЦО / Получение</text>
+<text x="925" y="3549" font-family="Arial, sans-serif" font-size="13" fill="#526273" font-weight="bold">ЦЕНТРАЛЬНЫЙ ОФИС</text>
+<rect x="20" y="3568" width="195" height="358" rx="10" fill="#f2f5f7" stroke="#d7dfe6"/>
+<text x="39" y="3619" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Главная</text>
+<text x="39" y="3673" font-family="Arial, sans-serif" font-size="15" fill="#136e7c" font-weight="bold">Входящее отправление</text>
+<text x="39" y="3727" font-family="Arial, sans-serif" font-size="15" fill="#647384" >История</text>
+<text x="39" y="3781" font-family="Arial, sans-serif" font-size="15" fill="#647384" >Справка</text>
+<text x="245" y="3611" font-family="Arial, sans-serif" font-size="16" fill="#526273" >Входящее отправление</text>
+<rect x="917" y="3584" width="185" height="36" rx="18" fill="#e7f4f1" stroke="#a5d6c8"/>
+<text x="932" y="3608" font-family="Arial, sans-serif" font-size="14" fill="#246b5d" font-weight="bold">Частично получено</text>
+<rect x="245" y="3641" width="856" height="138" rx="10" fill="#f8fafb" stroke="#d7dfe6"/>
+<text x="273" y="3685" font-family="Arial, sans-serif" font-size="24" fill="#223449" font-weight="bold">Подтверждение фактически полученных карт</text>
+<text x="273" y="3726" font-family="Arial, sans-serif" font-size="16" fill="#526477" >Карта 1 получена · Карты 2 и 3 ожидаются</text>
+<rect x="245" y="3797" width="856" height="55" rx="10" fill="#edf3f7" stroke="#d7dfe6"/>
+<text x="265" y="3831" font-family="Arial, sans-serif" font-size="17" fill="#243a4d" font-weight="bold">Получено 1 из 3 · За остальные отвечает архив</text>
+<rect x="245" y="3866" width="856" height="42" rx="10" fill="#ffffff" stroke="#d7dfe6"/>
+<text x="263" y="3894" font-family="Arial, sans-serif" font-size="15" fill="#126c7b" font-weight="bold">Подтвердить получение выбранных карт</text>
+</svg>
