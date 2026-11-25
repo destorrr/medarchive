@@ -1,0 +1,22 @@
+# UX-09.4D — archive box receipt and discrepancies
+2026-11-25. Проектная спецификация. Источники UX-07-WF-02-ARCHIVE-RECEIPT-AND-STORAGE, UX-07-DETAILED-ARCHIVE-RECEIPT-REGROUP-P09-STATES R1–R3, UX-07-WF-07-EXCEPTIONS-WRITEOFF-BULK-CORRECTIONS X04, UX-06-TECHNICAL-DATA-MODEL, DB-37–40,46,70. Только branch/CO→archive, не P09.
+
+| Screen/action | Use case | Scope/precondition | Result |
+|---|---|---|---|
+| WF-A02 входящие | IncomingShipmentRegistry (read) | active archive, destination scope | переданные отправления, box counts, no patient PII; без ФИО автора и курьера в основной шапке |
+| WF-A03 открыть | IncomingShipmentDetail (read) | отдельная проверка scope | immutable manifest, receipt per box, discrepancies, timeline |
+| R1/R2 подтвердить коробку | shipment_receive_box (DB-70) | active archive, correct destination, in_transit, expected box, no prior receipt | custody/location box and contents to archive, receipt actor/time/event; membership/cycle unchanged; no placement |
+| R3 недостающая | shipment_record_discrepancy (proposed) | archive scope, expected box | separate discrepancy, box remains expected, no custody mutation |
+| R3 лишняя | shipment_record_discrepancy (proposed) | archive scope, actual extra box if known | separate discrepancy, no manifest insertion or custody/location mutation |
+| R3 обработка расхождения | shipment_resolve_discrepancy (proposed) | archive scope, actual facts and allowed transition | preserve original record and history; exact resolution outcomes still require contract verification |
+| X04 исправить ошибочную приёмку | shipment_correct_box_receipt (proposed) | authorized archive, scope, original receipt, closed reason list | append-only compensating operation, no automatic expected/placement/custody rollback; exact allowed compensation matrix open |
+| Перейти к размещению | BoxPlacement read/navigation | independent box scope | no mutation; box_place separate command |
+| Завершение отправления | derived within protected command | all original manifest boxes processed and discrepancies resolved | full receipt projection and event, not manual bypass |
+
+Names marked proposed are not verified SQL identifiers. No receive-all button, card count, seal or packaging check, card-level receipt for ordinary shipment. No new role. Archive can place received box before shipment completion. Ordinary manifest only ShipmentBox; no ShipmentCard. Missing remains expected; extra separate, no automatic receipt. Do not invent terminal missing-box outcome: verify resolution rules before implementation. Display discrepancy type, box number if known, timestamp, actor snapshot if retained. Timeline preserves original receipt and subsequent correction; no PATCH historical payload. Reason mandatory closed list, free comment not required for receipt correction. Do not auto return to expected or undo placement/custody. Admin does not gain routine receipt authority. Exact correction permission, compensation and reason catalog remain open.
+
+## Transaction and UI
+Actor from session; lock/recheck principal/membership, shipment and box, relevant custody/placement and discrepancy rows in stable order per UX-06. Receipt of one box, location/custody of its cards, receipt event, ledger and completion projection atomic. No new BoxPlacement. Other boxes unchanged. Retry same command_id under current access; concurrent receipt with new command_id returns conflict/current state, UI shows already received without second event. Network failure not success; refresh authoritative read model. Discrepancy recording and resolution serialized with receipt/completion; no silent manifest change. Exact event IDs and ordinary partial receipt status representation require schema verification; UI label is not new DB enum. History includes actual employee/time, not courier as actor. No patient PII in shipment manifest; independent authorization for box detail/cycle.
+
+## Tests
+Partial receipt; last receipt with unresolved discrepancy; missing stays expected; extra no manifest/custody change; wrong destination/box; duplicate receipt and concurrent workers; receipt vs deactivation; receipt rollback on event failure; place accepted box before shipment complete; no count/seal/packaging predicate; no ShipmentCard; immutable manifest; direct URL scope; correction preserves original receipt and placement; invalid reason; correction vs placement concurrency; no false success on network failure; no PII. Code, migrations, HTML unchanged; tests not run.
