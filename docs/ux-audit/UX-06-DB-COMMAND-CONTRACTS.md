@@ -332,7 +332,7 @@ Replay не должен требовать, чтобы исходная ком�
 - shipment draft → `in_transit`;
 - все позиции полного manifest одновременно получают состояние `issued_pending_receipt`;
 - записать actor/time и `shipment.handed_over`;
-- **не переводить custody карт к курьеру или ЦО**: ответственность остаётся у архива до item-level receipt ЦО;
+- **перевести custody всех карт manifest назначенному курьеру** атомарно при handover; не переводить custody в ЦО до item-level receipt;
 - parent остаётся `processing`.
 
 **Запрет:** нельзя передать только часть manifest, выполнить повторный handover, включить чужие/неизвлечённые карты, изменить manifest/courier после handover или создать второе fulfillment-отправление для parent.
