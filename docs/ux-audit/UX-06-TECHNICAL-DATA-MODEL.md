@@ -198,7 +198,7 @@ Box (1)
 
 **4. Согласованность статусов и custody**
 - Допустимые P-09 shipment states: `draft`, `in_transit`, `partially_received`, `received`, `cancelled`. `partially_received` отражает item-level receipt части manifest; `cancelled` допустим только до handover и вместе с отменой parent.
-- Item `issued_pending_receipt` требует shipment `in_transit` или `partially_received`, manifest membership и неизменяемый факт единого handover. Custody карты при этом остаётся у архива.
+- Item `issued_pending_receipt` требует shipment `in_transit` или `partially_received`, manifest membership и неизменяемый факт единого handover. Custody карты при этом принадлежит назначенному курьеру.
 - Item `completed` после receipt требует shipment handover, фактического item receipt, `cards.current_location_id = central_office` и custody ЦО.
 - Shipment state — проекция item receipts, но persisted status обновляется в той же транзакции, что и receipt; периодическая задача не является источником истины.
 - Parent `completed` только когда все позиции получили терминальный исход: отправленные карты — `completed` после item receipt, остальные — `not_found` или `removed_by_archive`; при отмене до handover извлечённые позиции становятся `cancelled`. Позиции `pending`, `extracted` и `issued_pending_receipt` блокируют завершение.
@@ -209,7 +209,7 @@ Box (1)
 
 Целевая модель должна добавить отдельный FK `cards.custody_location_id → locations.id` (NOT NULL после backfill и reconciliation):
 - в обычном стационарном состоянии `custody_location_id = current_location_id`;
-- при handover единственного P-09 shipment карта получает `current_shipment_id = shipment.id`, `current_location_id = NULL`, но `custody_location_id` остаётся archive;
+- при handover единственного P-09 shipment карта получает `current_shipment_id = shipment.id`, `current_location_id = NULL`, а custody принадлежит назначенному курьеру; представление courier custody в схеме требует уточнения (location FK недостаточен);
 - после item receipt ЦО `current_shipment_id = NULL`, `current_location_id = central_office`, `custody_location_id = central_office`;
 - перевод custody в ЦО разрешён только item-level receipt конкретной карты, не общий handover и не receipt другой карты;
 - существующие внешние custody-сценарии не меняют семантику; правила совместимости `custody_location_id` с `custody_status` задаются отдельным CHECK/trigger и миграционным mapping.
@@ -259,7 +259,7 @@ Box (1)
 | Обычное архивное хранение | `current_location_id = archive`, `current_shipment_id IS NULL`, одно активное членство в открытом BoxCycle |
 | Извлечена по заявке | Та же архивная локация, нет активного членства, ровно одна позиция `extracted` у родителя `processing` |
 | Не найдена по заявке | Физически не локализована; membership и shipment отсутствуют; сохраняется терминальная позиция `not_found` в истории P-09, в том числе после `completed`/`cancelled` |
-| Выдана, receipt ожидается | `current_shipment_id` указывает на единственный fulfillment shipment, членства в обычном хранении нет, позиция `issued_pending_receipt`; custody остаётся у архива |
+| Выдана, receipt ожидается | `current_shipment_id` указывает на единственный fulfillment shipment, членства в обычном хранении нет, позиция `issued_pending_receipt`; custody принадлежит назначенному курьеру |
 | В ЦО после приёмки | `current_location_id = central_office`, отправление принято, позиция `completed` |
 | Внешнее хранение ЦО | Текущая модель `custody_status` и атрибуты внешней организации; это не маршрут отправления |
 
@@ -350,7 +350,7 @@ Box (1)
 2. Подтвердить, что действие выполняет текущий автор draft — активный сотрудник архива с полномочиями.
 3. Проверить, что shipment находится в draft, manifest содержит все и только позиции `extracted`, а карты остаются на ответственности архива.
 4. Перевести shipment draft → `in_transit`; все позиции полного manifest одновременно получают состояние `issued_pending_receipt`. Записать actor/time и `shipment.handed_over`.
-5. **Не переводить custody карт к курьеру или ЦО:** ответственность остаётся у архива до item-level receipt ЦО.
+5. **Перевести custody всех карт назначенному курьеру при handover;** в ЦО custody переходит только при item-level receipt.
 6. После handover manifest и назначение курьера неизменяемы; отмена parent запрещена.
 7. Handover, item state updates и события выполняются одной транзакцией. Повтор с тем же command_id идемпотентен; новый повторный handover отклоняется.
 
@@ -358,7 +358,7 @@ Box (1)
 
 - ЦО подтверждает получение каждой реально поступившей карты отдельно. Несколько фактически поступивших карт можно подтвердить одной атомарной bulk-командой.
 - Bulk receipt блокирует выбранные request items/cards в стабильном порядке, повторно проверяет actor scope и допустимость receipt; если одна позиция не допускает подтверждения, весь набор откатывается.
-- В одной транзакции для каждой выбранной карты фиксируются item receipt, custody archive → CO, учётная локация ЦО, actor/time и отдельный DomainEvent.
+- В одной транзакции для каждой выбранной карты фиксируются item receipt, custody courier → CO, учётная локация ЦО, actor/time и отдельный DomainEvent.
 - Частичная приёмка единственного отправления допустима на уровне карт: shipment имеет `in_transit` до первого receipt, `partially_received` после первого, но до последнего receipt, и `received` после receipt всех карт manifest.
 - Receipt одной карты не меняет остальные карты. Нельзя подтвердить карту, которая фактически не поступила.
 - Parent становится `completed`, когда
@@ -514,7 +514,7 @@ Admin deactivation и отзыв/изменение role/location membership и�
 
 Факт нахождения в пути определяется shipment и связью с коробкой, а не попыткой отслеживать физическое местоположение курьера. Не создавать для обычных коробочных отправлений дублирующие `ShipmentCard` для каждой вложенной карты. Handover не меняет состав коробок, циклы и memberships. Receipt обновляет локацию коробки и содержащихся карт атомарно; он сам по себе не назначает коробке полочное место и не создаёт `BoxPlacement` — размещение на полке остаётся отдельной складской операцией.
 
-Для P-09 archive → central_office действует иная модель: единственный fulfillment shipment содержит полный набор карт `extracted` через `ShipmentCard`; карты до handover имеют `extracted` без membership, после единого handover получают `current_shipment_id` и `issued_pending_receipt`, при этом custody остаётся у архива; после item-level receipt — локация ЦО и `completed`. Смешивать две модели манифеста запрещено.
+Для P-09 archive → central_office действует иная модель: единственный fulfillment shipment содержит полный набор карт `extracted` через `ShipmentCard`; карты до handover имеют `extracted` без membership, после единого handover получают `current_shipment_id` и `issued_pending_receipt`, при этом custody принадлежит назначенному курьеру; после item-level receipt — локация ЦО и `completed`. Смешивать две модели манифеста запрещено.
 
 ### 4.4. Учётная позиция карты с результатом `not_found`
 
@@ -684,7 +684,7 @@ P-09 timeline остаётся request-scoped проекцией DomainEvent п�
 
 Целевая модель заявки ЦО должна поддерживать несколько карт и независимое состояние каждой позиции. Архив может выдавать позиции частями; невыданные позиции остаются ожидающими и могут быть выданы позднее в рамках той же заявки. Для позиции допускается результат «Не найдена» с обязательной причиной из закрытого справочника и необязательным комментарием; карта при этом не списывается, не удаляется и не получает фиктивного изменения местонахождения. Если карта позднее обнаружена, её можно выдать в рамках той же заявки.
 
-Фактическая выдача архивом и фактическое получение ЦО — разные события. До handover все позиции заявки должны быть полностью обработаны; затем все позиции `extracted` передаются одним отправлением и одной атомарной операцией. До подтверждения получения конкретной карты custody остаётся у архива; после item-level receipt переходит ЦО. ЦО подтверждает только фактически поступившие карты поштучно или атомарным bulk-набором. Частичная приёмка единственного отправления допустима; частичная выдача и отмена остатка после handover не предусмотрены.
+Фактическая выдача архивом и фактическое получение ЦО — разные события. До handover все позиции заявки должны быть полностью обработаны; затем все позиции `extracted` передаются одним отправлением и одной атомарной операцией. После handover до подтверждения получения конкретной карты custody остаётся у курьера; после item-level receipt переходит ЦО. ЦО подтверждает только фактически поступившие карты поштучно или атомарным bulk-набором. Частичная приёмка единственного отправления допустима; частичная выдача и отмена остатка после handover не предусмотрены.
 
 В модели следует явно разделить как минимум item-level issued/awaiting-receipt/received/not-found/cancelled outcomes и custody. Конкретные enum names, ограничения уникальности, командные блокировки, event payloads и SQL guards уточняются в DB contracts; они не могут возвращать модель к полной приёмке всего набора одним действием.
 
