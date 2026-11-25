@@ -87,8 +87,8 @@ Workflow выполняет блокировки строк и проверки 
 | `request_remove_item` | Прямого эквивалента целевой позиции нет; текущие действия per-card/box | archive_requests, cards, memberships, cycles, placements, domain_events | Нужен результат позиции, обязательный комментарий и атомарный возврат исключённой карты |
 | `request_mark_not_found` | `PostgreSQLArchiveWorkflow.mark_not_found`; POST /requests/not-found | archive_requests, cards, domain_events | Сейчас финализируется одиночная заявка; нужно позиционное событие внутри родителя |
 | `request_cancel` | Текущая отмена отдельной заявки не эквивалентна P-09 | archive_requests, cards, memberships, cycles, placements, domain_events | Нужна parent-level отмена с различными полномочиями до/после processing и атомарным возвратом всех extracted карт |
-| `request_create_fulfillment_batch` / `request_confirm_batch_handover` | Текущие `hand_over`/fulfilment endpoint — только частичная основа | shipments, shipment_cards, archive_requests, domain_events | Целевая модель: one-to-many batches на parent; каждая batch содержит выбранные ready items; handover меняет item state на issued_pending_receipt, но custody остаётся у архива |
-| `request_confirm_item_receipt` / `request_confirm_bulk_receipt` / `shipment_receive_box` | Текущая `receive/_receive` — только частичная основа | shipments, shipment_cards, shipment_boxes, cards, archive_requests, domain_events | P-09: item-level receipt и атомарный bulk только реально полученных карт; обычные коробочные shipments: box-level receipt по одной коробке; parent/batch completion вычисляется по terminal outcomes |
+| `request_create_fulfillment_shipment` / `request_confirm_fulfillment_handover` | Текущие `hand_over`/fulfilment endpoint — только частичная основа | shipments, shipment_cards, archive_requests, domain_events | Целевая модель: не более одного fulfillment shipment на parent; manifest содержит все и только extracted items после обработки всех позиций; единый handover переводит все manifest items в issued_pending_receipt и custody назначенному курьеру |
+| `request_confirm_item_receipt` / `request_confirm_bulk_receipt` / `shipment_receive_box` | Текущая `receive/_receive` — только частичная основа | shipments, shipment_cards, shipment_boxes, cards, archive_requests, domain_events | P-09: item-level receipt и атомарный bulk только реально полученных карт; обычные коробочные shipments: box-level receipt по одной коробке; parent/shipment completion вычисляется по terminal outcomes |
 | `box_repack` | Операции add/remove card to/from box в shipment workflow | boxes, box_cycles, box_card_memberships, box_placements, cards, domain_events | Требуется отдельный контракт нового BoxCycle и сохранение placement при опустошении в сценарии regroup (D-11) |
 | `admin_correct` | `PostgreSQLAdminService` и admin routers | несколько операционных таблиц, DomainEvent / admin audit | Нужен allowlist корректировок, обоснование, запрет переписывания истории и отдельный security audit |
 
@@ -147,20 +147,20 @@ ORM содержит поля:
 
 ## 2026-11-22 — corrected command mapping for approved P-09 workflow
 
-The mapping below supersedes the older single-shipment/full-receipt proposal in §4 for archive → CO.
+The mapping below follows the approved single-shipment, atomic handover and item-level receipt model for archive → CO. Courier custody at handover supersedes the earlier archive custody rule.
 
 | Target command | Required target semantics | Transaction boundary |
 |---|---|---|
-| request_create_fulfillment_batch | Create one transport batch for selected ready-to-issue items of one P-09 parent; courier required; one-to-many parent link | Batch + subset manifest + item links + courier snapshot + DomainEvent — one commit |
-| request_confirm_batch_handover | Current batch author confirms physical issue; selected items become issued_pending_receipt; archive custody remains unchanged | Batch + selected items + DomainEvent — one commit |
+| request_create_fulfillment_shipment | Create the sole fulfillment shipment for all extracted items after every position is processed; courier required; unique parent link | Shipment + full manifest + item links + courier snapshot + DomainEvent — one commit |
+| request_confirm_fulfillment_handover | Current shipment author confirms physical handover of the entire manifest; all manifest items become issued_pending_receipt; custody transfers to the assigned courier | Shipment + all manifest items + custody + DomainEvent — one commit |
 | request_issue_item | Archive records physical issue of one card position; unissued positions remain pending and can be issued later in the same parent request | One item + custody/DomainEvent update |
 | request_mark_not_found | One item receives not_found with mandatory closed-list reason and optional comment; no write-off or fictitious location update | One item + DomainEvent |
 | request_cancel_remaining | Before any issue, cancel the request; after partial issue, cancel only the remaining unissued items; issued items remain unchanged | Parent + selected remaining items, one commit |
-| request_confirm_item_receipt | CO confirms actual receipt of one physically arrived card; only then custody transfers archive → CO | One item/card + DomainEvent |
+| request_confirm_item_receipt | CO confirms actual receipt of one physically arrived card; only then custody transfers courier → CO | One item/card + DomainEvent |
 | request_confirm_bulk_receipt | CO confirms a selected set of cards that have actually arrived; per-card actor/time is persisted | Entire selected set, all-or-nothing |
 | box_place_bulk | Place several received boxes on one active shelf | All selected boxes + target shelf, all-or-nothing |
 | box_move_bulk | Move boxes from one or more shelves to one target shelf | All selected boxes + source/target placements, all-or-nothing |
 
-The old request_handover / shipment_receive_all mapping is not an acceptable target contract if it requires one full immutable manifest, one indivisible handover, or full receipt of every card before any custody transition. Physical courier/transport records may be modeled separately; they do not change archive accountability before CO actual receipt.
+The target contract requires one full immutable manifest and one indivisible handover. Receipt is item-level, not shipment-wide: handover transfers custody to the assigned courier, and each actual receipt transfers only the received card to CO. No additional dispatch or cancellation after handover.
 
 Ordinary box shipments remain separate from P-09 card fulfilment. Their receipt does not inspect card counts, seals or packaging; box placement remains a separate operation.
