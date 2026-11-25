@@ -4016,3 +4016,7 @@ UX-09-04G-WRITEOFF-CORRECTION-MAPPING.md (`b367db5`) сохранён и пов�
 ## 2026-11-25 — UX-09.4H
 
 UX-09-04H-ADMIN-SECURITY-MAPPING.md (`2c48a4a`) сохранён и повторно прочитан. Admin screens/routes, permissions, session invalidation, audit boundaries, governance and tests. WF-D03 card_number_correct inherent admin resolves earlier gap subject to latest decision verification. Retention, exact commands/grants/session migration open. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-25 — UX-09.4I
+
+UX-09-04I-ANALYTICS-READ-MODELS.md (`cb1b56e`) сохранён и повторно прочитан. All nine functional mapping drafts prepared; consistency review pending. Analytics scope, timezone/buckets, correction semantics, event mapping and performance gates open. Код, миграции, HTML не менялись; тесты не запускались.
