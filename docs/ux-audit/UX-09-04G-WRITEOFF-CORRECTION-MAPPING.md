@@ -1,0 +1,21 @@
+# UX-09.4G — writeoff, restoration and correction mapping
+2026-11-25. Design only. Sources D-13 in PRODUCT-DECISIONS-D-01-D-18, UX-07-WF-07 X01–X04, UX-06-INVARIANTS-DB-TEST-MATRIX (DB-60 and 2026-11-22 decisions), UX-06-TECHNICAL-DATA-MODEL. Later user decision: restore directly to active without separate initiation or automatic location/custody change; reconcile into source docs before implementation.
+| UI/action | Proposed use case | Actor/precondition | Result |
+|---|---|---|---|
+| X01 initiate | card_writeoff_submit | active CO, accessible card, mandatory reason | independent request, submitted |
+| X02 start | card_writeoff_start | authorized archive | processing |
+| X02 execute | card_writeoff_execute | active archive with explicit execution grant, verified basis and conflicts | completed, Card written_off, immutable event, actor/time snapshot |
+| X02 reject | card_writeoff_reject | authorized archive | rejected, mandatory closed reason, optional comment, card unchanged |
+| Cancel | card_writeoff_cancel | CO before processing; archive after start, before execution | cancelled, mandatory reason, event |
+| Retry after rejection | card_writeoff_submit | CO, previous rejection cause resolved | new independent request, preserve previous |
+| Restore erroneous writeoff | card_restore | active authorized admin per P07, original writeoff reference, mandatory reason | active, no automatic location/custody change; preserve original request/event; no separate initiation |
+| Empty box writeoff | box_write_off | branch/CO/archive own scope; active admin any location per DB60; empty/no open cycle/placement/shipment | terminal box state, preserve all history, reason not mandatory |
+| Correct name/DOB | card_correct | explicit grant + scope, including admin granted by another admin | old/new values, mandatory reason, actor/time; number unchanged |
+| Correct number | card_number_correct (proposed) | separate elevated permission not yet defined | unique new number, old/new history, no merge |
+| Request/history detail | WriteoffRequestDetail | independently authorized CO/archive scope | status, reasons, comment, executor snapshot/time, history; no external notification |
+
+Proposed states submitted/processing/completed/rejected/cancelled, not verified schema enums. D13 reason codes lost/damaged/other; comment optional even other; no required external document or attachment. One authorized archive executor sufficient. No physical delete. No generic PATCH. Admin cannot initiate/execute ordinary card writeoff. Restoration does not reopen completed request. If unchanged location/custody conflicts with active-card invariants, reject until explicit valid correction path established; no invented relocation. Card_correct does not authorize phone or number correction; phone editing policy not established by these sources. Number collision rejected; preserve stable card ID and historical identifiers. No self grant card_correct; AdminSecurityAudit for grants.
+## Gaps and reconciliation
+UX06 cancellation text says CO until execution, conflicts with D13/WF-X02 cutoff at processing; use latter as design baseline, sync old text. Earlier terminal status language needs explicit restoration exception. Exact refusal/cancellation reason catalog, execution grant ID and grant authority, restoration authority details and active-state compatibility, conflict checks (shipment, placement, external custody, P09, membership), number correction permission and old QR handling, event IDs and schema remain technical gates. Do not silently unpack, cancel P09 or relocate at writeoff. 
+## Transactions/tests
+Lock/recheck principal/membership/grant then request/card and relevant aggregates in canonical order; state/event/ledger and required admin audit atomic. Proposed unique active writeoff request per card pending confirmation. Test unauthorized role/grant, duplicate requests, execute vs cancel/reject, external/transport/packing conflicts, retry after refusal, immutable history, restore same custody/location and original event, box empty/no placement, correction scope and reason, unique number race, stale QR, audit failure rollback, no PII in generic queues. No code/migration/HTML changes; tests not run.
