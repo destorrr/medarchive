@@ -4012,3 +4012,7 @@ UX-09-04F-EXTERNAL-CUSTODY-MAPPING.md (`442f8c2`) сохранён и повто
 ## 2026-11-25 — UX-09.4G
 
 UX-09-04G-WRITEOFF-CORRECTION-MAPPING.md (`b367db5`) сохранён и повторно прочитан. P04/P05/P07, restoration, card_correct, number correction, tests. Cancellation cutoff conflict, restoration invariants, reason/grant catalogs and schema open. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-25 — UX-09.4H
+
+UX-09-04H-ADMIN-SECURITY-MAPPING.md (`2c48a4a`) сохранён и повторно прочитан. Admin screens/routes, permissions, session invalidation, audit boundaries, governance and tests. WF-D03 card_number_correct inherent admin resolves earlier gap subject to latest decision verification. Retention, exact commands/grants/session migration open. Код, миграции, HTML не менялись; тесты не запускались.
