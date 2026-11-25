@@ -3996,3 +3996,7 @@ Inspected PostgreSQL archive, Central Office, shipment and admin routers/service
 ## 2026-11-25 — UX-09.4C
 
 UX-09-04C-BOX-SHIPMENT-MAPPING.md (`a526f86`) сохранён и повторно прочитан. Обычные коробочные маршруты, независимые drafts, custody, author reassignment, concurrency и тестовые сценарии. Batch create semantics и точные event IDs открыты. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-25 — UX-09.4D
+
+UX-09-04D-ARCHIVE-RECEIPT-MAPPING.md (`7bf0493`) сохранён и повторно прочитан. Поштучная приёмка, расхождения, корректировка, completion, scope и тесты. Точные outcomes разрешения расхождений, compensation matrix, reason catalog и event IDs требуют сверки. Код, миграции, HTML не менялись; тесты не запускались.
