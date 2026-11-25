@@ -164,10 +164,10 @@
 - Историю изменения состава не реконструировать вымышленными событиями: явно пометить недоступную историческую детализацию.
 
 **P-09 full shipment, physical transit, custody and item receipt**
-- The current `Card.current_location_id/current_shipment_id` pair describes location/transit, while current `custody_status` describes external custody and does not identify the responsible organization. Target schema must add a distinct `cards.custody_location_id` FK; do not overload `custody_status`.
+- The current `Card.current_location_id/current_shipment_id` pair describes location/transit, while current `custody_status` describes external custody and does not identify the responsible organization. Target custody representation is pending verification under UX-08-06-CUSTODY-REPRESENTATION-PROPOSAL.md; do not overload `custody_status` or require a location-only FK during courier transit.
 - Archive must complete processing of every request item before creating the only fulfillment shipment. The immutable manifest contains all and only `extracted` items; `not_found` and `removed_by_archive` are excluded.
 - Handover transfers the entire manifest in one atomic operation. Partial issue, multiple shipments per parent and processing remaining items after handover are prohibited.
-- On handover, each card in the full manifest gets the shipment transit pointer while `custody_location_id = archive`. Only item receipt moves `custody_location_id` to central_office and clears the transit pointer.
+- On handover, each card in the full manifest gets the shipment transit pointer and custody transfers to the assigned courier. Only item receipt transfers custody to central_office and clears the transit pointer. Physical schema remains a technical gate.
 - Add `shipment_cards.request_item_id`, `received_by`, `received_at` for P-09 item-level linkage and receipt evidence. The single shipment transitions to `partially_received` after the first, but before the last, item receipt; shipment-level received fields are populated only after every manifest card is received.
 - Extend `shipments_status_check`, `ck_shipment_handover_time`, `ck_shipment_received_fields`, `ck_shipment_exception_fields`, handover/receipt CHECK constraints and deferred shipment guards together. Replace the legacy `medarchive_guard_shipment_update`, shipment consistency triggers and `medarchive_guard_archive_request` from revision `0002_workflow_guards` at the controlled P-09 cutover. Preserve ordinary box shipment semantics.
 
@@ -284,7 +284,7 @@
 | Remove item | возврат карты в коробку, новое/активное membership, item removed_by_archive, comment/event | item удалён, карта осталась без хранения |
 | Cancel до processing | parent cancelled, pending items cancelled, reason/event | часть состава осталась активной |
 | Cancel после processing | возврат всех extracted карт, terminal item statuses, parent cancelled, events | часть карт возвращена, часть оставлена извлечённой |
-| Handover единственного shipment | parent/shipment/all manifest item locks, full manifest, all items issued_pending_receipt, archive custody unchanged, events | повторный handover, неполный manifest, ошибочный parent reference |
+| Handover единственного shipment | parent/shipment/all manifest item locks, full manifest, all items issued_pending_receipt, custody transferred to assigned courier, events | повторный handover, неполный manifest, ошибочный parent reference |
 | P-09 item/bulk receipt | validate only selected actually-arrived items; update each item receipt/custody/location, single-shipment projection, parent terminality and per-item events atomically | any non-arrived item accepted; partial mutation on bulk failure; premature shipment/parent completion |
 | Regroup | lock всех коробок/карт, close old memberships/cycles, create new cycles/memberships, preserve placements, events | автоматическое снятие placement пустой коробки по общему trigger |
 | Admin correction | allowlisted correction, reason, before/after audit, actor/time | произвольный UPDATE без отдельной записи аудита |
