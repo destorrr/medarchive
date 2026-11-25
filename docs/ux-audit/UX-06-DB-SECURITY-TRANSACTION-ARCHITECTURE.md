@@ -11,7 +11,7 @@
 Проектируется прежде всего для критичных процессов:
 
 - P-06: начало обработки заявки ЦО с атомарным извлечением карт;
-- P-09: полная обработка всех позиций до единственного полного manifest и атомарного handover; item-level actual receipt, атомарный bulk receipt и custody архива до receipt ЦО; отмена всей заявки только до handover;
+- P-09: полная обработка всех позиций до единственного полного manifest и атомарного handover; item-level actual receipt, атомарный bulk receipt и custody курьера после handover до receipt ЦО; отмена всей заявки только до handover;
 - D-02: индивидуальная приёмка каждой коробки обычного отправления;
 - D-10/D-11: циклы коробок, членства и размещение коробок;
 - P-07: корректирующие административные действия с обоснованием и отдельным аудитом.
@@ -203,7 +203,7 @@ DB command должна повторно проверять инварианты
 
 **P-09 full shipment handover / item-level actual receipt:**
 - архив завершает обработку всех позиций до создания единственного shipment; все и только позиции `extracted` входят в полный manifest;
-- физическая выдача не передаёт учётную ответственность ЦО: до фактического подтверждения получения она остаётся у архива;
+- физическая выдача не передаёт учётную ответственность ЦО: после handover до фактического подтверждения получения она принадлежит курьеру;
 - ЦО подтверждает фактическое получение отдельной карты; несколько фактически полученных карт допускается подтвердить одной атомарной bulk-командой;
 - bulk-команда блокирует выбранные позиции/карты в стабильном порядке, повторно проверяет полномочия и фактическую допустимость receipt, пишет actor/time и item-level DomainEvent для каждой карты;
 - если одна позиция не допускает receipt, весь bulk receipt откатывается;
@@ -300,7 +300,7 @@ This addendum supersedes the older partial-issue/remainder-cancellation wording 
 
 ### P-09 item-level operations
 
-The parent archive request contains multiple card items. Archive must finish processing every item before creating the single fulfillment shipment; the full manifest includes all and only `extracted` items. Partial issue, multiple shipments per parent and processing remaining items after handover are prohibited. A `not_found` item requires a closed-list reason code and optional comment; it does not write off the card or invent a new location. `removed_by_archive` is also a final processing outcome and is not converted to `cancelled` by remainder cancellation, because no such post-handover remainder operation exists. Before handover, only archive may cancel the whole request; after handover cancellation is prohibited. Item-level actual CO receipt and archive custody until each receipt remain distinct facts.
+The parent archive request contains multiple card items. Archive must finish processing every item before creating the single fulfillment shipment; the full manifest includes all and only `extracted` items. Partial issue, multiple shipments per parent and processing remaining items after handover are prohibited. A `not_found` item requires a closed-list reason code and optional comment; it does not write off the card or invent a new location. `removed_by_archive` is also a final processing outcome and is not converted to `cancelled` by remainder cancellation, because no such post-handover remainder operation exists. Before handover, only archive may cancel the whole request; after handover cancellation is prohibited. Item-level actual CO receipt and courier custody after handover until each receipt remain distinct facts.
 
 The database command boundary must provide:
 - a command that creates the one shipment only after every request item has a final processing outcome, with all and only `extracted` items in its immutable manifest;
