@@ -4008,3 +4008,7 @@ UX-09-04E-STORAGE-REGROUP-MAPPING.md (`88d2636`) сохранён и повто�
 ## 2026-11-25 — UX-09.4F
 
 UX-09-04F-EXTERNAL-CUSTODY-MAPPING.md (`442f8c2`) сохранён и повторно прочитан. Existing service/routes/event IDs verified; target authorization/locking and shipment conflict checks, tests. WF-04 old single-draft rule flagged. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-25 — UX-09.4G
+
+UX-09-04G-WRITEOFF-CORRECTION-MAPPING.md (`b367db5`) сохранён и повторно прочитан. P04/P05/P07, restoration, card_correct, number correction, tests. Cancellation cutoff conflict, restoration invariants, reason/grant catalogs and schema open. Код, миграции, HTML не менялись; тесты не запускались.
