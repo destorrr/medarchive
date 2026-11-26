@@ -4048,3 +4048,7 @@ UX-09-05E-ALEMBIC-MIGRATION-SEQUENCE.md (c14f0b1) saved and reread. Actual env.p
 ## 2026-11-26 — UX-09.5F
 
 UX-09-05F-DEPLOYMENT-AND-PG-VERIFICATION.md (489f52f) saved and reread; F01–F10 deployment findings, separate backup identity, ACL restore, CI and rollout gates. Host/PG state unverified; no execution. Next 5G retirement plan. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-26 — UX-09.5G
+
+UX-09-05G-SQLITE-RETIREMENT-MANIFEST.md (5b5dcdd) saved and reread. File/test candidates, confirmed shared AuthService dependency, removal sequence and exit checks. Exhaustive import scan exceeded tool limit; transitive proof and assertion mapping pending. Next 5H. Код, миграции, HTML не менялись; тесты не запускались.
