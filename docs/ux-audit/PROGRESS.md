@@ -4052,3 +4052,7 @@ UX-09-05F-DEPLOYMENT-AND-PG-VERIFICATION.md (489f52f) saved and reread; F01–F1
 ## 2026-11-26 — UX-09.5G
 
 UX-09-05G-SQLITE-RETIREMENT-MANIFEST.md (5b5dcdd) saved and reread. File/test candidates, confirmed shared AuthService dependency, removal sequence and exit checks. Exhaustive import scan exceeded tool limit; transitive proof and assertion mapping pending. Next 5H. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-26 — UX-09.5G follow-up
+
+Import audit 5cc1340f85cdefe6a2bea7cfe7c87980f9105674 updated and reread: 67 test modules, 12 Alembic files, cleanup script, 51 templates, 16 router template references checked across passes. Static inventory sufficient for 5H; AST/runtime proof and assertion-level mapping remain UX10 gates. No code changes/tests.
