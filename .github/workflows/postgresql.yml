@@ -69,6 +69,32 @@ jobs:
           python --version
           python -m pip check
           python -m pip freeze
+      - name: I01 verify technical principal bootstrap
+        run: |
+          url="postgresql://medarchive:medarchive@localhost:5432/medarchive"
+          psql "$url" -X -v ON_ERROR_STOP=1 -f db/postgresql/bootstrap-principals.sql
+          psql "$url" -X -v ON_ERROR_STOP=1 -f db/postgresql/bootstrap-principals.sql
+          psql "$url" -X -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          BEGIN
+            IF (SELECT count(*) FROM pg_roles WHERE rolname IN ('medarchive_owner','medarchive_migrator','medarchive_runtime','medarchive_backup')) <> 4 THEN
+              RAISE EXCEPTION 'Missing technical principal';
+            END IF;
+            IF has_schema_privilege('medarchive_runtime','public','CREATE') OR pg_has_role('medarchive_runtime','medarchive_owner','SET') OR pg_has_role('medarchive_backup','medarchive_owner','SET') OR NOT pg_has_role('medarchive_migrator','medarchive_owner','SET') OR pg_has_role('medarchive_migrator','medarchive_owner','USAGE') THEN
+              RAISE EXCEPTION 'Unexpected effective privilege';
+            END IF;
+          END $;
+          SET SESSION AUTHORIZATION medarchive_runtime;
+          DO $
+          BEGIN
+            BEGIN
+              CREATE TABLE public.i01_forbidden(id integer);
+              RAISE EXCEPTION 'Runtime DDL unexpectedly allowed';
+            EXCEPTION WHEN insufficient_privilege THEN NULL;
+            END;
+          END $;
+          RESET SESSION AUTHORIZATION;
+          SQL
       - name: Validate operational shell scripts
         run: |
           for script in scripts/install.sh scripts/backup.sh scripts/pg16-client-wrapper.sh; do
