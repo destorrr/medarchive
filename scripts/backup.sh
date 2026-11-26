@@ -2,7 +2,9 @@
 # PostgreSQL backup for МедАрхив. Run by the systemd timer.
 set -Eeuo pipefail
 
-: "${MEDARCHIVE_DATABASE_URL:?Set MEDARCHIVE_DATABASE_URL in /etc/medarchive/medarchive.env}"
+: "${MEDARCHIVE_BACKUP_DATABASE_URL:=${MEDARCHIVE_DATABASE_URL:-}}"
+: "${MEDARCHIVE_BACKUP_DATABASE_URL:?Set MEDARCHIVE_BACKUP_DATABASE_URL}"
+export MEDARCHIVE_BACKUP_DATABASE_URL
 : "${MEDARCHIVE_BACKUP_AGE_RECIPIENT:?Set MEDARCHIVE_BACKUP_AGE_RECIPIENT in /etc/medarchive/medarchive.env}"
 
 BACKUP_DIR="${MEDARCHIVE_BACKUP_DIR:-/var/lib/medarchive/backups}"
@@ -59,16 +61,16 @@ import os
 import shlex
 from urllib.parse import parse_qs, unquote, urlsplit
 
-raw = os.environ["MEDARCHIVE_DATABASE_URL"]
+raw = os.environ["MEDARCHIVE_BACKUP_DATABASE_URL"]
 url = urlsplit(raw)
 if url.scheme != "postgresql+asyncpg":
-    raise SystemExit("MEDARCHIVE_DATABASE_URL must use postgresql+asyncpg://")
+    raise SystemExit("MEDARCHIVE_BACKUP_DATABASE_URL must use postgresql+asyncpg://")
 if not url.hostname or not url.path.strip("/"):
-    raise SystemExit("MEDARCHIVE_DATABASE_URL must include a host and database name")
+    raise SystemExit("MEDARCHIVE_BACKUP_DATABASE_URL must include a host and database name")
 if not url.username:
-    raise SystemExit("MEDARCHIVE_DATABASE_URL must include a database username")
+    raise SystemExit("MEDARCHIVE_BACKUP_DATABASE_URL must include a database username")
 if url.fragment:
-    raise SystemExit("URL fragments are not supported in MEDARCHIVE_DATABASE_URL")
+    raise SystemExit("URL fragments are not supported in MEDARCHIVE_BACKUP_DATABASE_URL")
 
 query = parse_qs(url.query, keep_blank_values=True)
 unknown = set(query) - {"sslmode"}
@@ -77,7 +79,7 @@ if unknown:
 
 sslmode = (query.get("sslmode") or [""])[0]
 if sslmode and sslmode not in {"disable", "allow", "prefer", "require", "verify-ca", "verify-full"}:
-    raise SystemExit("Unsupported PostgreSQL SSL mode in MEDARCHIVE_DATABASE_URL")
+    raise SystemExit("Unsupported PostgreSQL SSL mode in MEDARCHIVE_BACKUP_DATABASE_URL")
 
 def pgpass_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace(":", "\\:")
