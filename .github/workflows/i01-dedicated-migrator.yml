@@ -123,8 +123,32 @@ jobs:
           test -n "$archive"
           age --decrypt -i "$RUNNER_TEMP/i01.agekey" -o "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump" "$archive"
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'CREATE DATABASE medarchive_i01_restore'
-          PGPASSWORD=ci-admin-only pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=postgres --dbname=medarchive_i01_restore "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump"
+          restore=postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore
+          psql "$restore" -X -v ON_ERROR_STOP=1 -c 'GRANT USAGE, CREATE ON SCHEMA public TO medarchive_owner'
+          PGPASSWORD=ci-admin-only pg_restore --role=medarchive_owner --no-owner --no-acl --exit-on-error --host=localhost --username=postgres --dbname=medarchive_i01_restore "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump"
           psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -qx 0011_login_throttles
           psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT string_agg(payload, ',' ORDER BY id) FROM public.i01_backup_probe" | grep -qx synthetic-alpha,synthetic-beta
           psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT last_value FROM public.i01_backup_probe_id_seq" | grep -qx 2
+          psql "$restore" -X -v ON_ERROR_STOP=1 -c 'SET ROLE medarchive_owner' -f db/postgresql/grant-backup-read.sql
+          psql "$restore" -X -v ON_ERROR_STOP=1 <<'SQL'
+          DO $restore$
+          BEGIN
+            IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+              WHERE n.nspname='public' AND c.relkind IN ('r','p','S','v','m','i','I')
+                AND pg_get_userbyid(c.relowner) <> 'medarchive_owner') THEN
+              RAISE EXCEPTION 'Restored relation ownership mismatch';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+              WHERE n.nspname='public' AND pg_get_userbyid(p.proowner) <> 'medarchive_owner') THEN
+              RAISE EXCEPTION 'Restored routine ownership mismatch';
+            END IF;
+          END $restore$;
+          SQL
+          restored_backup=postgresql://medarchive_backup:ci-backup-only@localhost:5432/medarchive_i01_restore
+          psql "$restored_backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT string_agg(payload, ',' ORDER BY id) FROM public.i01_backup_probe" | grep -qx synthetic-alpha,synthetic-beta
+          if psql "$restored_backup" -X -v ON_ERROR_STOP=1 -c "DELETE FROM public.i01_backup_probe" >"$RUNNER_TEMP/restore-denial.log" 2>&1; then
+            echo 'Restored backup unexpectedly has DELETE privilege' >&2
+            exit 1
+          fi
+          grep -q 'permission denied' "$RUNNER_TEMP/restore-denial.log"
           rm -f "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump" "$RUNNER_TEMP/i01.agekey"
