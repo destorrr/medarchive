@@ -95,6 +95,32 @@ jobs:
           END $i01$;
           RESET SESSION AUTHORIZATION;
           SQL
+      - name: I01 verify independent technical logins
+        run: |
+          admin="postgresql://medarchive:medarchive@localhost:5432/medarchive"
+          # Disposable CI service only; these credentials are never used in deployment.
+          psql "$admin" -X -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER ROLE medarchive_migrator PASSWORD 'ci-migrator-only';
+          ALTER ROLE medarchive_runtime PASSWORD 'ci-runtime-only';
+          ALTER ROLE medarchive_backup PASSWORD 'ci-backup-only';
+          GRANT CONNECT ON DATABASE medarchive TO medarchive_migrator, medarchive_runtime, medarchive_backup;
+          SQL
+          migrator="postgresql://medarchive_migrator:ci-migrator-only@localhost:5432/medarchive"
+          runtime="postgresql://medarchive_runtime:ci-runtime-only@localhost:5432/medarchive"
+          backup="postgresql://medarchive_backup:ci-backup-only@localhost:5432/medarchive"
+          psql "$migrator" -X -v ON_ERROR_STOP=1 -Atc "SET ROLE medarchive_owner; SELECT current_user = 'medarchive_owner' AND session_user = 'medarchive_migrator'" | grep -qx t
+          for role in runtime backup; do
+            url="${!role}"
+            psql "$url" -X -v ON_ERROR_STOP=1 -Atc "SELECT current_user = 'medarchive_$role' AND session_user = current_user" | grep -qx t
+            if psql "$url" -X -v ON_ERROR_STOP=1 -c "SET ROLE medarchive_owner"; then
+              echo "Forbidden SET ROLE succeeded" >&2
+              exit 1
+            fi
+          done
+          if psql "$runtime" -X -v ON_ERROR_STOP=1 -c "BEGIN; CREATE TABLE public.i01_forbidden_login(id integer); ROLLBACK"; then
+            echo "Forbidden runtime DDL succeeded" >&2
+            exit 1
+          fi
       - name: Validate operational shell scripts
         run: |
           for script in scripts/install.sh scripts/backup.sh scripts/pg16-client-wrapper.sh; do
