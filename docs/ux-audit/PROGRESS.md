@@ -4036,3 +4036,7 @@ UX-09-05B-SQLITE-DEPENDENCY-INVENTORY.md (`524374c`) saved and reread. Runtime/c
 ## 2026-11-26 — UX-09.5C
 
 Owner confirmed no real SQLite data and service not in production; SQLite conversion excluded. UX-09-05C-TARGET-RELATIONAL-MODEL.md (1e85ea5) saved and reread; logical 23 relations, ER, P09 single FK proposal, derived custody proposal, R04 verified explicit UX06 decision. PG data presence and DDL gates open. Next 5D. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-26 — UX-09.5D
+
+UX-09-05D-CONSTRAINTS-AND-COMMANDS.md (a77434c) saved and reread; guard replacement, constraints/index proposals, command/ACL boundary and verification matrix. Cross-family lock graph, effective live guards/ACL and exception contracts remain open. Next 5E migration sequence. Код, миграции, HTML не менялись; тесты не запускались.
