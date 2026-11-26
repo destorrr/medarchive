@@ -75,7 +75,7 @@ jobs:
           psql "$url" -X -v ON_ERROR_STOP=1 -f db/postgresql/bootstrap-principals.sql
           psql "$url" -X -v ON_ERROR_STOP=1 -f db/postgresql/bootstrap-principals.sql
           psql "$url" -X -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $i01$
           BEGIN
             IF (SELECT count(*) FROM pg_roles WHERE rolname IN ('medarchive_owner','medarchive_migrator','medarchive_runtime','medarchive_backup')) <> 4 THEN
               RAISE EXCEPTION 'Missing technical principal';
@@ -83,16 +83,16 @@ jobs:
             IF has_schema_privilege('medarchive_runtime','public','CREATE') OR pg_has_role('medarchive_runtime','medarchive_owner','SET') OR pg_has_role('medarchive_backup','medarchive_owner','SET') OR NOT pg_has_role('medarchive_migrator','medarchive_owner','SET') OR pg_has_role('medarchive_migrator','medarchive_owner','USAGE') THEN
               RAISE EXCEPTION 'Unexpected effective privilege';
             END IF;
-          END $;
+          END $i01$;
           SET SESSION AUTHORIZATION medarchive_runtime;
-          DO $
+          DO $i01$
           BEGIN
             BEGIN
               CREATE TABLE public.i01_forbidden(id integer);
               RAISE EXCEPTION 'Runtime DDL unexpectedly allowed';
             EXCEPTION WHEN insufficient_privilege THEN NULL;
             END;
-          END $;
+          END $i01$;
           RESET SESSION AUTHORIZATION;
           SQL
       - name: Validate operational shell scripts
