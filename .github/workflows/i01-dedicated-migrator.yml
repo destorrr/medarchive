@@ -1,0 +1,83 @@
+name: I01 dedicated Alembic principal integration
+
+on:
+  push:
+    branches: [feature/ux-implementation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dedicated-migrator:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: medarchive_i01
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-admin-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d medarchive_i01"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      ADMIN_URL: postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01
+      MEDARCHIVE_MIGRATION_DATABASE_URL: postgresql+asyncpg://medarchive_migrator:ci-migrator-only@localhost:5432/medarchive_i01
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.16"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c constraints/ci-python312.txt -e '.[dev]'
+      - name: Bootstrap isolated database principals
+        run: |
+          psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -f db/postgresql/bootstrap-principals.sql
+          psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER ROLE medarchive_migrator PASSWORD 'ci-migrator-only';
+          ALTER ROLE medarchive_runtime PASSWORD 'ci-runtime-only';
+          GRANT CONNECT ON DATABASE medarchive_i01 TO medarchive_migrator, medarchive_runtime;
+          GRANT USAGE, CREATE ON SCHEMA public TO medarchive_owner;
+          SQL
+      - name: Upgrade clean schema using dedicated migrator
+        run: |
+          unset MEDARCHIVE_DATABASE_URL
+          alembic upgrade head
+          alembic current
+      - name: Assert revision, object ownership and privilege boundaries
+        run: |
+          psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          DO $i01$
+          DECLARE n integer;
+          BEGIN
+            IF (SELECT version_num FROM public.alembic_version) <> '0011_login_throttles' THEN
+              RAISE EXCEPTION 'Unexpected Alembic revision';
+            END IF;
+            SELECT count(*) INTO n FROM pg_class c JOIN pg_namespace s ON s.oid=c.relnamespace
+              WHERE s.nspname='public' AND c.relkind IN ('r','p','S','v','m')
+                AND pg_get_userbyid(c.relowner) <> 'medarchive_owner';
+            IF n <> 0 THEN RAISE EXCEPTION 'Non-owner relations: %', n; END IF;
+            SELECT count(*) INTO n FROM pg_proc p JOIN pg_namespace s ON s.oid=p.pronamespace
+              WHERE s.nspname='public' AND pg_get_userbyid(p.proowner) <> 'medarchive_owner';
+            IF n <> 0 THEN RAISE EXCEPTION 'Non-owner routines: %', n; END IF;
+            IF has_schema_privilege('medarchive_runtime','public','CREATE')
+              OR pg_has_role('medarchive_runtime','medarchive_owner','SET') THEN
+              RAISE EXCEPTION 'Runtime privilege escalation';
+            END IF;
+          END $i01$;
+          SQL
+      - name: Reject wrong dedicated migration identity
+        run: |
+          export MEDARCHIVE_MIGRATION_DATABASE_URL=postgresql+asyncpg://medarchive_runtime:ci-runtime-only@localhost:5432/medarchive_i01
+          if alembic current >"$RUNNER_TEMP/wrong-migrator.log" 2>&1; then
+            echo 'Wrong migration identity unexpectedly accepted' >&2
+            exit 1
+          fi
+          grep -q 'Dedicated migration connection must use medarchive_migrator' "$RUNNER_TEMP/wrong-migrator.log"
