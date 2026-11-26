@@ -39,3 +39,7 @@ Runs 45851708162 and 45851713974 success; job 140019485032: 488 passed, 36 warni
 ## I01.1 — principal provisioning started
 
 47cd1aaec4da72cda91103d25a56fb9debc5216b adds transactional bootstrap outside Alembic, four technical principals, fail-closed attributes/membership validation, controlled migrator SET ROLE, public schema CREATE revoke. CI executes twice and checks effective role membership and runtime DDL denial via session authorization. CI pending. No passwords, production execution, ownership transfer, runtime DML grants/revocation, backup read grants or migration URL integration yet. Existing application tests still use baseline privileged connection. I01 in progress; I00 clean baseline complete, external DB1 gate remains. No business roles or prototypes changed.
+
+## I01.1 follow-up — CI syntax failure
+
+Runs 45852528278, 45852548097, 45853347615 success. Runs 45853375450 and 45853381823 failed in new I01 assertion step after both bootstrap invocations succeeded: workflow contained single-dollar SQL delimiters, PostgreSQL syntax error. Fixed with named $i01$ delimiters in 5320c34147c4f40406576852ef58eb56f53d3dad; fetched workflow again and verified both pairs. New CI pending; ACL assertions not yet proven. No weakening of assertions, no production changes. I01.1 remains open.
