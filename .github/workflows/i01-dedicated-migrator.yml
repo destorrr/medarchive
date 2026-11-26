@@ -57,7 +57,7 @@ jobs:
           DO $i01$
           DECLARE n integer;
           BEGIN
-            IF (SELECT version_num FROM public.alembic_version) <> '0011_login_throttles' THEN
+            IF (SELECT version_num FROM public.alembic_version) IS DISTINCT FROM '0011_login_throttles' THEN
               RAISE EXCEPTION 'Unexpected Alembic revision';
             END IF;
             SELECT count(*) INTO n FROM pg_class c JOIN pg_namespace s ON s.oid=c.relnamespace
@@ -86,11 +86,17 @@ jobs:
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
           ALTER ROLE medarchive_backup PASSWORD 'ci-backup-only';
           GRANT CONNECT ON DATABASE medarchive_i01 TO medarchive_backup;
-          SET ROLE medarchive_owner;
           SQL
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'SET ROLE medarchive_owner' -f db/postgresql/grant-backup-read.sql
+          psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE medarchive_owner;
+          CREATE TABLE public.i01_backup_probe (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, payload text NOT NULL);
+          INSERT INTO public.i01_backup_probe(payload) VALUES ('synthetic-alpha'), ('synthetic-beta');
+          SQL
           backup=postgresql://medarchive_backup:ci-backup-only@localhost:5432/medarchive_i01
           psql "$backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -qx 0011_login_throttles
+          psql "$backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT string_agg(payload, ',' ORDER BY id) FROM public.i01_backup_probe" | grep -qx synthetic-alpha,synthetic-beta
+          psql "$backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT last_value FROM public.i01_backup_probe_id_seq" | grep -qx 2
           for statement in 'SET ROLE medarchive_owner' 'CREATE TABLE public.i01_forbidden(id integer)' 'UPDATE public.alembic_version SET version_num=version_num' 'TRUNCATE public.alembic_version'; do
             if psql "$backup" -X -v ON_ERROR_STOP=1 -c "$statement" >"$RUNNER_TEMP/backup-denial.log" 2>&1; then
               echo "Forbidden backup operation succeeded: $statement" >&2
@@ -115,8 +121,10 @@ jobs:
           scripts/backup.sh
           archive="$(find "$MEDARCHIVE_BACKUP_DIR" -name '*.dump.age' -print -quit)"
           test -n "$archive"
-          age --decrypt -i "$RUNNER_TEMP/i01.agekey" -o "$RUNNER_TEMP/i01.dump" "$archive"
+          age --decrypt -i "$RUNNER_TEMP/i01.agekey" -o "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump" "$archive"
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'CREATE DATABASE medarchive_i01_restore'
-          PGPASSWORD=ci-admin-only pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=postgres --dbname=medarchive_i01_restore "$RUNNER_TEMP/i01.dump"
+          PGPASSWORD=ci-admin-only pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=postgres --dbname=medarchive_i01_restore "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump"
           psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -qx 0011_login_throttles
-          rm -f "$RUNNER_TEMP/i01.dump" "$RUNNER_TEMP/i01.agekey"
+          psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT string_agg(payload, ',' ORDER BY id) FROM public.i01_backup_probe" | grep -qx synthetic-alpha,synthetic-beta
+          psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT last_value FROM public.i01_backup_probe_id_seq" | grep -qx 2
+          rm -f "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump" "$RUNNER_TEMP/i01.agekey"
