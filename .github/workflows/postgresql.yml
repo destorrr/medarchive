@@ -2,9 +2,13 @@ name: PostgreSQL foundation
 
 on:
   push:
-    branches: [master, docs/target-architecture-spec]
+    branches: [master, docs/target-architecture-spec, feature/ux-implementation]
   pull_request:
-    branches: [master]
+    branches: [master, feature/ux-implementation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   postgres-schema:
