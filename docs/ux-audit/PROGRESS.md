@@ -4080,3 +4080,7 @@ Implementation plan review saved and reread: 674c8bc3e953d98f08c41b4448df57b5fb0
 ## 2026-11-26 — UX-09.7A
 
 Branch/baseline strategy saved and reread: 8d5e0ba764d1bdc240166210b245ce64eca5c106. Audit checkpoint 0cb0c108, original architecture ancestor, all five approved HTML blobs match. Proposed feature/ux-implementation after final 7C freeze; no branch created yet. Next 7B.
+
+## 2026-11-26 — UX-09.7B
+
+Cutover/rollback plan saved and reread: 262de04682ed3eb14605a95ebe00fb00ac603c15. G0–G4, clean/retained PG paths, SQLite no import, rollback before/after writes. Planning only; no deployment or tests. Next 7C.
