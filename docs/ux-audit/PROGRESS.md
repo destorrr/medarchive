@@ -4040,3 +4040,7 @@ Owner confirmed no real SQLite data and service not in production; SQLite conver
 ## 2026-11-26 — UX-09.5D
 
 UX-09-05D-CONSTRAINTS-AND-COMMANDS.md (a77434c) saved and reread; guard replacement, constraints/index proposals, command/ACL boundary and verification matrix. Cross-family lock graph, effective live guards/ACL and exception contracts remain open. Next 5E migration sequence. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-26 — UX-09.5E
+
+UX-09-05E-ALEMBIC-MIGRATION-SEQUENCE.md (c14f0b1) saved and reread. Actual env.py uses runtime URL/default; proposed separate migration principal, E0–E7 groups, clean/upgrade paths and recovery gates. No SQLite conversion. PG data/ACL unverified; no destructive reset authorized. Next 5F. Код, миграции, HTML не менялись; тесты не запускались.
