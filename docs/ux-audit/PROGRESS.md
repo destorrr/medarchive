@@ -4024,3 +4024,7 @@ UX-09-04I-ANALYTICS-READ-MODELS.md (`cb1b56e`) сохранён и повтор�
 ## 2026-11-25 — UX-09.4 cross-contract review
 
 UX-09-04-CROSS-CONTRACT-REVIEW.md (`906e315`) saved and reread; nine mapping drafts reviewed, R01–R09 reconciliation register and T01–T11 technical gates. Earlier source files not rewritten; implementation readiness not established. Next UX-09.5 PostgreSQL/SQLite inventory and migration design. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-26 — UX-09.5A
+
+UX-09.5 approved by owner. UX-09-05A-POSTGRESQL-INVENTORY.md (`00fb10c`) saved and reread; 16 ORM tables, 11 revision files, auth_login_throttles outside ORM, coupled constraints and migration gaps. Static inventory only; live schema and effective guard bodies not verified. Next 5B SQLite inventory. Код, миграции, HTML не менялись; тесты не запускались.
