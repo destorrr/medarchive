@@ -1,16 +1,17 @@
-"""Alembic environment using the application's async PostgreSQL URL."""
+"""Alembic environment with optional dedicated migration credentials."""
 import asyncio
 import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
-url = os.environ.get("MEDARCHIVE_DATABASE_URL", "postgresql+asyncpg://medarchive:medarchive@localhost:5432/medarchive")
+migration_url = os.environ.get("MEDARCHIVE_MIGRATION_DATABASE_URL")
+url = migration_url or os.environ.get("MEDARCHIVE_DATABASE_URL", "postgresql+asyncpg://medarchive:medarchive@localhost:5432/medarchive")
 config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
 target_metadata = None
 
@@ -23,6 +24,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection) -> None:
+    if migration_url:
+        if connection.scalar(text("SELECT session_user")) != "medarchive_migrator":
+            raise RuntimeError("Dedicated migration connection must use medarchive_migrator")
+        connection.execute(text("SET ROLE medarchive_owner"))
+        connection.commit()
     context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
     with context.begin_transaction():
         context.run_migrations()
@@ -32,9 +38,11 @@ async def run_async_migrations() -> None:
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}), prefix="sqlalchemy.", poolclass=pool.NullPool
     )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
+    try:
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+    finally:
+        await connectable.dispose()
 
 
 if context.is_offline_mode():
