@@ -4068,3 +4068,7 @@ Implementation packages I00–I11, dependencies and definition of done saved and
 ## 2026-11-26 — UX-09.6B
 
 Workflow test traceability matrix saved and reread: 8c57abcfb32c9ee2465ff890c90f1274b1f6feee. Original DB invariant subjects mapped, blocked contracts explicit, five E2E scenarios. Planning only, no tests run. Next 6C.
+
+## 2026-11-26 — UX-09.6C
+
+CI/test environment design saved and reread: d5dbb24b7f4b63d935d8edc4ffaeb3323b38f8c6. Existing workflow/fixtures audited; J01–J10 proposed, mandatory evidence/skip gates, phased PG-only enforcement. No workflow/source changes or runs. Next 6D.
