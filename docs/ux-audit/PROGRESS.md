@@ -4064,3 +4064,7 @@ Database design review c4fd549f825e97184be39696fabfa174923508df saved and reread
 ## 2026-11-26 — UX-09.6A
 
 Implementation packages I00–I11, dependencies and definition of done saved and reread: 8dd417e2eda061d2abfea7e1573a5ad1c09b7e5b. Next 6B test matrix, 6C CI, 6D review. Planning only; no code or tests.
+
+## 2026-11-26 — UX-09.6B
+
+Workflow test traceability matrix saved and reread: 8c57abcfb32c9ee2465ff890c90f1274b1f6feee. Original DB invariant subjects mapped, blocked contracts explicit, five E2E scenarios. Planning only, no tests run. Next 6C.
