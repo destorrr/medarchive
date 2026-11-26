@@ -4072,3 +4072,7 @@ Workflow test traceability matrix saved and reread: 8c57abcfb32c9ee2465ff890c90f
 ## 2026-11-26 — UX-09.6C
 
 CI/test environment design saved and reread: d5dbb24b7f4b63d935d8edc4ffaeb3323b38f8c6. Existing workflow/fixtures audited; J01–J10 proposed, mandatory evidence/skip gates, phased PG-only enforcement. No workflow/source changes or runs. Next 6D.
+
+## 2026-11-26 — UX-09.6D
+
+Implementation plan review saved and reread: 674c8bc3e953d98f08c41b4448df57b5fb0b6218. Package-to-test-to-CI mapping, D01–D08 reconciliation and DB1–DB8 routing. UX09.6 design complete; next UX09.7 cutover. No code or test execution.
