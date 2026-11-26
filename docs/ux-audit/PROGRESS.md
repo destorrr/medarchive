@@ -4028,3 +4028,7 @@ UX-09-04-CROSS-CONTRACT-REVIEW.md (`906e315`) saved and reread; nine mapping dra
 ## 2026-11-26 — UX-09.5A
 
 UX-09.5 approved by owner. UX-09-05A-POSTGRESQL-INVENTORY.md (`00fb10c`) saved and reread; 16 ORM tables, 11 revision files, auth_login_throttles outside ORM, coupled constraints and migration gaps. Static inventory only; live schema and effective guard bodies not verified. Next 5B SQLite inventory. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-26 — UX-09.5B
+
+UX-09-05B-SQLITE-DEPENDENCY-INVENTORY.md (`524374c`) saved and reread. Runtime/config/auth, legacy modules, fixtures, scripts, PG backup and CI inventory. Full transitive scan and actual legacy data presence remain open. Next 5C target data model. Код, миграции, HTML не менялись; тесты не запускались.
