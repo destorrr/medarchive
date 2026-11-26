@@ -81,3 +81,42 @@ jobs:
             exit 1
           fi
           grep -q 'Dedicated migration connection must use medarchive_migrator' "$RUNNER_TEMP/wrong-migrator.log"
+      - name: Verify scoped backup grants and encrypted restore
+        run: |
+          psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER ROLE medarchive_backup PASSWORD 'ci-backup-only';
+          GRANT CONNECT ON DATABASE medarchive_i01 TO medarchive_backup;
+          SET ROLE medarchive_owner;
+          SQL
+          psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'SET ROLE medarchive_owner' -f db/postgresql/grant-backup-read.sql
+          backup=postgresql://medarchive_backup:ci-backup-only@localhost:5432/medarchive_i01
+          psql "$backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -qx 0011_login_throttles
+          for statement in 'SET ROLE medarchive_owner' 'CREATE TABLE public.i01_forbidden(id integer)' 'UPDATE public.alembic_version SET version_num=version_num' 'TRUNCATE public.alembic_version'; do
+            if psql "$backup" -X -v ON_ERROR_STOP=1 -c "$statement" >"$RUNNER_TEMP/backup-denial.log" 2>&1; then
+              echo "Forbidden backup operation succeeded: $statement" >&2
+              exit 1
+            fi
+            grep -q 'permission denied' "$RUNNER_TEMP/backup-denial.log"
+          done
+          sudo apt-get update
+          sudo apt-get install -y age
+          client_bin="$RUNNER_TEMP/postgresql16-client"
+          mkdir -p "$client_bin"
+          for command in pg_dump pg_restore; do
+            cp scripts/pg16-client-wrapper.sh "$client_bin/$command"
+            chmod 0755 "$client_bin/$command"
+          done
+          export PATH="$client_bin:$PATH"
+          age-keygen -o "$RUNNER_TEMP/i01.agekey"
+          export MEDARCHIVE_BACKUP_AGE_RECIPIENT="$(age-keygen -y "$RUNNER_TEMP/i01.agekey")"
+          export MEDARCHIVE_BACKUP_DIR="$RUNNER_TEMP/i01-backups"
+          export MEDARCHIVE_BACKUP_DATABASE_URL=postgresql+asyncpg://medarchive_backup:ci-backup-only@localhost:5432/medarchive_i01
+          unset MEDARCHIVE_DATABASE_URL
+          scripts/backup.sh
+          archive="$(find "$MEDARCHIVE_BACKUP_DIR" -name '*.dump.age' -print -quit)"
+          test -n "$archive"
+          age --decrypt -i "$RUNNER_TEMP/i01.agekey" -o "$RUNNER_TEMP/i01.dump" "$archive"
+          psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'CREATE DATABASE medarchive_i01_restore'
+          PGPASSWORD=ci-admin-only pg_restore --no-owner --no-acl --exit-on-error --host=localhost --username=postgres --dbname=medarchive_i01_restore "$RUNNER_TEMP/i01.dump"
+          psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -qx 0011_login_throttles
+          rm -f "$RUNNER_TEMP/i01.dump" "$RUNNER_TEMP/i01.agekey"
