@@ -43,3 +43,7 @@ Runs 45851708162 and 45851713974 success; job 140019485032: 488 passed, 36 warni
 ## I01.1 follow-up — CI syntax failure
 
 Runs 45852528278, 45852548097, 45853347615 success. Runs 45853375450 and 45853381823 failed in new I01 assertion step after both bootstrap invocations succeeded: workflow contained single-dollar SQL delimiters, PostgreSQL syntax error. Fixed with named $i01$ delimiters in 5320c34147c4f40406576852ef58eb56f53d3dad; fetched workflow again and verified both pairs. New CI pending; ACL assertions not yet proven. No weakening of assertions, no production changes. I01.1 remains open.
+
+## I01.1 — bootstrap assertions passed; independent login checks added
+
+Runs 45854212593 and 45854228135 success. Latest job confirms I01 bootstrap step success, 488 passed / 36 warnings in 173.77s and existing backup restore success. Added independent TCP login tests in 9a3f5bae5eb1440a58e04ecc7e5b9086aa7047e9: disposable CI-only passwords, identity assertions, migrator SET ROLE positive, runtime/backup SET ROLE negative and runtime public DDL negative. Re-read workflow after commit. New CI pending. No deployment credentials or external DB access. Ownership, migration URL, backup read grants and final DML restrictions remain open; baseline application tests still privileged.
