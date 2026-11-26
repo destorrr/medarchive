@@ -4044,3 +4044,7 @@ UX-09-05D-CONSTRAINTS-AND-COMMANDS.md (a77434c) saved and reread; guard replacem
 ## 2026-11-26 — UX-09.5E
 
 UX-09-05E-ALEMBIC-MIGRATION-SEQUENCE.md (c14f0b1) saved and reread. Actual env.py uses runtime URL/default; proposed separate migration principal, E0–E7 groups, clean/upgrade paths and recovery gates. No SQLite conversion. PG data/ACL unverified; no destructive reset authorized. Next 5F. Код, миграции, HTML не менялись; тесты не запускались.
+
+## 2026-11-26 — UX-09.5F
+
+UX-09-05F-DEPLOYMENT-AND-PG-VERIFICATION.md (489f52f) saved and reread; F01–F10 deployment findings, separate backup identity, ACL restore, CI and rollout gates. Host/PG state unverified; no execution. Next 5G retirement plan. Код, миграции, HTML не менялись; тесты не запускались.
