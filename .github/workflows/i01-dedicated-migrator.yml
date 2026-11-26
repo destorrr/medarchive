@@ -152,3 +152,47 @@ jobs:
           fi
           grep -q 'permission denied' "$RUNNER_TEMP/restore-denial.log"
           rm -f "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump" "$RUNNER_TEMP/i01.agekey"
+      - name: Verify dedicated offline rejection and legacy fallback
+        run: |
+          if alembic upgrade head --sql >"$RUNNER_TEMP/i01-offline.log" 2>&1; then
+            echo 'Dedicated offline migration unexpectedly accepted' >&2
+            exit 1
+          fi
+          grep -q 'Dedicated migrations require online identity verification' "$RUNNER_TEMP/i01-offline.log"
+          unset MEDARCHIVE_MIGRATION_DATABASE_URL
+          export MEDARCHIVE_DATABASE_URL=postgresql+asyncpg://postgres:ci-admin-only@localhost:5432/medarchive_i01
+          alembic current | grep -q '0011_login_throttles'
+      - name: Rehearse existing schema ownership transfer in disposable database
+        run: |
+          psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE i01_legacy LOGIN PASSWORD 'ci-legacy-only' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+          CREATE DATABASE medarchive_i01_legacy;
+          SQL
+          legacy=postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_legacy
+          psql "$legacy" -X -v ON_ERROR_STOP=1 -c 'GRANT USAGE, CREATE ON SCHEMA public TO i01_legacy, medarchive_owner'
+          unset MEDARCHIVE_MIGRATION_DATABASE_URL
+          export MEDARCHIVE_DATABASE_URL=postgresql+asyncpg://i01_legacy:ci-legacy-only@localhost:5432/medarchive_i01_legacy
+          alembic upgrade head
+          psql "$legacy" -X -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE i01_legacy;
+          CREATE TABLE public.i01_transfer_probe(id integer PRIMARY KEY, payload text NOT NULL);
+          INSERT INTO public.i01_transfer_probe VALUES (1, 'synthetic-transfer');
+          RESET ROLE;
+          REASSIGN OWNED BY i01_legacy TO medarchive_owner;
+          DO $transfer$
+          BEGIN
+            IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+              WHERE n.nspname='public' AND c.relkind IN ('r','p','S','v','m','i','I')
+                AND pg_get_userbyid(c.relowner) <> 'medarchive_owner') THEN
+              RAISE EXCEPTION 'Transferred relation ownership mismatch';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+              WHERE n.nspname='public' AND pg_get_userbyid(p.proowner) <> 'medarchive_owner') THEN
+              RAISE EXCEPTION 'Transferred routine ownership mismatch';
+            END IF;
+          END $transfer$;
+          SQL
+          psql "$legacy" -X -v ON_ERROR_STOP=1 -Atc "SELECT payload FROM public.i01_transfer_probe WHERE id=1" | grep -qx synthetic-transfer
+          export MEDARCHIVE_MIGRATION_DATABASE_URL=postgresql+asyncpg://medarchive_migrator:ci-migrator-only@localhost:5432/medarchive_i01_legacy
+          alembic upgrade head
+          alembic current | grep -q '0011_login_throttles'
