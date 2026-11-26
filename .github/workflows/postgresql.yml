@@ -47,6 +47,24 @@ jobs:
       - name: Verify core tables exist
         run: |
           psql "postgresql://medarchive:medarchive@localhost:5432/medarchive" -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.cards') IS NOT NULL AND to_regclass('public.shipments') IS NOT NULL AND to_regclass('public.domain_events') IS NOT NULL AND to_regclass('public.auth_login_throttles') IS NOT NULL AS schema_ready" | grep -qx t
+      - name: I00 read-only PostgreSQL baseline inventory
+        run: |
+          psql "postgresql://medarchive:medarchive@localhost:5432/medarchive" -X -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN READ ONLY;
+          SELECT current_database(), current_user, current_setting('server_version');
+          SELECT current_setting('server_version_num')::integer BETWEEN 160000 AND 169999 AS pg16;
+          SELECT version_num FROM alembic_version;
+          SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolcanlogin FROM pg_roles WHERE rolname = current_user;
+          SELECT schemaname, tablename, tableowner FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
+          SELECT c.relname, c.relacl FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','S') ORDER BY c.relname;
+          SELECT conrelid::regclass, conname, contype, convalidated FROM pg_constraint WHERE connamespace='public'::regnamespace ORDER BY 1,2;
+          SELECT event_object_table, trigger_name, event_manipulation FROM information_schema.triggers WHERE trigger_schema='public' ORDER BY 1,2,3;
+          SELECT relname, n_live_tup AS estimated_rows FROM pg_stat_user_tables ORDER BY relname;
+          COMMIT;
+          SQL
+          python --version
+          python -m pip check
+          python -m pip freeze
       - name: Validate operational shell scripts
         run: |
           for script in scripts/install.sh scripts/backup.sh scripts/pg16-client-wrapper.sh; do
