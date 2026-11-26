@@ -1,3 +1,6 @@
+-- HISTORICAL DESIGN DRAFT ONLY — do not execute for installation or upgrade.
+-- Authoritative schema: Alembic migrations (alembic upgrade head).
+-- Retained for design history; not equivalent to the current migration head.
 -- МедАрхив: PostgreSQL target schema (draft)
 -- PostgreSQL 15+
 -- This is a target-schema draft, not a production migration.
