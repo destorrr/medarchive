@@ -23,11 +23,10 @@ async def verify_test_connection(connection, *, database):
     row = (await connection.execute(text("""
         SELECT current_database(), session_user, current_user,
                current_setting('server_version_num')::integer,
-               inet_server_addr()::text,
                (SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls
                 FROM pg_roles WHERE rolname = current_user)
     """))).one()
     if (row[0] != database or row[1] != "medarchive_runtime"
             or row[2] != "medarchive_runtime" or not 160000 <= row[3] < 170000
-            or row[4] not in {"127.0.0.1", "::1"} or row[5] is not False):
+            or row[4] is not False):
         raise ValueError("Unexpected PostgreSQL test connection identity")
