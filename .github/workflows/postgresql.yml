@@ -60,6 +60,10 @@ jobs:
           SELECT conrelid::regclass, conname, contype, convalidated FROM pg_constraint WHERE connamespace='public'::regnamespace ORDER BY 1,2;
           SELECT event_object_table, trigger_name, event_manipulation FROM information_schema.triggers WHERE trigger_schema='public' ORDER BY 1,2,3;
           SELECT relname, n_live_tup AS estimated_rows FROM pg_stat_user_tables ORDER BY relname;
+          SELECT p.oid::regprocedure, pg_get_functiondef(p.oid) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.prokind='f' ORDER BY 1;
+          SELECT tgrelid::regclass, tgname, pg_get_triggerdef(oid) FROM pg_trigger WHERE NOT tgisinternal AND tgrelid IN (SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace) ORDER BY 1,2;
+          SELECT format('SELECT %L AS relation, count(*) AS exact_rows FROM %I.%I;', tablename, schemaname, tablename) FROM pg_tables WHERE schemaname='public' ORDER BY tablename
+          \gexec
           COMMIT;
           SQL
           python --version
