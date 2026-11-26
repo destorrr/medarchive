@@ -4060,3 +4060,7 @@ Import audit 5cc1340f85cdefe6a2bea7cfe7c87980f9105674 updated and reread: 67 tes
 ## 2026-11-26 — UX-09.5H
 
 Database design review c4fd549f825e97184be39696fabfa174923508df saved and reread. 5A–H design complete; H01–H09 reconciliation, DB1–DB8 implementation gates. No implementation approval or live verification. Next UX09.6. No source/migrations/HTML changes or tests.
+
+## 2026-11-26 — UX-09.6A
+
+Implementation packages I00–I11, dependencies and definition of done saved and reread: 8dd417e2eda061d2abfea7e1573a5ad1c09b7e5b. Next 6B test matrix, 6C CI, 6D review. Planning only; no code or tests.
