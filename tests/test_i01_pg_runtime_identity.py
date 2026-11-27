@@ -83,3 +83,37 @@ async def test_independent_sessions_and_uncommitted_visibility(pg_runtime_pair):
         await first.rollback()
         await second.rollback()
     assert await second.scalar(text("SELECT count(*) FROM public.i01_fixture_probe WHERE id=2")) == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reverse", [False, True])
+async def test_conflicting_insert_and_committed_visibility(pg_runtime_pair, reverse):
+    import asyncio
+    from sqlalchemy.exc import DBAPIError
+
+    first, second = pg_runtime_pair
+    if reverse:
+        first, second = second, first
+    key = 31 if reverse else 30
+    insert = text("INSERT INTO public.i01_fixture_probe(id, payload) VALUES (:id, :payload)")
+    try:
+        await first.execute(insert, {"id": key, "payload": "synthetic-winner"})
+        await second.execute(text("SET LOCAL lock_timeout = '250ms'"))
+        with pytest.raises(DBAPIError) as error:
+            await asyncio.wait_for(second.execute(insert, {"id": key, "payload": "synthetic-loser"}), 5)
+        assert error.value.orig.sqlstate == "55P03"
+        await second.rollback()
+        await first.commit()
+        assert await second.scalar(text(
+            "SELECT payload FROM public.i01_fixture_probe WHERE id=:id"
+        ), {"id": key}) == "synthetic-winner"
+        with pytest.raises(DBAPIError) as duplicate:
+            await asyncio.wait_for(second.execute(insert, {"id": key, "payload": "synthetic-loser"}), 5)
+        assert duplicate.value.orig.sqlstate == "23505"
+    finally:
+        await first.rollback()
+        await second.rollback()
+        await first.execute(text(
+            "DELETE FROM public.i01_fixture_probe WHERE id=:id AND payload='synthetic-winner'"
+        ), {"id": key})
+        await first.commit()
