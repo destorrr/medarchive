@@ -6,8 +6,9 @@
 
 | Пакет | Статус |
 |---|---|
-| I00 | In progress |
-| I01–I11 | Planned |
+| I00 | Clean CI accepted; external inventory open |
+| I01 | In progress: I01.1 accepted, I01.2 active |
+| I02–I11 | Planned |
 
 ## I00 — исходный baseline
 
@@ -70,3 +71,6 @@ Foundation #1623/#1624 and dedicated integration #9/#10 succeeded. Job 140059834
 
 ### I01.1 — accepted in isolated CI (10/10)
 Foundation #1625–1627 and dedicated integration #11–13 succeeded at final evidence SHA 936882a003f941c7b42e866671de420cb91f6a59. Job 140062208112: 488 passed, 36 warnings, 219.79s. Job 140062208225: all dedicated migration, backup/restore, offline rejection, legacy fallback and disposable legacy ownership transfer steps succeeded; logs confirm INSERT 0 1 and REASSIGN OWNED. I01.1 accepted for isolated implementation; production inventory and actual retained database transfer remain external gates. Full runtime/API ACL and DML retirement remain later packages. No production changes. I01.2 may start; I01 as a whole remains open.
+
+### I01.2 — guarded PostgreSQL fixture
+Foundation #1629: 494 passed, 36 warnings, 211.59s. #1631/#1632 failed at collection (ModuleNotFoundError: pg_fixture_guard); integration #16–18 succeeded but did not exercise the new fixture. Commits f16d3eaabedaec1b8180c242fad747bcf02a870a, 4767697e5f6e97f69df1eb3ff3acc92a7d9d493c, 68f49d3de15f3d820f629ce4c596e358ec92ee3a and 4c64a089b4a783b97e4186a9464c78976cff1c25 fix package import, add opt-in runtime fixture, real identity tests and dedicated CI database. Positive runtime and negative admin/migrator/backup/wrong database cases pending CI. Existing SQLite fixtures retained. No destructive cleanup or production access. Progress 2/8 verified; server identity not yet accepted.
