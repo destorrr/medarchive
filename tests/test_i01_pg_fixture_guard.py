@@ -1,6 +1,6 @@
 """Guard contract for the new isolated PostgreSQL fixture path."""
 import pytest
-from pg_fixture_guard import validate_test_url
+from tests.pg_fixture_guard import validate_test_url
 
 URL = "postgresql+asyncpg://medarchive_runtime:synthetic@localhost/medarchive_test_i01"
 
