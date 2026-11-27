@@ -42,3 +42,18 @@ async def test_invalid_fulfillment_reference(pg_runtime_transaction, table, colu
         async with c.begin_nested():
             await c.execute(text(f"UPDATE public.{table} SET {column}='ffffffff-ffff-4fff-8fff-ffffffffffff'"))
     assert error.value.orig.sqlstate == "23503", str(error.value.orig)
+
+
+@pytest.mark.parametrize("table,column", [
+    ("shipments", "request_id"),
+    ("shipment_cards", "request_item_id"),
+])
+async def test_fulfillment_unique_constraint(pg_runtime_transaction, table, column):
+    c = pg_runtime_transaction
+    assert await c.scalar(text("""
+        SELECT count(*) FROM pg_constraint con
+        JOIN pg_attribute a ON a.attrelid=con.conrelid
+        WHERE con.conrelid=to_regclass(:relation)
+          AND con.contype='u' AND con.convalidated
+          AND con.conkey=ARRAY[a.attnum] AND a.attname=:column
+    """), {"relation": "public." + table, "column": column}) == 1
