@@ -200,6 +200,43 @@ BEGIN
   END IF;
 END $check$;
 SQL
+# Independently protect the populated request-item link against downgrade.
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE medarchive_owner;
+INSERT INTO public.archive_request_items(request_id,card_id,status,reservation_active,added_at,added_by)
+SELECT id,card_id,'pending',true,now(),requested_by FROM public.archive_requests;
+UPDATE public.shipment_cards SET request_item_id=(SELECT id FROM public.archive_request_items)
+WHERE shipment_id='10000000-0000-4000-8000-000000000013';
+SQL
+if alembic downgrade 0012_archive_request_items >"$report_dir/i02-item-link-downgrade.log" 2>&1; then
+  echo "Populated request-item link downgrade unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -q 'Cannot downgrade populated shipment receipt links' "$report_dir/i02-item-link-downgrade.log"
+alembic current | grep -q '0013_shipment_receipt_links'
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE medarchive_owner;
+DO $check$
+BEGIN
+  IF current_database() <> 'medarchive_test_i01'
+     OR (SELECT count(*) FROM public.archive_request_items) <> 1
+     OR (SELECT count(*) FROM public.shipment_cards s JOIN public.archive_request_items i ON i.id=s.request_item_id
+         WHERE s.shipment_id='10000000-0000-4000-8000-000000000013') <> 1 THEN
+    RAISE EXCEPTION 'Unexpected request-item link rehearsal state';
+  END IF;
+  UPDATE public.shipment_cards SET request_item_id=NULL
+  WHERE shipment_id='10000000-0000-4000-8000-000000000013'
+    AND request_item_id=(SELECT id FROM public.archive_request_items);
+  DELETE FROM public.archive_request_items i USING public.archive_requests r, public.cards c
+  WHERE i.request_id=r.id AND i.card_id=r.card_id AND c.id=i.card_id
+    AND c.card_number='I01-SYNTH-002' AND i.status='pending' AND i.reservation_active;
+  IF NOT FOUND OR EXISTS (SELECT 1 FROM public.archive_request_items)
+     OR EXISTS (SELECT 1 FROM public.shipment_cards WHERE request_item_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Request-item link rehearsal cleanup failed';
+  END IF;
+END $check$;
+SQL
+
 # Independently protect each newly stored receipt fact against downgrade.
 for receipt_table in shipment_cards shipment_boxes; do
   psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c "SET ROLE medarchive_owner; UPDATE public.$receipt_table SET received_at=now(), received_by='10000000-0000-4000-8000-000000000003' WHERE shipment_id='10000000-0000-4000-8000-000000000013'"
