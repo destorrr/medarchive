@@ -57,7 +57,7 @@ GRANT SELECT, INSERT, DELETE ON public.i01_fixture_probe TO medarchive_runtime;
 SQL
 export MEDARCHIVE_MIGRATION_DATABASE_URL=postgresql+asyncpg://medarchive_migrator:ci-migrator-only@127.0.0.1:$port/medarchive_test_i01
 alembic upgrade head
-alembic current | grep -q '0012_archive_request_items'
+alembic current | grep -q '0013_shipment_receipt_links'
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
 SET ROLE medarchive_owner;
 GRANT SELECT ON public.cards, public.shipments, public.domain_events,
@@ -166,6 +166,9 @@ BEGIN
   END IF;
 END $check$;
 SQL
+
+alembic upgrade head
+alembic current | grep -q '0013_shipment_receipt_links'
 
 run_tests() (
   set -e
