@@ -262,6 +262,20 @@ jobs:
                     '10000000-0000-4000-8000-000000000006');
           INSERT INTO public.archive_requests(card_id, requested_by) VALUES
             ('10000000-0000-4000-8000-000000000014', '10000000-0000-4000-8000-000000000007');
+          INSERT INTO public.branches(id, code, name) VALUES
+            ('10000000-0000-4000-8000-000000000015', 'I01-SYNTH-B', 'Fixture branch B');
+          INSERT INTO public.locations(id, kind, branch_id, name) VALUES
+            ('10000000-0000-4000-8000-000000000016', 'branch', '10000000-0000-4000-8000-000000000015', 'Fixture location B');
+          INSERT INTO public.users(id, username, password_hash, full_name, role, branch_id, is_active) VALUES
+            ('10000000-0000-4000-8000-000000000017', 'i01-synthetic-active-b', 'invalid-test-hash', 'Fixture employee B', 'branch',
+             '10000000-0000-4000-8000-000000000015', true);
+          INSERT INTO public.cards(id, card_number, full_name, date_of_birth, origin_branch_id, current_location_id, created_by)
+            VALUES ('10000000-0000-4000-8000-000000000018', 'I01-SYNTH-003', 'Synthetic patient 003',
+                    DATE '2000-01-03', '10000000-0000-4000-8000-000000000015',
+                    '10000000-0000-4000-8000-000000000016', '10000000-0000-4000-8000-000000000017');
+          INSERT INTO public.archive_shelves(section_name, shelf_name, is_active) VALUES
+            ('I01-SYNTH', 'A', true), ('I01-SYNTH', 'B', false);
+          GRANT SELECT ON public.archive_shelves TO medarchive_runtime;
           GRANT SELECT ON public.box_cycles, public.box_card_memberships, public.shipment_boxes,
             public.shipment_cards, public.archive_requests TO medarchive_runtime;
           SQL
@@ -290,9 +304,9 @@ jobs:
               OR (SELECT count(*) FROM public.shipments WHERE id='10000000-0000-4000-8000-000000000013') <> 1 THEN
               RAISE EXCEPTION 'Synthetic baseline changed';
             END IF;
-            IF (SELECT count(*) FROM public.branches) <> 1
-              OR (SELECT count(*) FROM public.locations) <> 3
-              OR (SELECT count(*) FROM public.users) <> 4
+            IF (SELECT count(*) FROM public.branches) <> 2
+              OR (SELECT count(*) FROM public.locations) <> 4
+              OR (SELECT count(*) FROM public.users) <> 5
               OR (SELECT count(*) FROM public.couriers) <> 1
               OR (SELECT count(*) FROM public.boxes) <> 1
               OR (SELECT count(*) FROM public.box_cycles) <> 1
@@ -300,8 +314,9 @@ jobs:
               OR (SELECT count(*) FROM public.shipment_boxes) <> 1
               OR (SELECT count(*) FROM public.shipment_cards) <> 1
               OR (SELECT count(*) FROM public.archive_requests) <> 1
-              OR (SELECT count(*) FROM public.cards) <> 2
+              OR (SELECT count(*) FROM public.cards) <> 3
               OR (SELECT count(*) FROM public.shipments) <> 1
+              OR (SELECT count(*) FROM public.archive_shelves) <> 2
               OR (SELECT count(*) FROM public.domain_events) <> 0 THEN
               RAISE EXCEPTION 'Unexpected fixture table counts';
             END IF;
