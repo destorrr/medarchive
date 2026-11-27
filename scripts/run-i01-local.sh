@@ -169,6 +169,39 @@ SQL
 
 alembic upgrade head
 alembic current | grep -q '0013_shipment_receipt_links'
+# Rehearse 0013 rollback with retained legacy manifest and request.
+alembic downgrade 0012_archive_request_items
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc "SELECT NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='shipments' AND column_name='request_id') AND (SELECT count(*) FROM public.shipment_cards)=1 AND (SELECT count(*) FROM public.shipment_boxes)=1 AND (SELECT count(*) FROM public.archive_requests)=1" | grep -qx t
+alembic upgrade 0013_shipment_receipt_links
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE medarchive_owner;
+UPDATE public.shipments SET request_id=(SELECT id FROM public.archive_requests)
+WHERE id='10000000-0000-4000-8000-000000000013';
+SQL
+if alembic downgrade 0012_archive_request_items >"$report_dir/i02-receipt-downgrade.log" 2>&1; then
+  echo "Populated receipt-link downgrade unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -q 'Cannot downgrade populated shipment receipt links' "$report_dir/i02-receipt-downgrade.log"
+alembic current | grep -q '0013_shipment_receipt_links'
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE medarchive_owner;
+DO $check$
+BEGIN
+  IF current_database() <> 'medarchive_test_i01'
+     OR (SELECT count(*) FROM public.shipments WHERE request_id IS NOT NULL) <> 1 THEN
+    RAISE EXCEPTION 'Unexpected receipt-link rehearsal state';
+  END IF;
+  UPDATE public.shipments SET request_id=NULL
+  WHERE id='10000000-0000-4000-8000-000000000013'
+    AND request_id=(SELECT id FROM public.archive_requests);
+  IF NOT FOUND OR EXISTS (SELECT 1 FROM public.shipments WHERE request_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Receipt-link rehearsal cleanup failed';
+  END IF;
+END $check$;
+SQL
+alembic upgrade head
+
 # Test-only UPDATE privileges in the disposable fixture database.
 psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c 'GRANT UPDATE ON public.shipments, public.shipment_cards, public.shipment_boxes TO medarchive_runtime; GRANT SELECT ON public.card_placements, public.box_placements TO medarchive_runtime'
