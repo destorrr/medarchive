@@ -27,4 +27,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    raise RuntimeError("Revision 0015 requires a separately reviewed downgrade plan")
+    op.execute("""
+        DO $
+        BEGIN
+            LOCK TABLE public.shipment_discrepancies IN ACCESS EXCLUSIVE MODE;
+            IF EXISTS (SELECT 1 FROM public.shipment_discrepancies) THEN
+                RAISE EXCEPTION 'Cannot downgrade populated shipment_discrepancies';
+            END IF;
+        END
+        $
+    """)
+    op.execute("DROP TABLE public.shipment_discrepancies")
