@@ -144,6 +144,18 @@ async def test_synthetic_reference_entities(pg_runtime_transaction):
         "SELECT kind FROM public.locations WHERE name LIKE 'Synthetic %'"
     ))).scalars().all()
     assert sorted(kinds) == ["archive", "branch", "central_office"]
+    assert await pg_runtime_transaction.scalar(text("""
+        SELECT count(*) FROM public.cards c
+        JOIN public.branches b ON b.id=c.origin_branch_id
+        JOIN public.locations l ON l.id=c.current_location_id AND l.branch_id=b.id
+        JOIN public.users u ON u.id=c.created_by AND u.branch_id=b.id
+        WHERE c.card_number='I01-SYNTH-003' AND b.code='I01-SYNTH-B'
+          AND u.is_active AND u.role='branch'
+    """)) == 1
+    shelves = (await pg_runtime_transaction.execute(text(
+        "SELECT shelf_name, is_active FROM public.archive_shelves WHERE section_name='I01-SYNTH' ORDER BY shelf_name"
+    ))).all()
+    assert [tuple(row) for row in shelves] == [("A", True), ("B", False)]
     assert await pg_runtime_transaction.scalar(text(
         "SELECT count(*) FROM public.couriers WHERE full_name='Synthetic courier' AND phone IS NULL"
     )) == 1
