@@ -216,7 +216,7 @@ alembic upgrade head
 
 # Test-only UPDATE privileges in the disposable fixture database.
 psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null
-psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c 'GRANT UPDATE ON public.shipments, public.shipment_cards, public.shipment_boxes TO medarchive_runtime; GRANT SELECT ON public.card_placements, public.box_placements TO medarchive_runtime'
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c 'GRANT INSERT, UPDATE ON public.shipments, public.shipment_cards, public.shipment_boxes TO medarchive_runtime; GRANT SELECT ON public.card_placements, public.box_placements TO medarchive_runtime'
 
 run_tests() (
   set -e
