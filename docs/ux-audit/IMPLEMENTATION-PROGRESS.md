@@ -7,8 +7,9 @@
 | Пакет | Статус |
 |---|---|
 | I00 | Clean CI accepted; external inventory open |
-| I01 | In progress: I01.1 accepted, I01.2 active |
-| I02–I11 | Planned |
+| I01 | Accepted for isolated implementation; workstation check deferred to I11 |
+| I02 | In progress: E2, I02.1–I02.2 accepted, I02.3 open |
+| I03–I11 | Planned |
 
 ## I00 — исходный baseline
 
@@ -142,3 +143,8 @@ Revision 0012_archive_request_items, commit 653cee9e546a2445587877fca37ad546dad4
 ### I02.2 — additive shipment links and receipt storage accepted (2026-11-27)
 
 Revision 0013_shipment_receipt_links (9f822bae19839528ba520e0e5712073df8b02511) adds nullable unique fulfillment links and paired receipt metadata to card and box manifest rows. Verified Foundation #1704 (46025982827) and dedicated integration #90 (46025982682) at d3f9dcfe6016f781fe2267e4db726d3bcec4952a: both success. Integration logs report 10 infrastructure, 25 mandatory I01 and 16 I02 cases passed (51 total); I01 manifest verified. Nine I02.2 cases cover nullable legacy links, receipt pairs, foreign keys, catalog uniqueness and actual duplicate inserts. Rehearsals verify empty downgrade/re-upgrade with retained legacy rows and refusal of downgrade with populated request link or card/box receipt metadata. Independent populated request_item_id downgrade case remains untested. Intermediate failures were corrected by test-only fixture grants; no production ACL change. Acceptance is limited to additive storage, not route-aware receipt commands, grouped request writers, reconciliation, custody or final guards. I02 remains open. Strict I02 JUnit manifest and dynamic head checks remain follow-up infrastructure work.
+
+
+### I02.3 — additive writeoff request storage; acceptance pending (2026-11-27)
+
+Revision 0014_card_writeoff_requests (eb3a49c703cf8a2840908d55284209f6e59fda52) adds transitional storage; 2dbcb8a3e79ac9fbfbad83b8cbb96e0806fc4477 adds 11 constraint cases. Integration #101 (46033721509, ec64db26762039b15e9ef0b7ef635629dfc7396f) failed at guarded runtime fixture verification with Mandatory manifest mismatch: manifest required the new cases before runner inclusion. Corrected by 3ef3f3b8acf7ba1dbf846f50e58857068627fdc9; Integration #102 and #103 succeeded. Verified Actions metadata for #103 (46034467144) and Foundation #1717 (46034467160), both success at 23e304cdad68cc1022dbf42f2ecf9121654d1e8f. Prior recorded integration evidence: 19 infrastructure, 25 I01 and 27 I02 cases passed, 71 total. Owner terminology: writeoff request is distinct from P09 archive request. Migration source contains a populated-table downgrade guard, but its independent execution and preservation of the saved row/revision remain unverified. I02.3 remains open. No workflow cutover, production access or business-rule changes. Local execution unavailable in current environment (no PostgreSQL server or Docker). Overall isolated package acceptance: 2/12.
