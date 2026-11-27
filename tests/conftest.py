@@ -5,18 +5,18 @@ from medarchive.config import Config
 
 
 @pytest.fixture
-def test_config():
+def test_config(monkeypatch):
     """Временная БД для тестов."""
     fd, path = tempfile.mkstemp(suffix=".db", prefix="medarchive_test_")
     os.close(fd)
-    os.environ["MEDARCHIVE_DB_PATH"] = path
-    os.environ["MEDARCHIVE_SECRET_KEY"] = "test-secret-key-for-testing"
-    cfg = Config()
-    yield cfg
-    os.environ.pop("MEDARCHIVE_DB_PATH", None)
-    os.environ.pop("MEDARCHIVE_SECRET_KEY", None)
-    if os.path.exists(path):
-        os.unlink(path)
+    try:
+        with monkeypatch.context() as env:
+            env.setenv("MEDARCHIVE_DB_PATH", path)
+            env.setenv("MEDARCHIVE_SECRET_KEY", "test-secret-key-for-testing")
+            yield Config()
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)
 
 
 @pytest.fixture
@@ -42,7 +42,8 @@ async def pg_runtime_connection():
         database=database,
         role="medarchive_runtime",
     )
-    engine = create_async_engine(url, poolclass=NullPool)
+    engine = create_async_engine(url, poolclass=NullPool,
+                                 connect_args={"timeout": 5, "command_timeout": 10})
     try:
         async with engine.connect() as connection:
             await verify_test_connection(connection, database=database)
@@ -80,7 +81,8 @@ async def pg_runtime_pair(pg_runtime_connection):
         database=database,
         role="medarchive_runtime",
     )
-    engine = create_async_engine(url, poolclass=NullPool)
+    engine = create_async_engine(url, poolclass=NullPool,
+                                 connect_args={"timeout": 5, "command_timeout": 10})
     try:
         async with engine.connect() as second:
             await verify_test_connection(second, database=database)
