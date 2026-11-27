@@ -65,3 +65,21 @@ async def test_fixture_reads_migrated_application_schema(pg_runtime_transaction)
         assert await pg_runtime_transaction.scalar(text(
             f"SELECT count(*) FROM public.{table}"
         )) == 0
+
+
+@pytest.mark.asyncio
+async def test_independent_sessions_and_uncommitted_visibility(pg_runtime_pair):
+    first, second = pg_runtime_pair
+    assert await first.scalar(text("SELECT pg_backend_pid()")) != await second.scalar(text("SELECT pg_backend_pid()"))
+    await first.rollback()
+    await second.rollback()
+    try:
+        await first.execute(text(
+            "INSERT INTO public.i01_fixture_probe(id, payload) VALUES (2, 'synthetic-concurrent')"
+        ))
+        assert await first.scalar(text("SELECT count(*) FROM public.i01_fixture_probe WHERE id=2")) == 1
+        assert await second.scalar(text("SELECT count(*) FROM public.i01_fixture_probe WHERE id=2")) == 0
+    finally:
+        await first.rollback()
+        await second.rollback()
+    assert await second.scalar(text("SELECT count(*) FROM public.i01_fixture_probe WHERE id=2")) == 0
