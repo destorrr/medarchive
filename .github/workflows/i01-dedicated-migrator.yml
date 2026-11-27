@@ -241,6 +241,29 @@ jobs:
             ('10000000-0000-4000-8000-000000000011', 'I01-SYNTH-BOX',
              '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000003');
           GRANT SELECT ON public.couriers, public.boxes TO medarchive_runtime;
+          INSERT INTO public.box_cycles(id, box_id, cycle_number, started_by) VALUES
+            ('10000000-0000-4000-8000-000000000012', '10000000-0000-4000-8000-000000000011', 1,
+             '10000000-0000-4000-8000-000000000003');
+          INSERT INTO public.box_card_memberships(box_cycle_id, card_id, added_by) VALUES
+            ('10000000-0000-4000-8000-000000000012', '10000000-0000-4000-8000-000000000004',
+             '10000000-0000-4000-8000-000000000003');
+          INSERT INTO public.shipments(id, from_location_id, to_location_id, courier_id, issued_by) VALUES
+            ('10000000-0000-4000-8000-000000000013', '10000000-0000-4000-8000-000000000002',
+             '10000000-0000-4000-8000-000000000006', '10000000-0000-4000-8000-000000000010',
+             '10000000-0000-4000-8000-000000000003');
+          INSERT INTO public.shipment_boxes(shipment_id, box_id) VALUES
+            ('10000000-0000-4000-8000-000000000013', '10000000-0000-4000-8000-000000000011');
+          INSERT INTO public.shipment_cards(shipment_id, card_id, box_id) VALUES
+            ('10000000-0000-4000-8000-000000000013', '10000000-0000-4000-8000-000000000004',
+             '10000000-0000-4000-8000-000000000011');
+          INSERT INTO public.cards(id, card_number, full_name, date_of_birth, origin_branch_id, current_location_id)
+            VALUES ('10000000-0000-4000-8000-000000000014', 'I01-SYNTH-002', 'Synthetic patient 002',
+                    DATE '2000-01-02', '10000000-0000-4000-8000-000000000001',
+                    '10000000-0000-4000-8000-000000000006');
+          INSERT INTO public.archive_requests(card_id, requested_by) VALUES
+            ('10000000-0000-4000-8000-000000000014', '10000000-0000-4000-8000-000000000007');
+          GRANT SELECT ON public.box_cycles, public.box_card_memberships, public.shipment_boxes,
+            public.shipment_cards, public.archive_requests TO medarchive_runtime;
           SQL
           export MEDARCHIVE_TEST_PG_ENABLED=1
           export MEDARCHIVE_TEST_PG_DATABASE=medarchive_test_i01
