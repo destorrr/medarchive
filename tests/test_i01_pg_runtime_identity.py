@@ -6,7 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
-from tests.pg_fixture_guard import verify_test_connection
+from tests.pg_fixture_guard import cleanup_committed_probe, verify_test_connection
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("MEDARCHIVE_TEST_PG_ENABLED") != "1",
@@ -113,10 +113,11 @@ async def test_conflicting_insert_and_committed_visibility(pg_runtime_pair, reve
     finally:
         await first.rollback()
         await second.rollback()
-        await first.execute(text(
-            "DELETE FROM public.i01_fixture_probe WHERE id=:id AND payload='synthetic-winner'"
-        ), {"id": key})
-        await first.commit()
+        await cleanup_committed_probe(
+            first, url=os.environ["MEDARCHIVE_TEST_PG_URL"],
+            enabled=os.environ.get("MEDARCHIVE_TEST_PG_ENABLED"),
+            database=os.environ["MEDARCHIVE_TEST_PG_DATABASE"], key=key,
+        )
 
 
 @pytest.mark.asyncio
