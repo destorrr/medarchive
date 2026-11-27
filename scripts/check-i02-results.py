@@ -18,6 +18,11 @@ EXPECTED = {
         "test_duplicate_request_link": 1,
         "test_duplicate_request_item_link": 1,
     },
+    "tests.test_i02_writeoff_requests": {
+        "test_writeoff_valid_reason": 3,
+        "test_writeoff_invalid_input": 4,
+        "test_writeoff_actor_time_pair": 4,
+    },
 }
 
 def main(path):
