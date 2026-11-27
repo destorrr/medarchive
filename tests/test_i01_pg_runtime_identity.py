@@ -40,3 +40,20 @@ async def test_other_identity_rejected(role, password):
 async def test_wrong_database_rejected(pg_runtime_connection):
     with pytest.raises(ValueError, match="Unexpected PostgreSQL test connection identity"):
         await verify_test_connection(pg_runtime_connection, database="medarchive_test_other")
+
+
+@pytest.mark.asyncio
+async def test_rollback_fixture_writes_synthetic_probe(pg_runtime_transaction):
+    await pg_runtime_transaction.execute(text(
+        "INSERT INTO public.i01_fixture_probe(id, payload) VALUES (1, 'synthetic-rollback')"
+    ))
+    assert await pg_runtime_transaction.scalar(text(
+        "SELECT payload FROM public.i01_fixture_probe WHERE id=1"
+    )) == "synthetic-rollback"
+
+
+@pytest.mark.asyncio
+async def test_rollback_fixture_leaves_no_rows(pg_runtime_transaction):
+    assert await pg_runtime_transaction.scalar(text(
+        "SELECT count(*) FROM public.i01_fixture_probe"
+    )) == 0
