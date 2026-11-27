@@ -28,13 +28,13 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("""
-        DO $
+        DO $guard$
         BEGIN
             LOCK TABLE public.shipment_discrepancies IN ACCESS EXCLUSIVE MODE;
             IF EXISTS (SELECT 1 FROM public.shipment_discrepancies) THEN
                 RAISE EXCEPTION 'Cannot downgrade populated shipment_discrepancies';
             END IF;
         END
-        $
+        $guard$
     """)
     op.execute("DROP TABLE public.shipment_discrepancies")
