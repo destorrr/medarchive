@@ -132,3 +132,22 @@ async def test_synthetic_card_relationships(pg_runtime_transaction):
     """))).one()
     assert tuple(row) == ("I01-SYNTH-001", "Synthetic patient 001", None,
                           "active", "I01-SYNTH", "branch", False, "branch")
+
+
+@pytest.mark.asyncio
+async def test_synthetic_reference_entities(pg_runtime_transaction):
+    roles = (await pg_runtime_transaction.execute(text(
+        "SELECT role FROM public.users WHERE username LIKE 'i01-synthetic-%' AND NOT is_active"
+    ))).scalars().all()
+    assert sorted(roles) == ["admin", "archive", "branch", "central_office"]
+    kinds = (await pg_runtime_transaction.execute(text(
+        "SELECT kind FROM public.locations WHERE name LIKE 'Synthetic %'"
+    ))).scalars().all()
+    assert sorted(kinds) == ["archive", "branch", "central_office"]
+    assert await pg_runtime_transaction.scalar(text(
+        "SELECT count(*) FROM public.couriers WHERE full_name='Synthetic courier' AND phone IS NULL"
+    )) == 1
+    assert await pg_runtime_transaction.scalar(text("""
+        SELECT count(*) FROM public.boxes b JOIN public.locations l ON l.id=b.current_location_id
+        WHERE b.box_number='I01-SYNTH-BOX' AND l.kind='branch'
+    """)) == 1
