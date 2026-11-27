@@ -153,3 +153,7 @@ Revision 0014_card_writeoff_requests (eb3a49c703cf8a2840908d55284209f6e59fda52) 
 ### I02.4 — discrepancy storage checkpoint
 
 Revision 0015 added in d313da8; Integration #105 failed on unconditional downgrade rejection. Fix 1e2ee6a exposed malformed SQL dollar quoting in Integration #106. Corrected in 7b5b4e6; Integration #107 and Foundation #1721 passed. Eight discrepancy storage tests added in d2a4a39; Integration #108 and Foundation #1722 passed, but the new tests are not yet confirmed in the mandatory PostgreSQL suite. I02.4 remains open. Populated downgrade rehearsal remains outstanding. No production changes.
+
+### I02.4 — mandatory integration evidence (2026-11-28)
+
+Integration #110 (46043326668) failed at intermediate commit 551f3d578ab914b94814f77d6f891cc41cb1fa5c: 27 I02 cases passed, eight discrepancy cases missing from runner. Corrected in 709ae7f8d14d2244a4f4189b3f6fc129dccba563. Verified exact-SHA Integration #111 (46043335697, job 140656310610): 19 infrastructure, 25 mandatory I01 and 35 mandatory I02 cases passed (79 total); both mandatory manifests verified, all steps successful. Foundation #1725 (46043335932, job 140656310736): 514 passed, 53 skipped, 36 warnings; all steps successful. Discrepancy storage tests now verified in dedicated CI. Populated downgrade rehearsals for 0014 and 0015 remain outstanding; neither package is fully accepted. Overall isolated package acceptance remains 2/12. No production changes.
