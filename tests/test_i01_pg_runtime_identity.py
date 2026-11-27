@@ -61,7 +61,7 @@ async def test_rollback_fixture_leaves_no_rows(pg_runtime_transaction):
 
 @pytest.mark.asyncio
 async def test_fixture_reads_migrated_application_schema(pg_runtime_transaction):
-    for table in ("shipments", "domain_events"):
+    for table in ("domain_events",):
         assert await pg_runtime_transaction.scalar(text(
             f"SELECT count(*) FROM public.{table}"
         )) == 0
@@ -150,4 +150,28 @@ async def test_synthetic_reference_entities(pg_runtime_transaction):
     assert await pg_runtime_transaction.scalar(text("""
         SELECT count(*) FROM public.boxes b JOIN public.locations l ON l.id=b.current_location_id
         WHERE b.box_number='I01-SYNTH-BOX' AND l.kind='branch'
+    """)) == 1
+
+
+@pytest.mark.asyncio
+async def test_synthetic_manifest_and_request(pg_runtime_transaction):
+    assert await pg_runtime_transaction.scalar(text("""
+        SELECT count(*) FROM public.shipments s
+        JOIN public.shipment_boxes sb ON sb.shipment_id=s.id
+        JOIN public.shipment_cards sc ON sc.shipment_id=s.id AND sc.box_id=sb.box_id
+        JOIN public.box_cycles bc ON bc.box_id=sb.box_id AND bc.ended_at IS NULL
+        JOIN public.box_card_memberships m ON m.box_cycle_id=bc.id AND m.card_id=sc.card_id AND m.removed_at IS NULL
+        JOIN public.locations src ON src.id=s.from_location_id
+        JOIN public.locations dst ON dst.id=s.to_location_id
+        WHERE s.status='draft' AND src.kind='branch' AND dst.kind='archive'
+          AND s.id='10000000-0000-4000-8000-000000000013'
+    """)) == 1
+    assert await pg_runtime_transaction.scalar(text("""
+        SELECT count(*) FROM public.archive_requests r
+        JOIN public.cards c ON c.id=r.card_id
+        JOIN public.locations l ON l.id=c.current_location_id
+        JOIN public.users u ON u.id=r.requested_by
+        WHERE c.card_number='I01-SYNTH-002' AND l.kind='archive'
+          AND u.role='central_office' AND r.status='new'
+          AND r.fulfillment_shipment_id IS NULL
     """)) == 1
