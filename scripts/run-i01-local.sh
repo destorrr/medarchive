@@ -260,7 +260,7 @@ run_tests() (
   export MEDARCHIVE_TEST_PG_ENABLED=1
   export MEDARCHIVE_TEST_PG_DATABASE=medarchive_test_i01
   export MEDARCHIVE_TEST_PG_URL=postgresql+asyncpg://medarchive_runtime:ci-runtime-only@127.0.0.1:$port/medarchive_test_i01
-  pytest -q tests/test_i01_manifest_checker.py tests/test_i01_fixture_environment.py -o xfail_strict=true
+  pytest -q tests/test_i01_manifest_checker.py tests/test_i01_fixture_environment.py tests/test_i02_manifest_checker.py -o xfail_strict=true
   pytest -q tests/test_i01_pg_fixture_guard.py tests/test_i01_pg_runtime_identity.py -o asyncio_mode=auto -rs --junitxml="$report" -o junit_family=xunit2 -o xfail_strict=true
   python scripts/check-i01-results.py "$report"
   pytest -q tests/test_i02_request_items.py tests/test_i02_shipment_receipt_links.py -o asyncio_mode=auto -o xfail_strict=true --junitxml="$report_dir/i02.xml" -o junit_family=xunit2
