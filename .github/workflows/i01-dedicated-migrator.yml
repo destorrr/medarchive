@@ -212,7 +212,22 @@ jobs:
           alembic current | grep -q '0011_login_throttles'
           psql "postgresql://postgres:ci-admin-only@localhost:5432/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
           SET ROLE medarchive_owner;
-          GRANT SELECT ON public.cards, public.shipments, public.domain_events TO medarchive_runtime;
+          GRANT SELECT ON public.cards, public.shipments, public.domain_events,
+            public.branches, public.locations, public.users TO medarchive_runtime;
+          INSERT INTO public.branches(id, code, name)
+            VALUES ('10000000-0000-4000-8000-000000000001', 'I01-SYNTH', 'Synthetic branch');
+          INSERT INTO public.locations(id, kind, branch_id, name)
+            VALUES ('10000000-0000-4000-8000-000000000002', 'branch',
+                    '10000000-0000-4000-8000-000000000001', 'Synthetic location');
+          INSERT INTO public.users(id, username, password_hash, full_name, role, branch_id)
+            VALUES ('10000000-0000-4000-8000-000000000003', 'i01-synthetic-disabled',
+                    'invalid-test-hash', 'Synthetic employee', 'branch',
+                    '10000000-0000-4000-8000-000000000001');
+          UPDATE public.users SET is_active=false WHERE username='i01-synthetic-disabled';
+          INSERT INTO public.cards(id, card_number, full_name, date_of_birth, origin_branch_id, current_location_id, created_by)
+            VALUES ('10000000-0000-4000-8000-000000000004', 'I01-SYNTH-001', 'Synthetic patient 001',
+                    DATE '2000-01-01', '10000000-0000-4000-8000-000000000001',
+                    '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000003');
           SQL
           export MEDARCHIVE_TEST_PG_ENABLED=1
           export MEDARCHIVE_TEST_PG_DATABASE=medarchive_test_i01
