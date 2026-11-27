@@ -80,3 +80,6 @@ Foundation #1634–1637 and integration #20–23 succeeded. Job 140349116274: 49
 
 ### I01.2 — rollback probe verified; migrated fixture database
 Foundation #1638–1641 succeeded. Integration #25 failed with missing i01_fixture_probe (intermediate commit before CI provisioning); #26–27 succeeded. Job 140351238208: 14 passed in 0.27s. Rollback probe and final empty-state assertion verified. Commits aa28ba184db2baf8a41dc301efbcdc8e06ef9c48 and 9f9eb44abde7b4e846b83f273703016cf3f3a7cd migrate the disposable fixture database through dedicated migrator and add scoped runtime reads of cards, shipments, domain_events. Pending CI. Progress remains 3/8 until migrated fixture evidence; no broad runtime DML grants or production changes.
+
+### I01.2 — migrated fixture accepted; independent sessions started
+Foundation #1642–1644 and integration #28–30 succeeded. Job 140353832557: 495 passed, 8 dedicated-only skips, 36 warnings, 212.58s. Job 140353832730: 15 passed in 0.33s. Migrated fixture reads and rollback probe verified; progress 4/8 (50%). Commits bad5594b6ff37d29802ac74ef6fcc40d75df7c41 and ee4ef74e8c86c8b97c4fc58a2bbcb02d1c5f2f02 add independently guarded session pair and backend PID/uncommitted visibility/rollback assertions. Pending CI. This does not yet prove committed concurrency, lock contention or both winner orders. No production changes.
