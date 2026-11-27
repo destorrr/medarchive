@@ -200,7 +200,15 @@ jobs:
         run: |
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'CREATE DATABASE medarchive_test_i01'
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'GRANT CONNECT ON DATABASE medarchive_test_i01 TO medarchive_runtime, medarchive_migrator, medarchive_backup'
+          psql "postgresql://postgres:ci-admin-only@localhost:5432/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
+          GRANT USAGE, CREATE ON SCHEMA public TO medarchive_owner;
+          SET ROLE medarchive_owner;
+          CREATE TABLE public.i01_fixture_probe(id integer PRIMARY KEY, payload text NOT NULL);
+          GRANT USAGE ON SCHEMA public TO medarchive_runtime;
+          GRANT SELECT, INSERT ON public.i01_fixture_probe TO medarchive_runtime;
+          SQL
           export MEDARCHIVE_TEST_PG_ENABLED=1
           export MEDARCHIVE_TEST_PG_DATABASE=medarchive_test_i01
           export MEDARCHIVE_TEST_PG_URL=postgresql+asyncpg://medarchive_runtime:ci-runtime-only@localhost:5432/medarchive_test_i01
           pytest -q tests/test_i01_pg_fixture_guard.py tests/test_i01_pg_runtime_identity.py -o asyncio_mode=auto -rs
+          psql "postgresql://postgres:ci-admin-only@localhost:5432/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc 'SELECT count(*) FROM public.i01_fixture_probe' | grep -qx 0
