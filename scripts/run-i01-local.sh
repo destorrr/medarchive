@@ -200,6 +200,18 @@ BEGIN
   END IF;
 END $check$;
 SQL
+# Independently protect each newly stored receipt fact against downgrade.
+for receipt_table in shipment_cards shipment_boxes; do
+  psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c "SET ROLE medarchive_owner; UPDATE public.$receipt_table SET received_at=now(), received_by='10000000-0000-4000-8000-000000000003' WHERE shipment_id='10000000-0000-4000-8000-000000000013'"
+  if alembic downgrade 0012_archive_request_items >"$report_dir/i02-$receipt_table-downgrade.log" 2>&1; then
+    echo "Populated receipt downgrade unexpectedly succeeded" >&2
+    exit 1
+  fi
+  grep -q 'Cannot downgrade populated shipment receipt links' "$report_dir/i02-$receipt_table-downgrade.log"
+  alembic current | grep -q '0013_shipment_receipt_links'
+  psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM public.$receipt_table WHERE shipment_id='10000000-0000-4000-8000-000000000013' AND received_at IS NOT NULL AND received_by='10000000-0000-4000-8000-000000000003'" | grep -qx 1
+  psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c "SET ROLE medarchive_owner; UPDATE public.$receipt_table SET received_at=NULL, received_by=NULL WHERE shipment_id='10000000-0000-4000-8000-000000000013'"
+done
 alembic upgrade head
 
 # Test-only UPDATE privileges in the disposable fixture database.
