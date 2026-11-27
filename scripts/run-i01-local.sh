@@ -6,6 +6,12 @@ for cmd in docker psql python alembic pytest; do
   command -v "$cmd" >/dev/null || { echo "Missing prerequisite: $cmd" >&2; exit 1; }
 done
 unset MEDARCHIVE_DATABASE_URL MEDARCHIVE_MIGRATION_DATABASE_URL MEDARCHIVE_TEST_PG_URL MEDARCHIVE_TEST_PG_DATABASE MEDARCHIVE_TEST_PG_ENABLED
+expected_head="$(python -c 'from alembic.config import Config; from alembic.script import ScriptDirectory; h=ScriptDirectory.from_config(Config("alembic.ini")).get_current_head(); assert h; print(h)')"
+test -n "$expected_head"
+assert_revision() {
+  local expected="$1"
+  test "$(psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc 'SELECT version_num FROM public.alembic_version')" = "$expected"
+}
 # Ignore inherited libpq settings and Docker contexts pointing at remote engines.
 for var in ${!PG@}; do unset "$var"; done
 unset DOCKER_HOST DOCKER_CONTEXT
@@ -57,7 +63,7 @@ GRANT SELECT, INSERT, DELETE ON public.i01_fixture_probe TO medarchive_runtime;
 SQL
 export MEDARCHIVE_MIGRATION_DATABASE_URL=postgresql+asyncpg://medarchive_migrator:ci-migrator-only@127.0.0.1:$port/medarchive_test_i01
 alembic upgrade head
-alembic current | grep -q '0013_shipment_receipt_links'
+assert_revision "$expected_head"
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
 SET ROLE medarchive_owner;
 GRANT SELECT ON public.cards, public.shipments, public.domain_events,
@@ -134,7 +140,7 @@ SQL
 # Rehearse 0011 -> 0012 with retained synthetic legacy rows.
 # This database is created by this runner, never supplied by the caller.
 alembic downgrade 0011_login_throttles
-alembic current | grep -q '0011_login_throttles'
+assert_revision 0011_login_throttles
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.archive_request_items') IS NULL AND (SELECT count(*) FROM public.archive_requests)=1" | grep -qx t
 alembic upgrade 0012_archive_request_items
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
@@ -148,7 +154,7 @@ if alembic downgrade 0011_login_throttles >"$report_dir/i02-populated-downgrade.
   exit 1
 fi
 grep -q 'Cannot downgrade populated archive_request_items' "$report_dir/i02-populated-downgrade.log"
-alembic current | grep -q '0012_archive_request_items'
+assert_revision 0012_archive_request_items
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
 SET ROLE medarchive_owner;
 DO $check$
@@ -168,7 +174,7 @@ END $check$;
 SQL
 
 alembic upgrade head
-alembic current | grep -q '0013_shipment_receipt_links'
+assert_revision "$expected_head"
 # Rehearse 0013 rollback with retained legacy manifest and request.
 alembic downgrade 0012_archive_request_items
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc "SELECT NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='shipments' AND column_name='request_id') AND (SELECT count(*) FROM public.shipment_cards)=1 AND (SELECT count(*) FROM public.shipment_boxes)=1 AND (SELECT count(*) FROM public.archive_requests)=1" | grep -qx t
@@ -183,7 +189,7 @@ if alembic downgrade 0012_archive_request_items >"$report_dir/i02-receipt-downgr
   exit 1
 fi
 grep -q 'Cannot downgrade populated shipment receipt links' "$report_dir/i02-receipt-downgrade.log"
-alembic current | grep -q '0013_shipment_receipt_links'
+assert_revision 0013_shipment_receipt_links
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
 SET ROLE medarchive_owner;
 DO $check$
@@ -213,7 +219,7 @@ if alembic downgrade 0012_archive_request_items >"$report_dir/i02-item-link-down
   exit 1
 fi
 grep -q 'Cannot downgrade populated shipment receipt links' "$report_dir/i02-item-link-downgrade.log"
-alembic current | grep -q '0013_shipment_receipt_links'
+assert_revision 0013_shipment_receipt_links
 psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
 SET ROLE medarchive_owner;
 DO $check$
@@ -245,11 +251,12 @@ for receipt_table in shipment_cards shipment_boxes; do
     exit 1
   fi
   grep -q 'Cannot downgrade populated shipment receipt links' "$report_dir/i02-$receipt_table-downgrade.log"
-  alembic current | grep -q '0013_shipment_receipt_links'
+  assert_revision 0013_shipment_receipt_links
   psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM public.$receipt_table WHERE shipment_id='10000000-0000-4000-8000-000000000013' AND received_at IS NOT NULL AND received_by='10000000-0000-4000-8000-000000000003'" | grep -qx 1
   psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c "SET ROLE medarchive_owner; UPDATE public.$receipt_table SET received_at=NULL, received_by=NULL WHERE shipment_id='10000000-0000-4000-8000-000000000013'"
 done
 alembic upgrade head
+assert_revision "$expected_head"
 
 # Test-only UPDATE privileges in the disposable fixture database.
 psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null
