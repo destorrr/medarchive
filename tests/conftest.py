@@ -26,3 +26,26 @@ async def db(test_config):
     await db.init()
     yield db
     await db.close()
+
+
+@pytest.fixture
+async def pg_runtime_connection():
+    """Opt-in isolated connection; no destructive cleanup or implicit fallback."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+    from tests.pg_fixture_guard import validate_test_url, verify_test_connection
+
+    database = os.environ.get("MEDARCHIVE_TEST_PG_DATABASE")
+    url = validate_test_url(
+        os.environ.get("MEDARCHIVE_TEST_PG_URL", ""),
+        enabled=os.environ.get("MEDARCHIVE_TEST_PG_ENABLED"),
+        database=database,
+        role="medarchive_runtime",
+    )
+    engine = create_async_engine(url, poolclass=NullPool)
+    try:
+        async with engine.connect() as connection:
+            await verify_test_connection(connection, database=database)
+            yield connection
+    finally:
+        await engine.dispose()
