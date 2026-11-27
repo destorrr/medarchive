@@ -205,7 +205,7 @@ jobs:
           SET ROLE medarchive_owner;
           CREATE TABLE public.i01_fixture_probe(id integer PRIMARY KEY, payload text NOT NULL);
           GRANT USAGE ON SCHEMA public TO medarchive_runtime;
-          GRANT SELECT, INSERT ON public.i01_fixture_probe TO medarchive_runtime;
+          GRANT SELECT, INSERT, DELETE ON public.i01_fixture_probe TO medarchive_runtime;
           SQL
           export MEDARCHIVE_MIGRATION_DATABASE_URL=postgresql+asyncpg://medarchive_migrator:ci-migrator-only@localhost:5432/medarchive_test_i01
           alembic upgrade head
