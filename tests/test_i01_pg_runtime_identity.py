@@ -57,3 +57,11 @@ async def test_rollback_fixture_leaves_no_rows(pg_runtime_transaction):
     assert await pg_runtime_transaction.scalar(text(
         "SELECT count(*) FROM public.i01_fixture_probe"
     )) == 0
+
+
+@pytest.mark.asyncio
+async def test_fixture_reads_migrated_application_schema(pg_runtime_transaction):
+    for table in ("cards", "shipments", "domain_events"):
+        assert await pg_runtime_transaction.scalar(text(
+            f"SELECT count(*) FROM public.{table}"
+        )) == 0
