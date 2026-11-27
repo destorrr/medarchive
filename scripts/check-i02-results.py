@@ -23,6 +23,10 @@ EXPECTED = {
         "test_writeoff_invalid_input": 4,
         "test_writeoff_actor_time_pair": 4,
     },
+    "tests.test_i02_shipment_discrepancies": {
+        "test_discrepancy_preserves_shipment": 3,
+        "test_discrepancy_invalid_input": 5,
+    },
 }
 
 def main(path):
