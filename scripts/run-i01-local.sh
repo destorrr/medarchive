@@ -260,7 +260,7 @@ assert_revision "$expected_head"
 
 # Test-only UPDATE privileges in the disposable fixture database.
 psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT 1' >/dev/null
-psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c 'GRANT INSERT, UPDATE ON public.shipments, public.shipment_cards, public.shipment_boxes TO medarchive_runtime; GRANT SELECT ON public.card_placements, public.box_placements TO medarchive_runtime'
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -c 'GRANT INSERT, UPDATE ON public.shipments, public.shipment_cards, public.shipment_boxes TO medarchive_runtime; GRANT SELECT ON public.card_placements, public.box_placements TO medarchive_runtime; GRANT SELECT, INSERT, UPDATE ON public.card_writeoff_requests TO medarchive_runtime'
 
 run_tests() (
   set -e
@@ -270,7 +270,7 @@ run_tests() (
   pytest -q tests/test_i01_manifest_checker.py tests/test_i01_fixture_environment.py tests/test_i02_manifest_checker.py -o xfail_strict=true
   pytest -q tests/test_i01_pg_fixture_guard.py tests/test_i01_pg_runtime_identity.py -o asyncio_mode=auto -rs --junitxml="$report" -o junit_family=xunit2 -o xfail_strict=true
   python scripts/check-i01-results.py "$report"
-  pytest -q tests/test_i02_request_items.py tests/test_i02_shipment_receipt_links.py -o asyncio_mode=auto -o xfail_strict=true --junitxml="$report_dir/i02.xml" -o junit_family=xunit2
+  pytest -q tests/test_i02_request_items.py tests/test_i02_shipment_receipt_links.py tests/test_i02_writeoff_requests.py -o asyncio_mode=auto -o xfail_strict=true --junitxml="$report_dir/i02.xml" -o junit_family=xunit2
   python scripts/check-i02-results.py "$report_dir/i02.xml"
   psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc 'SELECT count(*) FROM public.i01_fixture_probe' | grep -qx 0
 )
@@ -303,6 +303,7 @@ BEGIN
     OR (SELECT count(*) FROM public.box_card_memberships) <> 1
     OR (SELECT count(*) FROM public.shipment_boxes) <> 1
     OR (SELECT count(*) FROM public.shipment_cards) <> 1
+    OR (SELECT count(*) FROM public.card_writeoff_requests) <> 0
     OR (SELECT count(*) FROM public.archive_request_items) <> 0
     OR (SELECT count(*) FROM public.archive_requests) <> 1
     OR (SELECT count(*) FROM public.cards) <> 3
