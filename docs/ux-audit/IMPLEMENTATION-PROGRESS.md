@@ -92,3 +92,6 @@ Foundation #1648–1650 and integration #34–36 succeeded. Job 140359117378: 49
 
 ### I01.2 — initial synthetic seed verified; reference entities expanded
 Foundation #1651–1653 succeeded. Integration #37 failed on intermediate empty-card assertion; #38–39 succeeded. Job 140360961551: 495 passed, 12 dedicated-only skips, 36 warnings, 176.37s. Job 140360962252: 19 passed in 1.00s. Commits 8eb649ae58cbf4da097d8e2d0d2ccbd969fe5379 and d36cf23f8e0a93bfd8d42e134c9c3ceea1079aeb expand synthetic seed to all four disabled business-role identities, three location kinds, courier and box, and add runtime reference assertions. Pending CI; progress remains 5/8. Shipment and request seed not yet implemented. No production changes.
+
+### I01.2 — reference seed verified; manifest and request seed added
+Foundation #1654–1656 and integration #40–42 succeeded. Job 140365664638: 495 passed, 13 dedicated-only skips, 36 warnings, 190.25s. Job 140365664399: 20 passed in 0.86s. Commits b38b2cb20af85325a907b11e9fb7b58f65a28e61 and 83042de4ae906691e1a665a14dfb53055e08cbd6 add synthetic box cycle/membership, draft branch-to-archive manifest and separate archive card with historical single-card CO request. Runtime read assertions pending CI. Historical request shape is not target P-09 acceptance. Progress remains 5/8 until evidence. No production changes.
