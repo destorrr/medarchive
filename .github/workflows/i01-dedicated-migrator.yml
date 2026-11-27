@@ -228,6 +228,19 @@ jobs:
             VALUES ('10000000-0000-4000-8000-000000000004', 'I01-SYNTH-001', 'Synthetic patient 001',
                     DATE '2000-01-01', '10000000-0000-4000-8000-000000000001',
                     '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000003');
+          INSERT INTO public.locations(id, kind, name) VALUES
+            ('10000000-0000-4000-8000-000000000005', 'central_office', 'Synthetic central office'),
+            ('10000000-0000-4000-8000-000000000006', 'archive', 'Synthetic archive');
+          INSERT INTO public.users(id, username, password_hash, full_name, role, is_active) VALUES
+            ('10000000-0000-4000-8000-000000000007', 'i01-synthetic-co', 'invalid-test-hash', 'Synthetic CO employee', 'central_office', false),
+            ('10000000-0000-4000-8000-000000000008', 'i01-synthetic-archive', 'invalid-test-hash', 'Synthetic archive employee', 'archive', false),
+            ('10000000-0000-4000-8000-000000000009', 'i01-synthetic-admin', 'invalid-test-hash', 'Synthetic admin', 'admin', false);
+          INSERT INTO public.couriers(id, full_name) VALUES
+            ('10000000-0000-4000-8000-000000000010', 'Synthetic courier');
+          INSERT INTO public.boxes(id, box_number, current_location_id, created_by) VALUES
+            ('10000000-0000-4000-8000-000000000011', 'I01-SYNTH-BOX',
+             '10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000003');
+          GRANT SELECT ON public.couriers, public.boxes TO medarchive_runtime;
           SQL
           export MEDARCHIVE_TEST_PG_ENABLED=1
           export MEDARCHIVE_TEST_PG_DATABASE=medarchive_test_i01
