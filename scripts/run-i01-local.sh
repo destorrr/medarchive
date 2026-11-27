@@ -130,6 +130,43 @@ GRANT SELECT ON public.box_cycles, public.box_card_memberships, public.shipment_
 GRANT SELECT, INSERT, UPDATE ON public.archive_request_items TO medarchive_runtime;
 SQL
 
+
+# Rehearse 0011 -> 0012 with retained synthetic legacy rows.
+# This database is created by this runner, never supplied by the caller.
+alembic downgrade 0011_login_throttles
+alembic current | grep -q '0011_login_throttles'
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc "SELECT to_regclass('public.archive_request_items') IS NULL AND (SELECT count(*) FROM public.archive_requests)=1" | grep -qx t
+alembic upgrade 0012_archive_request_items
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE medarchive_owner;
+GRANT SELECT, INSERT, UPDATE ON public.archive_request_items TO medarchive_runtime;
+INSERT INTO public.archive_request_items(request_id, card_id, status, reservation_active, added_at, added_by)
+SELECT id, card_id, 'pending', true, now(), requested_by FROM public.archive_requests;
+SQL
+if alembic downgrade 0011_login_throttles >"$report_dir/i02-populated-downgrade.log" 2>&1; then
+  echo "Populated downgrade unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -q 'Cannot downgrade populated archive_request_items' "$report_dir/i02-populated-downgrade.log"
+alembic current | grep -q '0012_archive_request_items'
+psql "postgresql://postgres:ci-admin-only@127.0.0.1:$port/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
+SET ROLE medarchive_owner;
+DO $check$
+BEGIN
+  IF current_database() <> 'medarchive_test_i01'
+     OR (SELECT count(*) FROM public.archive_request_items) <> 1
+     OR (SELECT count(*) FROM public.archive_requests) <> 1 THEN
+    RAISE EXCEPTION 'Unexpected migration rehearsal state';
+  END IF;
+  DELETE FROM public.archive_request_items i USING public.archive_requests r, public.cards c
+  WHERE i.request_id=r.id AND i.card_id=r.card_id AND c.id=i.card_id
+    AND c.card_number='I01-SYNTH-002' AND i.status='pending' AND i.reservation_active;
+  IF FOUND IS FALSE OR EXISTS (SELECT 1 FROM public.archive_request_items) THEN
+    RAISE EXCEPTION 'Synthetic migration rehearsal cleanup failed';
+  END IF;
+END $check$;
+SQL
+
 run_tests() (
   set -e
   export MEDARCHIVE_TEST_PG_ENABLED=1
