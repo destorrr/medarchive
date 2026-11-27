@@ -20,6 +20,9 @@ EXPECTED = {
         "test_synthetic_card_relationships": 1,
         "test_synthetic_reference_entities": 1,
         "test_synthetic_manifest_and_request": 1,
+        "test_cleanup_rejects_unsafe_arguments": 2,
+        "test_cleanup_rejects_wrong_identity": 1,
+        "test_cleanup_preserves_unrelated_probe": 1,
     },
 }
 
