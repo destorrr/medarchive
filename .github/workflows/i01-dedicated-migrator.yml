@@ -37,6 +37,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -c constraints/ci-python312.txt -e '.[dev]'
+      - name: Resolve single Alembic head from migration graph
+        run: |
+          expected_head="$(python -c 'from alembic.config import Config; from alembic.script import ScriptDirectory; h=ScriptDirectory.from_config(Config("alembic.ini")).get_current_head(); assert h; print(h)')"
+          test -n "$expected_head"
+          echo "EXPECTED_ALEMBIC_HEAD=$expected_head" >> "$GITHUB_ENV"
       - name: Bootstrap isolated database principals
         run: |
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -f db/postgresql/bootstrap-principals.sql
@@ -53,13 +58,11 @@ jobs:
           alembic current
       - name: Assert revision, object ownership and privilege boundaries
         run: |
+          test "$(psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 -Atc 'SELECT version_num FROM public.alembic_version')" = "$EXPECTED_ALEMBIC_HEAD"
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
           DO $i01$
           DECLARE n integer;
           BEGIN
-            IF (SELECT version_num FROM public.alembic_version) IS DISTINCT FROM '0013_shipment_receipt_links' THEN
-              RAISE EXCEPTION 'Unexpected Alembic revision';
-            END IF;
             SELECT count(*) INTO n FROM pg_class c JOIN pg_namespace s ON s.oid=c.relnamespace
               WHERE s.nspname='public' AND c.relkind IN ('r','p','S','v','m')
                 AND pg_get_userbyid(c.relowner) <> 'medarchive_owner';
@@ -94,7 +97,7 @@ jobs:
           INSERT INTO public.i01_backup_probe(payload) VALUES ('synthetic-alpha'), ('synthetic-beta');
           SQL
           backup=postgresql://medarchive_backup:ci-backup-only@localhost:5432/medarchive_i01
-          psql "$backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -qx 0013_shipment_receipt_links
+          psql "$backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -Fxq "$EXPECTED_ALEMBIC_HEAD"
           psql "$backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT string_agg(payload, ',' ORDER BY id) FROM public.i01_backup_probe" | grep -qx synthetic-alpha,synthetic-beta
           psql "$backup" -X -v ON_ERROR_STOP=1 -Atc "SELECT last_value FROM public.i01_backup_probe_id_seq" | grep -qx 2
           for statement in 'SET ROLE medarchive_owner' 'CREATE TABLE public.i01_forbidden(id integer)' 'UPDATE public.alembic_version SET version_num=version_num' 'TRUNCATE public.alembic_version'; do
@@ -126,7 +129,7 @@ jobs:
           restore=postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore
           psql "$restore" -X -v ON_ERROR_STOP=1 -c 'GRANT USAGE, CREATE ON SCHEMA public TO medarchive_owner'
           PGPASSWORD=ci-admin-only pg_restore --role=medarchive_owner --no-owner --no-acl --exit-on-error --host=localhost --username=postgres --dbname=medarchive_i01_restore "$MEDARCHIVE_BACKUP_DIR/i01-restore.dump"
-          psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -qx 0013_shipment_receipt_links
+          psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT version_num FROM public.alembic_version" | grep -Fxq "$EXPECTED_ALEMBIC_HEAD"
           psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT string_agg(payload, ',' ORDER BY id) FROM public.i01_backup_probe" | grep -qx synthetic-alpha,synthetic-beta
           psql postgresql://postgres:ci-admin-only@localhost:5432/medarchive_i01_restore -X -v ON_ERROR_STOP=1 -Atc "SELECT last_value FROM public.i01_backup_probe_id_seq" | grep -qx 2
           psql "$restore" -X -v ON_ERROR_STOP=1 -c 'SET ROLE medarchive_owner' -f db/postgresql/grant-backup-read.sql
@@ -161,7 +164,7 @@ jobs:
           grep -q 'Dedicated migrations require online identity verification' "$RUNNER_TEMP/i01-offline.log"
           unset MEDARCHIVE_MIGRATION_DATABASE_URL
           export MEDARCHIVE_DATABASE_URL=postgresql+asyncpg://postgres:ci-admin-only@localhost:5432/medarchive_i01
-          alembic current | grep -q '0013_shipment_receipt_links'
+          alembic current | grep -Fxq "$EXPECTED_ALEMBIC_HEAD (head)"
       - name: Rehearse existing schema ownership transfer in disposable database
         run: |
           psql "$ADMIN_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
@@ -195,7 +198,7 @@ jobs:
           psql "$legacy" -X -v ON_ERROR_STOP=1 -Atc "SELECT payload FROM public.i01_transfer_probe WHERE id=1" | grep -qx synthetic-transfer
           export MEDARCHIVE_MIGRATION_DATABASE_URL=postgresql+asyncpg://medarchive_migrator:ci-migrator-only@localhost:5432/medarchive_i01_legacy
           alembic upgrade head
-          alembic current | grep -q '0013_shipment_receipt_links'
+          alembic current | grep -Fxq "$EXPECTED_ALEMBIC_HEAD (head)"
       - name: I01.2 verify guarded runtime fixture with real PostgreSQL identities
         run: |
           bash -n scripts/run-i01-local.sh
