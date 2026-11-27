@@ -23,7 +23,7 @@ async def test_receipt_metadata_pair(pg_runtime_transaction, table):
         with pytest.raises(DBAPIError) as error:
             async with c.begin_nested():
                 await c.execute(text(f"UPDATE public.{table} SET {assignment}"))
-        assert error.value.orig.sqlstate == code
+        assert error.value.orig.sqlstate == code, str(error.value.orig)
 
 
 async def test_nullable_legacy_links(pg_runtime_transaction):
@@ -41,4 +41,4 @@ async def test_invalid_fulfillment_reference(pg_runtime_transaction, table, colu
     with pytest.raises(DBAPIError) as error:
         async with c.begin_nested():
             await c.execute(text(f"UPDATE public.{table} SET {column}='ffffffff-ffff-4fff-8fff-ffffffffffff'"))
-    assert error.value.orig.sqlstate == "23503"
+    assert error.value.orig.sqlstate == "23503", str(error.value.orig)
