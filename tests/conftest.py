@@ -49,3 +49,18 @@ async def pg_runtime_connection():
             yield connection
     finally:
         await engine.dispose()
+
+
+@pytest.fixture
+async def pg_runtime_transaction(pg_runtime_connection):
+    """Rollback-only fixture for tests not requiring committed state."""
+    connection = pg_runtime_connection
+    # The identity SELECT starts an implicit transaction.
+    await connection.rollback()
+    transaction = await connection.begin()
+    try:
+        yield connection
+    finally:
+        if not transaction.is_active:
+            raise AssertionError("Rollback-only fixture transaction ended by test")
+        await transaction.rollback()
