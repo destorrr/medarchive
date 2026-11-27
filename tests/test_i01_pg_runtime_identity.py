@@ -61,7 +61,7 @@ async def test_rollback_fixture_leaves_no_rows(pg_runtime_transaction):
 
 @pytest.mark.asyncio
 async def test_fixture_reads_migrated_application_schema(pg_runtime_transaction):
-    for table in ("cards", "shipments", "domain_events"):
+    for table in ("shipments", "domain_events"):
         assert await pg_runtime_transaction.scalar(text(
             f"SELECT count(*) FROM public.{table}"
         )) == 0
@@ -117,3 +117,18 @@ async def test_conflicting_insert_and_committed_visibility(pg_runtime_pair, reve
             "DELETE FROM public.i01_fixture_probe WHERE id=:id AND payload='synthetic-winner'"
         ), {"id": key})
         await first.commit()
+
+
+@pytest.mark.asyncio
+async def test_synthetic_card_relationships(pg_runtime_transaction):
+    row = (await pg_runtime_transaction.execute(text("""
+        SELECT c.card_number, c.full_name, c.phone, c.status, b.code,
+               l.kind, u.is_active, u.role
+        FROM public.cards c
+        JOIN public.branches b ON b.id=c.origin_branch_id
+        JOIN public.locations l ON l.id=c.current_location_id AND l.branch_id=b.id
+        JOIN public.users u ON u.id=c.created_by AND u.branch_id=b.id
+        WHERE c.card_number='I01-SYNTH-001'
+    """))).one()
+    assert tuple(row) == ("I01-SYNTH-001", "Synthetic patient 001", None,
+                          "active", "I01-SYNTH", "branch", False, "branch")
