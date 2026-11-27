@@ -270,3 +270,26 @@ jobs:
           export MEDARCHIVE_TEST_PG_URL=postgresql+asyncpg://medarchive_runtime:ci-runtime-only@localhost:5432/medarchive_test_i01
           pytest -q tests/test_i01_pg_fixture_guard.py tests/test_i01_pg_runtime_identity.py -o asyncio_mode=auto -rs
           psql "postgresql://postgres:ci-admin-only@localhost:5432/medarchive_test_i01" -X -v ON_ERROR_STOP=1 -Atc 'SELECT count(*) FROM public.i01_fixture_probe' | grep -qx 0
+      - name: I01.2 verify disposable fixture final state
+        if: always()
+        run: |
+          test_url=postgresql://postgres:ci-admin-only@localhost:5432/medarchive_test_i01
+          psql "$test_url" -X -v ON_ERROR_STOP=1 <<'SQL'
+          SET statement_timeout = '5s';
+          DO $check$
+          BEGIN
+            IF current_database() <> 'medarchive_test_i01' OR session_user <> 'postgres' THEN
+              RAISE EXCEPTION 'Unexpected fixture verification identity';
+            END IF;
+            IF EXISTS (SELECT 1 FROM public.i01_fixture_probe) THEN
+              RAISE EXCEPTION 'Residual synthetic probe records';
+            END IF;
+            IF (SELECT count(*) FROM public.cards WHERE card_number IN ('I01-SYNTH-001','I01-SYNTH-002')) <> 2
+              OR (SELECT count(*) FROM public.shipments WHERE id='10000000-0000-4000-8000-000000000013') <> 1 THEN
+              RAISE EXCEPTION 'Synthetic baseline changed';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND usename='medarchive_runtime') THEN
+              RAISE EXCEPTION 'Residual runtime connections';
+            END IF;
+          END $check$;
+          SQL
