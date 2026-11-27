@@ -188,3 +188,58 @@ async def test_synthetic_manifest_and_request(pg_runtime_transaction):
           AND u.role='central_office' AND r.status='new'
           AND r.fulfillment_shipment_id IS NULL
     """)) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enabled,key", [("0", 30), ("1", 99)])
+async def test_cleanup_rejects_unsafe_arguments(pg_runtime_pair, enabled, key):
+    first, _ = pg_runtime_pair
+    with pytest.raises(ValueError):
+        await cleanup_committed_probe(
+            first, url=os.environ["MEDARCHIVE_TEST_PG_URL"], enabled=enabled,
+            database=os.environ["MEDARCHIVE_TEST_PG_DATABASE"], key=key,
+        )
+    assert not first.in_transaction()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_rejects_wrong_identity():
+    url = make_url(os.environ["MEDARCHIVE_TEST_PG_URL"]).set(
+        username="medarchive_backup", password="ci-backup-only")
+    engine = create_async_engine(url, poolclass=NullPool)
+    try:
+        async with engine.connect() as connection:
+            with pytest.raises(ValueError, match="Unexpected PostgreSQL test connection identity"):
+                await cleanup_committed_probe(
+                    connection, url=os.environ["MEDARCHIVE_TEST_PG_URL"], enabled="1",
+                    database=os.environ["MEDARCHIVE_TEST_PG_DATABASE"], key=30,
+                )
+            assert not connection.in_transaction()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_preserves_unrelated_probe(pg_runtime_pair):
+    first, second = pg_runtime_pair
+    try:
+        await first.execute(text(
+            "INSERT INTO public.i01_fixture_probe(id,payload) VALUES (30,'synthetic-winner'),(31,'synthetic-winner')"
+        ))
+        await first.commit()
+        await cleanup_committed_probe(
+            first, url=os.environ["MEDARCHIVE_TEST_PG_URL"], enabled="1",
+            database=os.environ["MEDARCHIVE_TEST_PG_DATABASE"], key=30,
+        )
+        rows = (await second.execute(text(
+            "SELECT id FROM public.i01_fixture_probe ORDER BY id"
+        ))).scalars().all()
+        assert rows == [31]
+    finally:
+        await first.rollback()
+        await second.rollback()
+        for key in (30, 31):
+            await cleanup_committed_probe(
+                first, url=os.environ["MEDARCHIVE_TEST_PG_URL"], enabled="1",
+                database=os.environ["MEDARCHIVE_TEST_PG_DATABASE"], key=key,
+            )
