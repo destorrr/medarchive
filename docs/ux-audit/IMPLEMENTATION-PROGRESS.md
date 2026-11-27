@@ -128,3 +128,8 @@ Verified push runs via GitHub Actions REST API at d550e4d04fa815edfbebf60ce5203d
 ### I01 — implementation gate accepted; workstation check deferred (2026-11-27)
 
 Owner approved deferral of actual local workstation execution to I11. I01.1 and I01.2 accepted for isolated implementation based on recorded successful CI, including shared runner #67 and Foundation #1681. I01 implementation gate closed; I02 may proceed. I11 must verify the documented runner on the actual workstation and record evidence before final acceptance. External retained database inventory, final runtime/API ACL and DML retirement remain separate gates; no production readiness claim. No production changes.
+
+
+### I02 — owner-confirmed custody rule (2026-11-27)
+
+Owner explicitly confirmed that actual handover transfers responsibility to the courier on every supported route: branch to archive, archive to central office, central office to archive. Assignment/draft alone does not transfer responsibility. Receipt transfers responsibility to destination for the received objects (ordinary box and contents, P09 individual card); unreceived objects remain courier responsibility. This clarification supersedes conflicting earlier interpretations that archive retains responsibility during P09 transit. Courier remains a directory entity, not an application role. Reconcile affected design contracts before implementing custody guards. No schema changes in this commit.
