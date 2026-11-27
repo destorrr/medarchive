@@ -64,3 +64,28 @@ async def pg_runtime_transaction(pg_runtime_connection):
         if not transaction.is_active:
             raise AssertionError("Rollback-only fixture transaction ended by test")
         await transaction.rollback()
+
+
+@pytest.fixture
+async def pg_runtime_pair(pg_runtime_connection):
+    """Two independently verified sessions for concurrency tests."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+    from tests.pg_fixture_guard import validate_test_url, verify_test_connection
+
+    database = os.environ.get("MEDARCHIVE_TEST_PG_DATABASE")
+    url = validate_test_url(
+        os.environ.get("MEDARCHIVE_TEST_PG_URL", ""),
+        enabled=os.environ.get("MEDARCHIVE_TEST_PG_ENABLED"),
+        database=database,
+        role="medarchive_runtime",
+    )
+    engine = create_async_engine(url, poolclass=NullPool)
+    try:
+        async with engine.connect() as second:
+            await verify_test_connection(second, database=database)
+            await pg_runtime_connection.rollback()
+            await second.rollback()
+            yield pg_runtime_connection, second
+    finally:
+        await engine.dispose()
