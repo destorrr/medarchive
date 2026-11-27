@@ -30,3 +30,25 @@ async def verify_test_connection(connection, *, database):
             or row[2] != "medarchive_runtime" or not 160000 <= row[3] < 170000
             or row[4] is not False):
         raise ValueError("Unexpected PostgreSQL test connection identity")
+
+
+async def cleanup_committed_probe(connection, *, url, enabled, database, key):
+    """Remove only the known committed concurrency probe in a verified test DB."""
+    import asyncio
+
+    validate_test_url(url, enabled=enabled, database=database, role="medarchive_runtime")
+    if key not in (30, 31):
+        raise ValueError("Unknown concurrency probe key")
+    if connection.in_transaction():
+        raise ValueError("Cleanup requires an idle connection")
+    try:
+        await asyncio.wait_for(verify_test_connection(connection, database=database), 5)
+        await connection.execute(text("SET LOCAL statement_timeout = '5s'"))
+        await connection.execute(text("SET LOCAL lock_timeout = '1s'"))
+        await asyncio.wait_for(connection.execute(text(
+            "DELETE FROM public.i01_fixture_probe WHERE id=:id AND payload='synthetic-winner'"
+        ), {"id": key}), 5)
+        await asyncio.wait_for(connection.commit(), 5)
+    except BaseException:
+        await connection.rollback()
+        raise
