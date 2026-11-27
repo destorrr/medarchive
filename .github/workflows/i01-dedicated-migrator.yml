@@ -207,6 +207,13 @@ jobs:
           GRANT USAGE ON SCHEMA public TO medarchive_runtime;
           GRANT SELECT, INSERT ON public.i01_fixture_probe TO medarchive_runtime;
           SQL
+          export MEDARCHIVE_MIGRATION_DATABASE_URL=postgresql+asyncpg://medarchive_migrator:ci-migrator-only@localhost:5432/medarchive_test_i01
+          alembic upgrade head
+          alembic current | grep -q '0011_login_throttles'
+          psql "postgresql://postgres:ci-admin-only@localhost:5432/medarchive_test_i01" -X -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE medarchive_owner;
+          GRANT SELECT ON public.cards, public.shipments, public.domain_events TO medarchive_runtime;
+          SQL
           export MEDARCHIVE_TEST_PG_ENABLED=1
           export MEDARCHIVE_TEST_PG_DATABASE=medarchive_test_i01
           export MEDARCHIVE_TEST_PG_URL=postgresql+asyncpg://medarchive_runtime:ci-runtime-only@localhost:5432/medarchive_test_i01
