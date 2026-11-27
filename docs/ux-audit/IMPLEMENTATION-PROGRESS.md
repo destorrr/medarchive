@@ -123,3 +123,8 @@ Commits b1b76f6abf4132c1950f41bd3437fb39596ebe0d and 4a115711865bb8c37f02a49fcec
 ### I01.2 — shared runner CI acceptance (2026-11-27)
 
 Verified push runs via GitHub Actions REST API at d550e4d04fa815edfbebf60ce5203d162650d1e7: Foundation #1681 (45970673804, job 140410054528) and Integration #67 (45970674242, job 140410056118), both success; all listed steps succeeded, including the shared guarded runtime runner. Integration #66 (45970646362) at 4a115711 also succeeded. Shared runner CI acceptance: PASS. Actual developer workstation execution remains unverified; native Windows support not established. Detailed test counts for these latest runs not extracted; previous counts remain historical evidence. I02 preparation may proceed in the isolated branch; overall I01.2 local acceptance remains open. No production changes.
+
+
+### I01 — implementation gate accepted; workstation check deferred (2026-11-27)
+
+Owner approved deferral of actual local workstation execution to I11. I01.1 and I01.2 accepted for isolated implementation based on recorded successful CI, including shared runner #67 and Foundation #1681. I01 implementation gate closed; I02 may proceed. I11 must verify the documented runner on the actual workstation and record evidence before final acceptance. External retained database inventory, final runtime/API ACL and DML retirement remain separate gates; no production readiness claim. No production changes.
