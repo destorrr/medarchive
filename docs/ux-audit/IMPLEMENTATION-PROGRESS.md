@@ -252,3 +252,8 @@ Verified all runs at 70f04cd62a687d816f156be2c4f5c58de601e730. Foundation #1762 
 ### I02/E3.1 — remaining inventory coverage
 
 Verified all CI at ae9ef3993b119a8d44bb3ef882f6d010dac0a6c5: Foundation #1763 (46113006168, job 140880496566), 622 passed, 53 skipped, 36 warnings; Dedicated #149 (46113006157, job 140880496424), 19+25+35 passed, both manifests, all 37 steps successful including backup/restore. Added four PostgreSQL cases for remaining four inventory categories, including two membership conflict variants rejected by existing deferred constraints. No guard bypass, actual retained data access or migration. E3.1 closure candidate pending CI; next E3.2 deterministic mapping classification. Overall 2/12; I02.3/4 blocker unchanged.
+
+
+### I02/E3.1 accepted; E3.2 pending mapping planner
+
+All CI at 2f108c8e503ae9992d94a02b2942f72d14421e5e verified: Foundation #1764 (46113584767, job 140882304089), 626 passed, 53 skipped, 36 warnings; dedicated #150 (46113584780, job 140882304203), 19+25+35, mandatory manifests verified; all 37 steps successful. E3.1 diagnostic inventory accepted. E3.2 implementation started with conservative deterministic read-only pending request planner, stable child UUIDv5, retained parent/actor/time, four integration cases. No fabricated timestamps, status updates, writes to retained data, guard bypass or new migrations. Existing items and ambiguous statuses still require classification/equivalence and atomic apply tests before E3.2 acceptance. CI pending. Overall 2/12; I02.3/4 blocker unchanged.
