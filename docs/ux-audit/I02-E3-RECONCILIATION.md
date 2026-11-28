@@ -29,3 +29,7 @@ retained; this is independent read-only preparation.
 ## E3.1 — route and additive-link coverage
 
 Verified initial inventory CI at 7a92ee0be9ac74616006427390415bfb76688c65: Foundation #1761 617 passed, 53 skipped, 36 warnings; dedicated #147 19+25+35 passed, mandatory manifests verified, all steps successful. Expanded actual PostgreSQL fixture coverage to both permitted incoming routes and both excluded legacy routes, boxed manifest counts, and inconsistent additive item links. Normalize whitespace before trim to detect tabs/newlines at edges. All test rows synthetic and rollback-only. Existing legacy constraints remain in force. No automatic data correction. Positive coverage of other conflict predicates remains outstanding; do not mark E3.1 complete until evidence or a documented invariant explains why a positive fixture is inadmissible.
+
+## E3.1 — regression fixture correction
+
+Foundation #1762 at 70f04cd62a687d816f156be2c4f5c58de601e730: 1 failed, 621 passed, 53 skipped, 36 warnings. Four route cases and additive-link mismatch passed; courier duplicate fixture incorrectly supplied literal backslash-t/backslash-n strings instead of tab/newline characters. Correct Python escapes; retain the normalization SQL and exact duplicate-count assertion. Dedicated #148 succeeded, 19+25+35 cases, both mandatory manifests verified. New CI pending.

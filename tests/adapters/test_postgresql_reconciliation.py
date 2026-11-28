@@ -30,7 +30,7 @@ async def test_e3_inventory_detects_legacy_roles_and_duplicate_couriers(pg_sessi
     await connection.execute(text("""
         INSERT INTO public.couriers (full_name, is_active)
         VALUES (:first, true), (:second, false)
-    """), {"first": marker + " Test", "second": "\\t" + marker.upper() + "  TEST\\n"})
+    """), {"first": marker + " Test", "second": "\t" + marker.upper() + "  TEST\n"})
     after = await inspect_reconciliation(connection)
     expected = asdict(before)
     expected["viewer_accounts"] += 1

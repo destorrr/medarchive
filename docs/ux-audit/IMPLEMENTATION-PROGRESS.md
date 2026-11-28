@@ -242,3 +242,8 @@ Verified all CI at b8b4ac74a806c84ccf5ed0cc0b07986bc415541d: Foundation #1760 (4
 ### I02/E3.1 — inventory integration coverage expanded
 
 All CI for 7a92ee0be9ac74616006427390415bfb76688c65 verified: Foundation #1761 (46112178861, job 140877933964) 617 passed, 53 skipped, 36 warnings; dedicated #147 (46112178835, job 140877933981) 19+25+35 passed, both manifests, all steps successful including backup/restore. Added five parametrized PostgreSQL cases for four legacy incoming/excluded route combinations and mismatched additive item link; corrected diagnostic courier whitespace normalization and exercised tabs/newlines. CI pending. No guard bypass, no retained data access or production changes. E3.1 partial; I02.3/4 blocker unchanged; no package acceptance claimed.
+
+
+### I02/E3.1 — fixture regression fixed
+
+Verified all runs at 70f04cd62a687d816f156be2c4f5c58de601e730. Foundation #1762 (46112620630, job 140879304848) failed application tests: 1 failed, 621 passed, 53 skipped, 36 warnings; backup/restore skipped. Dedicated #148 (46112620608, job 140879304630) all 18 steps successful, 19+25+35 cases, both manifests verified. Root cause: Python fixture supplied literal escaped strings rather than actual whitespace. Corrected test data, without weakening assertion or changing SQL. New CI pending; E3.1 not yet accepted. No changes to migrations, runtime guards or production data.
