@@ -73,3 +73,60 @@ async def test_pending_request_mapping_is_conservative(pg_session, scenario):
     assert (await connection.execute(text("""
         SELECT count(*) FROM public.archive_request_items WHERE request_id = :request
     """), {"request": request.id})).scalar_one() == int(has_item) + int(scenario == "extra_item")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scenario", ["draft_link", "handed_over", "received", "not_found", "cancelled"])
+async def test_historical_fulfillment_inventory(pg_session, scenario):
+    from dataclasses import asdict
+    from medarchive.adapters.postgresql.request_reconciliation import inspect_historical_fulfillments
+    from medarchive.services.postgresql_archive_workflow import PostgreSQLArchiveWorkflow
+
+    branch, _, archive, central, _, archivist, central_user, courier = await seed_locations(pg_session)
+    connection = await pg_session.connection()
+    before = await inspect_historical_fulfillments(connection)
+    plan_before = await plan_pending_request_mappings(connection)
+    card = Card(card_number=uuid4().hex, full_name="Synthetic patient",
+                date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+                current_location_id=archive.id, status="active")
+    pg_session.add(card)
+    await pg_session.flush()
+    request = ArchiveRequest(card_id=card.id, requested_by=central_user.id, status="new")
+    pg_session.add(request)
+    await pg_session.flush()
+    expected = asdict(before)
+    if scenario == "not_found":
+        await PostgreSQLArchiveWorkflow(pg_session).mark_not_found(
+            request_id=request.id, actor_id=archivist.id, note="Synthetic legacy result",
+        )
+        expected["not_found_with_result"] += 1
+    elif scenario == "cancelled":
+        request.status = "cancelled"
+        await pg_session.flush()
+        expected["cancelled"] += 1
+    else:
+        workflow = PostgreSQLShipmentWorkflow(pg_session)
+        shipment = await workflow.create_draft(
+            from_location_id=archive.id, to_location_id=central.id,
+            courier_id=courier.id, issued_by=archivist.id,
+        )
+        await workflow.add_standalone_card(
+            shipment_id=shipment.id, card_id=card.id, actor_id=archivist.id,
+        )
+        if scenario == "draft_link":
+            request.status = "in_progress"
+            request.fulfillment_shipment_id = shipment.id
+            await pg_session.flush()
+        else:
+            await workflow.hand_over(shipment_id=shipment.id, actor_id=archivist.id)
+            if scenario == "received":
+                await workflow.receive(shipment_id=shipment.id, actor_id=central_user.id)
+        expected[scenario] += 1
+    await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+    assert asdict(await inspect_historical_fulfillments(connection)) == expected
+    after = await plan_pending_request_mappings(connection)
+    assert after.review_count == plan_before.review_count + 1
+    statuses = dict(plan_before.review_by_status)
+    statuses[request.status] = statuses.get(request.status, 0) + 1
+    assert dict(after.review_by_status) == statuses
+    assert after.candidates == plan_before.candidates

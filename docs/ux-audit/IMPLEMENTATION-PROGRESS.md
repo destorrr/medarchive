@@ -262,3 +262,8 @@ All CI at 2f108c8e503ae9992d94a02b2942f72d14421e5e verified: Foundation #1764 (4
 ### I02/E3.2 — existing pending item equivalence
 
 All CI at cfba102fe2e6a090a5f883b319a1e72aa9187eb2 verified: Foundation #1765 (46114018264, job 140883646903) 630 passed, 53 skipped, 36 warnings; dedicated #151 (46114018427, job 140883646938) 19+25+35, both manifests verified, all 37 steps successful. Planner now distinguishes exact existing deterministic pending child from conflicts, with five additional integration cases. Existing rows never rewritten. CI pending; no actual backfill, production data, guard changes or E4 cutover. Overall 2/12; I02.3/4 blocker unchanged.
+
+
+### I02/E3.2 — historical evidence classification
+
+All CI at 6649366cd566215eccb94c3799f7490ac5b08948 verified: Foundation #1766 (46118735268, job 140898287661) 635 passed, 53 skipped, 36 warnings; dedicated #152 (46118735564, job 140898288222) 19+25+35, both manifests, all 37 steps successful. Implemented historical fulfillment evidence counts and per-status review counts; added five synthetic PostgreSQL cases. No inferred receipt times or reason codes; no historical writes or migration. CI pending. I02.3/4 blocker unchanged, overall 2/12.
