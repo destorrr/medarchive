@@ -247,3 +247,8 @@ All CI for 7a92ee0be9ac74616006427390415bfb76688c65 verified: Foundation #1761 (
 ### I02/E3.1 — fixture regression fixed
 
 Verified all runs at 70f04cd62a687d816f156be2c4f5c58de601e730. Foundation #1762 (46112620630, job 140879304848) failed application tests: 1 failed, 621 passed, 53 skipped, 36 warnings; backup/restore skipped. Dedicated #148 (46112620608, job 140879304630) all 18 steps successful, 19+25+35 cases, both manifests verified. Root cause: Python fixture supplied literal escaped strings rather than actual whitespace. Corrected test data, without weakening assertion or changing SQL. New CI pending; E3.1 not yet accepted. No changes to migrations, runtime guards or production data.
+
+
+### I02/E3.1 — remaining inventory coverage
+
+Verified all CI at ae9ef3993b119a8d44bb3ef882f6d010dac0a6c5: Foundation #1763 (46113006168, job 140880496566), 622 passed, 53 skipped, 36 warnings; Dedicated #149 (46113006157, job 140880496424), 19+25+35 passed, both manifests, all 37 steps successful including backup/restore. Added four PostgreSQL cases for remaining four inventory categories, including two membership conflict variants rejected by existing deferred constraints. No guard bypass, actual retained data access or migration. E3.1 closure candidate pending CI; next E3.2 deterministic mapping classification. Overall 2/12; I02.3/4 blocker unchanged.

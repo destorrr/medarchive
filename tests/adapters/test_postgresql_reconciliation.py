@@ -158,3 +158,120 @@ async def test_e3_inventory_detects_inconsistent_additive_item_link(pg_session):
     expected = asdict(before)
     expected["conflicting_item_links"] += 1
     assert asdict(await inspect_reconciliation(connection)) == expected
+
+
+@pytest.mark.asyncio
+async def test_e3_inventory_detects_shared_legacy_fulfillment_and_conflicting_link(pg_session):
+    from datetime import date
+    from medarchive.adapters.postgresql.models import ArchiveRequest, Card
+    from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+
+    branch, _, archive, central, _, archivist, central_user, courier = (
+        await seed_locations(pg_session)
+    )
+    connection = await pg_session.connection()
+    before = await inspect_reconciliation(connection)
+    cards = [Card(card_number=uuid4().hex, full_name="Synthetic patient",
+                  date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+                  current_location_id=archive.id, status="active") for _ in range(2)]
+    pg_session.add_all(cards)
+    await pg_session.flush()
+    requests = [ArchiveRequest(card_id=card.id, requested_by=central_user.id, status="new")
+                for card in cards]
+    pg_session.add_all(requests)
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    shipment = await workflow.create_draft(
+        from_location_id=archive.id, to_location_id=central.id,
+        courier_id=courier.id, issued_by=archivist.id,
+    )
+    for card in cards:
+        await workflow.add_standalone_card(
+            shipment_id=shipment.id, card_id=card.id, actor_id=archivist.id,
+        )
+    await workflow.hand_over(shipment_id=shipment.id, actor_id=archivist.id)
+    await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+    expected = asdict(before)
+    expected["legacy_requests"] += 2
+    expected["shared_legacy_fulfillments"] += 1
+    assert asdict(await inspect_reconciliation(connection)) == expected
+    # The new nullable parent link is not sufficient to resolve shared old requests.
+    await connection.execute(text("""
+        UPDATE public.shipments SET request_id = :request WHERE id = :shipment
+    """), {"request": requests[0].id, "shipment": shipment.id})
+    expected["conflicting_request_links"] += 1
+    assert asdict(await inspect_reconciliation(connection)) == expected
+
+
+@pytest.mark.asyncio
+async def test_e3_inventory_detects_inactive_shelf_with_existing_box(pg_session):
+    from datetime import date
+    from medarchive.adapters.postgresql.models import ArchiveShelf, Card
+    from medarchive.services.postgresql_archive_workflow import PostgreSQLArchiveWorkflow
+    from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+
+    branch, _, archive, _, _, archivist, _, _ = await seed_locations(pg_session)
+    connection = await pg_session.connection()
+    before = await inspect_reconciliation(connection)
+    card = Card(card_number=uuid4().hex, full_name="Synthetic patient",
+                date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+                current_location_id=archive.id, status="active")
+    shelf = ArchiveShelf(section_name="Synthetic", shelf_name=uuid4().hex)
+    pg_session.add_all([card, shelf])
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=archive.id, actor_id=archivist.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=archivist.id)
+    await PostgreSQLArchiveWorkflow(pg_session).place_box(
+        box_id=box.id, shelf_id=shelf.id, actor_id=archivist.id,
+    )
+    await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+    assert await inspect_reconciliation(connection) == before
+    # Legacy schema does not recheck existing placements on shelf deactivation.
+    await connection.execute(text("""
+        UPDATE public.archive_shelves SET is_active = false WHERE id = :shelf
+    """), {"shelf": shelf.id})
+    expected = asdict(before)
+    expected["conflicting_active_box_placements"] += 1
+    assert asdict(await inspect_reconciliation(connection)) == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("conflict", ["closed_cycle", "location_mismatch"])
+async def test_e3_inventory_detects_membership_conflict_before_deferred_rejection(pg_session, conflict):
+    from datetime import date
+    from sqlalchemy.exc import DBAPIError
+    from medarchive.adapters.postgresql.models import Card
+    from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+
+    branch, branch_loc, archive, _, branch_user, _, _, _ = await seed_locations(pg_session)
+    connection = await pg_session.connection()
+    before = await inspect_reconciliation(connection)
+    card = Card(card_number=uuid4().hex, full_name="Synthetic patient",
+                date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+                current_location_id=branch_loc.id, status="active")
+    pg_session.add(card)
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=branch_loc.id, actor_id=branch_user.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=branch_user.id)
+    assert await inspect_reconciliation(connection) == before
+    # Inspect the inconsistent intermediate state inside a savepoint, then
+    # demonstrate the existing deferred constraint rejects it. Never commit it.
+    with pytest.raises(DBAPIError) as error:
+        async with connection.begin_nested():
+            if conflict == "closed_cycle":
+                await connection.execute(text("""
+                    UPDATE public.box_cycles SET ended_at = now()
+                    WHERE box_id = :box AND ended_at IS NULL
+                """), {"box": box.id})
+            else:
+                await connection.execute(text("""
+                    UPDATE public.cards SET current_location_id = :archive WHERE id = :card
+                """), {"archive": archive.id, "card": card.id})
+            expected = asdict(before)
+            expected["conflicting_active_memberships"] += 1
+            assert asdict(await inspect_reconciliation(connection)) == expected
+            await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
+    assert error.value.orig.sqlstate == "23514"
+    assert await inspect_reconciliation(connection) == before
