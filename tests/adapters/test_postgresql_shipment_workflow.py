@@ -1351,7 +1351,9 @@ async def test_receipt_correction_storage_preserves_append_only_history(pg_sessi
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("scenario", ["valid", "foreign_box", "draft", "absent_event"])
+@pytest.mark.parametrize("scenario", [
+    "valid", "foreign_box", "draft", "absent_event", "missing_receipt", "wrong_receipt_actor",
+])
 async def test_resolve_receipt_correction_manifest(pg_session, scenario):
     """Resolve actual manifest rows; receipt vocabulary here is synthetic."""
     from datetime import date
@@ -1388,6 +1390,18 @@ async def test_resolve_receipt_correction_manifest(pg_session, scenario):
     )
     pg_session.add(original)
     await pg_session.flush()
+    await pg_session.refresh(original)
+    from sqlalchemy import update
+    from medarchive.adapters.postgresql.models import ShipmentBox
+    if scenario not in ("draft", "missing_receipt"):
+        await pg_session.execute(
+            update(ShipmentBox).where(
+                ShipmentBox.shipment_id == shipment_id, ShipmentBox.box_id == box.id,
+            ).values(
+                received_at=original.occurred_at,
+                received_by=branch_user.id if scenario == "wrong_receipt_actor" else archive_user.id,
+            )
+        )
     original_id = original.id
     if scenario == "absent_event":
         original_id = (await pg_session.scalar(select(func.max(DomainEvent.id)))) + 1000000
@@ -1450,6 +1464,14 @@ async def test_fixed_receipt_correction_catalog_on_incoming_routes(
     )
     pg_session.add(original)
     await pg_session.flush()
+    await pg_session.refresh(original)
+    from sqlalchemy import update
+    from medarchive.adapters.postgresql.models import ShipmentBox
+    await pg_session.execute(
+        update(ShipmentBox).where(
+            ShipmentBox.shipment_id == shipment.id, ShipmentBox.box_id == box.id,
+        ).values(received_at=original.occurred_at, received_by=archive_user.id)
+    )
     fact = ReceiptCorrectionPayload(shipment.id, box.id, original.id, "test_reason")
     options = dict(actor_id=archive_user.id, allowed_reason_codes=frozenset({"test_reason"}))
     before = await pg_session.scalar(select(func.count()).select_from(DomainEvent))

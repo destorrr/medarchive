@@ -254,10 +254,18 @@ class ShipmentBox(Base):
         ForeignKeyConstraint(["shipment_id"], ["shipments.id"], ondelete="RESTRICT"),
         ForeignKeyConstraint(["box_id"], ["boxes.id"], ondelete="RESTRICT"),
         UniqueConstraint("box_id", "shipment_id"),
+        CheckConstraint(
+            "(received_at IS NULL) = (received_by IS NULL)",
+            name="ck_shipment_boxes_receipt_pair",
+        ),
     )
 
     shipment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     box_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    received_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+    )
 
 
 class ShipmentCard(Base):

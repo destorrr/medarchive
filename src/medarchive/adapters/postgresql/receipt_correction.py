@@ -76,7 +76,7 @@ async def resolve_receipt_correction_event(
     source = aliased(Location)
     destination = aliased(Location)
     statement = (
-        select(ShipmentBox.box_id)
+        select(ShipmentBox.received_at, ShipmentBox.received_by)
         .join(Shipment, Shipment.id == ShipmentBox.shipment_id)
         .join(source, source.id == Shipment.from_location_id)
         .join(destination, destination.id == Shipment.to_location_id)
@@ -89,12 +89,13 @@ async def resolve_receipt_correction_event(
         )
     )
     with session.no_autoflush:
-        if await session.scalar(statement) is None:
+        receipt = (await session.execute(statement)).one_or_none()
+        if receipt is None:
             raise ValueError("No handed-over archive shipment manifest entry for this box")
         original = await session.get(DomainEvent, fact.original_event_id, populate_existing=True)
         if original is None:
             raise ValueError("Original receipt event not found")
-        return build_receipt_correction_event(
+        event = build_receipt_correction_event(
             fact,
             original,
             actor_id=actor_id,
@@ -103,6 +104,13 @@ async def resolve_receipt_correction_event(
             receipt_payload_version=receipt_payload_version,
             allowed_reason_codes=allowed_reason_codes,
         )
+        if receipt.received_at is None or receipt.received_by is None:
+            raise ValueError("Individual box receipt metadata is absent")
+        if receipt.received_by != original.actor_user_id:
+            raise ValueError("Individual box receipt actor does not match original event")
+        # Timestamp equality is not assumed until the producer contract is finalized.
+        # This pre-compensation check is not a general historical replay validator.
+        return event
 
 
 async def resolve_ordinary_box_receipt_correction(

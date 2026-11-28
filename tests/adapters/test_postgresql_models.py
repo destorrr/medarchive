@@ -117,3 +117,15 @@ def test_domain_event_correction_references_original_event():
     assert fk.target_fullname == "domain_events.id"
     assert fk.ondelete == "RESTRICT"
     assert table.c.id.primary_key is True
+
+
+def test_shipment_box_maps_individual_receipt_metadata():
+    table = Base.metadata.tables["shipment_boxes"]
+    assert table.c.received_at.nullable is True
+    assert table.c.received_at.type.timezone is True
+    assert table.c.received_by.nullable is True
+    fk, = table.c.received_by.foreign_keys
+    assert fk.target_fullname == "users.id"
+    assert fk.ondelete == "RESTRICT"
+    check = next(c for c in table.constraints if c.name == "ck_shipment_boxes_receipt_pair")
+    assert str(check.sqltext) == "(received_at IS NULL) = (received_by IS NULL)"
