@@ -28,3 +28,18 @@ Verified 21c1a41b349c6d8d3fe641b56d9fb90095126824: Foundation #1772 (46121328915
 ## E4 — additive installation of PostgreSQL validators
 
 Verified 2a900d73d20cd79ed09d7ed25cca1e61a6131ed1: Foundation #1773 (46121705204, job 140907442587), 689 passed, 53 skipped, 36 warnings; dedicated #159 (46121705203, job 140907442469), 19+25+35, both manifests, all 37 steps successful. Revision 0016_target_validators installs both previously tested functions with frozen SQL and explicit PUBLIC execute revoke. No trigger replacement, no constraint removal, no data mutation. Integration tests now exercise installed functions rather than creating test copies. Manifest predicate excludes non-reserving draft tombstones per approved parent composition rule. Actual target activation, lifecycle, pointer and correction guards remain open. CI pending. I02.3/4 blocker unchanged. Scope E2–E4 only.
+
+
+## Fixed E4 checklist (owner confirmed; no further subdivision)
+
+| ID | Task | Component status |
+|---|---|---|
+| E4.1 | Транспортная ответственность | CI verified |
+| E4.2 | Доменная модель манифестов и приёмки | CI verified |
+| E4.3 | Серверные ограничения манифестов | Installed validators verified at 0016; activation belongs to E4.4/E4.5 |
+| E4.4 | Связи, резервирование и приёмка на уровне БД | In progress |
+| E4.5 | Согласованная миграция и итоговые тесты | Pending |
+
+Three of five components verified; not an effort estimate or E4 acceptance. Migrations and commits are evidence, not new checklist items. E4.5 must integrate E3 data gate and prove coupled activation, including rollback/restore. No additional E4 tasks.
+
+Verified fc9db87c51e9bbf794b69c0f648bce86b7bb34d4: Foundation #1774 (46122092471, job 140908605567) 689 passed, 53 skipped, 36 warnings; Dedicated #160 (46122092475, job 140908605546) 19+25+35, both manifests, all 37 steps successful. E4.3 installed component verified. E4.4: revision 0017 adds actual history guard for request item identity, original addition facts, deletion and draft tombstones; six integration cases pending CI. Does not yet enforce target lifecycle or complete reservation/receipt constraints. No legacy guards weakened. E4.5 coupled activation remains required. I02.3/4 prior blocker unchanged. No actual retained-data access.
