@@ -282,3 +282,8 @@ All CI at 75b8bf3c78783fc706eedd38daf6f3cf933004a2 verified: Foundation #1768 (4
 ### I02/E3 components verified; E4.1 started
 
 All CI at d0f22fa49796f9311f6efbf4766523de42a2a2d4 verified: Foundation #1769 (46119972411, job 140902119748), 646 passed, 53 skipped, 36 warnings; dedicated #155 (46119972448, job 140902119749), 19+25+35, both manifests verified, all 37 steps successful. E3 software components complete within bounded scope; retained-data gate remains. Started E4 with pure target route and per-object responsibility rules per explicit 2026-11-27 owner confirmation in UX-08-06. Added 12 unit cases. No DDL, runtime wiring, production access or guard weakening. DB3 still open; I02.3/4 blocker unchanged. CI pending. Overall 2/12.
+
+
+## E4 — target manifest and receipt progress
+
+Verified 79b0fd1ef5968253caff05f8633d28097a6650d2: Foundation #1770 (46120382821, job 140903367453) 658 passed, 53 skipped, 36 warnings; dedicated #156 (46120382825, job 140903367369) 19+25+35, both manifests, all 37 steps successful. Added target manifest validation: ordinary final handover requires unique nonempty box-only set; P09 draft requires one parent and exact complete extracted card/item set, no duplicates or boxes. Per-object effective receipt progress separates none/partial/all without assuming ordinary discrepancy closure. 19 unit scenarios pending CI. Pure domain component, not DB enforcement; caller must verify fully processed parent and effective receipt facts under locks. No live schema change. I02 scope is E2–E4 only per UX-09-06A; E5–E7 are outside this package. Next coupled persistence constraints; DB3 and retained data gate still open.
