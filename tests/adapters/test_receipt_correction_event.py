@@ -91,3 +91,26 @@ def test_event_mapping_rejects_invalid_contract(options):
 def test_event_mapping_requires_uuid_actor():
     with pytest.raises(TypeError):
         build(original_receipt(), actor_id=None)
+
+
+@pytest.mark.asyncio
+async def test_ordinary_resolver_uses_server_owned_event_vocabulary(monkeypatch):
+    from unittest.mock import AsyncMock
+    from medarchive.adapters.postgresql import receipt_correction as adapter
+
+    resolver = AsyncMock(return_value=original_receipt())
+    monkeypatch.setattr(adapter, "resolve_receipt_correction_event", resolver)
+    session = object()
+    fact = ReceiptCorrectionPayload(SHIPMENT, BOX, 42, "test_reason")
+    catalog = frozenset({"test_reason"})
+    await adapter.resolve_ordinary_box_receipt_correction(
+        session, fact, actor_id=CORRECTOR, allowed_reason_codes=catalog,
+    )
+    resolver.assert_awaited_once_with(
+        session, fact,
+        actor_id=CORRECTOR,
+        receipt_event_type="shipment.box_received",
+        correction_event_type="shipment.box_receipt_corrected",
+        receipt_payload_version=1,
+        allowed_reason_codes=catalog,
+    )
