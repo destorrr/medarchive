@@ -1348,3 +1348,61 @@ async def test_receipt_correction_storage_preserves_append_only_history(pg_sessi
     assert original.payload == {"version": 1}
     assert correction.payload == {"version": 1, "reason_code": "test_reason"}
     assert correction.correction_of_event_id == original_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scenario", ["valid", "foreign_box", "draft", "absent_event"])
+async def test_resolve_receipt_correction_manifest(pg_session, scenario):
+    """Resolve actual manifest rows; receipt vocabulary here is synthetic."""
+    from datetime import date
+    from sqlalchemy import inspect
+    from medarchive.adapters.postgresql.receipt_correction import resolve_receipt_correction_event
+    from medarchive.domain.receipt_correction import ReceiptCorrectionPayload
+
+    branch, branch_loc, archive_loc, _, branch_user, archive_user, _, courier = (
+        await seed_locations(pg_session)
+    )
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Synthetic patient",
+        date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+        current_location_id=branch_loc.id, status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=branch_loc.id, actor_id=branch_user.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=branch_user.id)
+    shipment = await workflow.create_draft(
+        from_location_id=branch_loc.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=branch_user.id,
+    )
+    await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=branch_user.id)
+    if scenario != "draft":
+        await workflow.hand_over(shipment_id=shipment.id, actor_id=branch_user.id)
+    shipment_id = shipment.id
+    box_id = uuid.uuid4() if scenario == "foreign_box" else box.id
+    original = DomainEvent(
+        event_type="test.box_received", aggregate_type="shipment",
+        aggregate_id=shipment_id, actor_user_id=archive_user.id,
+        payload={"version": 1, "shipment_id": str(shipment_id), "box_id": str(box_id)},
+    )
+    pg_session.add(original)
+    await pg_session.flush()
+    original_id = original.id
+    if scenario == "absent_event":
+        original_id = (await pg_session.scalar(select(func.max(DomainEvent.id)))) + 1000000
+    fact = ReceiptCorrectionPayload(shipment_id, box_id, original_id, "test_reason")
+    options = dict(
+        actor_id=archive_user.id, receipt_event_type="test.box_received",
+        correction_event_type="test.box_receipt_corrected", receipt_payload_version=1,
+        allowed_reason_codes=frozenset({"test_reason"}),
+    )
+    before = await pg_session.scalar(select(func.count()).select_from(DomainEvent))
+    if scenario == "valid":
+        event = await resolve_receipt_correction_event(pg_session, fact, **options)
+        assert inspect(event).transient
+        assert event.correction_of_event_id == original_id
+    else:
+        with pytest.raises(ValueError):
+            await resolve_receipt_correction_event(pg_session, fact, **options)
+    assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == before
