@@ -4,6 +4,7 @@ This module does not authorize, persist or execute corrections. The eventual
 protected command must resolve the original receipt, validate scope and use
 the approved reason catalog before writing a DomainEvent.
 """
+from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -36,3 +37,39 @@ class ReceiptCorrectionPayload:
             "original_event_id": self.original_event_id,
             "reason_code": self.reason_code,
         }
+
+
+    def validate_original_receipt(
+        self,
+        *,
+        event_id: int,
+        event_type: str,
+        expected_receipt_type: str,
+        aggregate_type: str,
+        aggregate_id: UUID,
+        payload: Mapping[str, object],
+        expected_payload_version: int,
+    ) -> None:
+        """Validate a resolved per-box receipt fact, without changing any state.
+
+        The caller supplies the approved receipt type and schema version.
+        Legacy whole-shipment receipts are not per-box receipt evidence.
+        Authorization, manifest membership and persistence remain command duties.
+        """
+        if type(event_id) is not int or event_id != self.original_event_id:
+            raise ValueError("Original receipt event identifier does not match")
+        if not expected_receipt_type or event_type != expected_receipt_type:
+            raise ValueError("Original event is not the expected receipt type")
+        if aggregate_type != "shipment" or aggregate_id != self.shipment_id:
+            raise ValueError("Original receipt belongs to another aggregate")
+        if (
+            type(expected_payload_version) is not int
+            or expected_payload_version <= 0
+            or type(payload.get("version")) is not int
+            or payload["version"] != expected_payload_version
+        ):
+            raise ValueError("Unsupported original receipt payload version")
+        if payload.get("box_id") != str(self.box_id):
+            raise ValueError("Original receipt does not identify the requested box")
+        if payload.get("shipment_id") != str(self.shipment_id):
+            raise ValueError("Original receipt does not identify the requested shipment")
