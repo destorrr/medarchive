@@ -161,7 +161,10 @@ async def test_e3_inventory_detects_inconsistent_additive_item_link(pg_session):
 
 
 @pytest.mark.asyncio
-async def test_e3_inventory_detects_shared_legacy_fulfillment_and_conflicting_link(pg_session):
+@pytest.mark.parametrize("linked_before_handover", [False, True])
+async def test_e3_inventory_detects_shared_legacy_fulfillment_and_conflicting_link(
+    pg_session, linked_before_handover
+):
     from datetime import date
     from medarchive.adapters.postgresql.models import ArchiveRequest, Card
     from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
@@ -189,17 +192,30 @@ async def test_e3_inventory_detects_shared_legacy_fulfillment_and_conflicting_li
         await workflow.add_standalone_card(
             shipment_id=shipment.id, card_id=card.id, actor_id=archivist.id,
         )
+    if linked_before_handover:
+        await connection.execute(text("""
+            UPDATE public.shipments SET request_id = :request WHERE id = :shipment
+        """), {"request": requests[0].id, "shipment": shipment.id})
     await workflow.hand_over(shipment_id=shipment.id, actor_id=archivist.id)
     await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
     expected = asdict(before)
     expected["legacy_requests"] += 2
     expected["shared_legacy_fulfillments"] += 1
+    if linked_before_handover:
+        expected["conflicting_request_links"] += 1
     assert asdict(await inspect_reconciliation(connection)) == expected
-    # The new nullable parent link is not sufficient to resolve shared old requests.
-    await connection.execute(text("""
-        UPDATE public.shipments SET request_id = :request WHERE id = :shipment
-    """), {"request": requests[0].id, "shipment": shipment.id})
-    expected["conflicting_request_links"] += 1
+    if linked_before_handover:
+        return
+    # Newly written late links must be rejected. The historical conflict
+    # inventory is exercised by establishing the link before handover below
+    # in the parametrized variant of this fixture.
+    from sqlalchemy.exc import DBAPIError
+    with pytest.raises(DBAPIError) as error:
+        async with connection.begin_nested():
+            await connection.execute(text("""
+                UPDATE public.shipments SET request_id = :request WHERE id = :shipment
+            """), {"request": requests[0].id, "shipment": shipment.id})
+    assert error.value.orig.sqlstate == "23514"
     assert asdict(await inspect_reconciliation(connection)) == expected
 
 
