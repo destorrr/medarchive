@@ -1482,3 +1482,67 @@ async def test_fixed_receipt_correction_catalog_on_incoming_routes(
     with pytest.raises(ValueError, match=expected):
         await resolve_ordinary_box_receipt_correction(pg_session, fact, **options)
     assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == before
+
+
+@pytest.mark.asyncio
+async def test_receipt_correction_storage_roundtrip_multiple_receipt_facts(pg_session):
+    """E2 history capacity only; synthetic facts, not a receipt transition."""
+    from medarchive.adapters.postgresql.receipt_correction import (
+        build_receipt_correction_event, read_ordinary_box_receipt_correction,
+    )
+    from medarchive.domain.receipt_correction import ReceiptCorrectionPayload
+
+    _, _, _, _, _, archive_user, _, _ = await seed_locations(pg_session)
+    shipment_id, box_id = uuid.uuid4(), uuid.uuid4()
+    actor_id = archive_user.id
+
+    async def add_receipt():
+        event = DomainEvent(
+            event_type="shipment.box_received", aggregate_type="shipment",
+            aggregate_id=shipment_id, actor_user_id=actor_id,
+            payload={"version": 1, "shipment_id": str(shipment_id), "box_id": str(box_id)},
+        )
+        pg_session.add(event)
+        await pg_session.flush()
+        await pg_session.refresh(event)
+        return event
+
+    async def add_correction(original):
+        fact = ReceiptCorrectionPayload(shipment_id, box_id, original.id, "test_reason")
+        event = build_receipt_correction_event(
+            fact, original, actor_id=actor_id,
+            receipt_event_type="shipment.box_received",
+            correction_event_type="shipment.box_receipt_corrected",
+            receipt_payload_version=1, allowed_reason_codes=frozenset({"test_reason"}),
+        )
+        pg_session.add(event)
+        await pg_session.flush()
+        await pg_session.refresh(event)
+        return event
+
+    first = await add_receipt()
+    corrected_first = await add_correction(first)
+    second = await add_receipt()
+    corrected_second = await add_correction(second)
+    ids = [event.id for event in (first, corrected_first, second, corrected_second)]
+    assert ids == sorted(set(ids))
+    snapshots = [(event.id, event.occurred_at, event.actor_user_id, event.payload.copy())
+                 for event in (first, corrected_first, second, corrected_second)]
+    pg_session.expunge_all()
+    rows = (await pg_session.scalars(
+        select(DomainEvent).where(
+            DomainEvent.aggregate_type == "shipment",
+            DomainEvent.aggregate_id == shipment_id,
+        ).order_by(DomainEvent.id)
+    )).all()
+    assert [(row.id, row.occurred_at, row.actor_user_id, row.payload) for row in rows] == snapshots
+    assert read_ordinary_box_receipt_correction(rows[1], rows[0]) == ReceiptCorrectionPayload(
+        shipment_id, box_id, ids[0], "test_reason",
+    )
+    assert read_ordinary_box_receipt_correction(rows[3], rows[2]) == ReceiptCorrectionPayload(
+        shipment_id, box_id, ids[2], "test_reason",
+    )
+    with pytest.raises(ValueError, match="references"):
+        read_ordinary_box_receipt_correction(rows[3], rows[0])
+    assert rows[0].correction_of_event_id is None
+    assert rows[2].correction_of_event_id is None
