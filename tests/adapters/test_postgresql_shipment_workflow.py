@@ -1231,3 +1231,52 @@ async def test_handover_rechecks_legacy_standalone_card_placement_without_mutati
     assert card.current_shipment_id is None
     assert placement is not None and placement.shelf_id == shelf.id
     assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == event_count
+
+
+@pytest.mark.asyncio
+async def test_receipt_correction_event_storage_preserves_original_fact(pg_session):
+    """Synthetic facts in the existing rollback-only Foundation fixture."""
+    from medarchive.adapters.postgresql.receipt_correction import build_receipt_correction_event
+    from medarchive.domain.receipt_correction import ReceiptCorrectionPayload
+
+    _, _, _, _, _, archive_user, _, _ = await seed_locations(pg_session)
+    shipment_id, box_id = uuid.uuid4(), uuid.uuid4()
+    original = DomainEvent(
+        event_type="test.box_received",
+        aggregate_type="shipment",
+        aggregate_id=shipment_id,
+        actor_user_id=archive_user.id,
+        payload={"version": 1, "shipment_id": str(shipment_id), "box_id": str(box_id)},
+    )
+    pg_session.add(original)
+    await pg_session.flush()
+    await pg_session.refresh(original)
+    original_id = original.id
+    original_time = original.occurred_at
+    original_payload = original.payload.copy()
+    correction = build_receipt_correction_event(
+        ReceiptCorrectionPayload(shipment_id, box_id, original_id, "test_reason"),
+        original,
+        actor_id=archive_user.id,
+        receipt_event_type="test.box_received",
+        correction_event_type="test.box_receipt_corrected",
+        receipt_payload_version=1,
+        allowed_reason_codes=frozenset({"test_reason"}),
+    )
+    pg_session.add(correction)
+    await pg_session.flush()
+    await pg_session.refresh(correction)
+    await pg_session.refresh(original)
+    assert correction.id != original_id
+    assert correction.correction_of_event_id == original_id
+    assert correction.occurred_at is not None
+    assert correction.payload["reason_code"] == "test_reason"
+    assert original.payload == original_payload
+    assert original.occurred_at == original_time
+    assert original.correction_of_event_id is None
+    assert original.actor_user_id == archive_user.id
+    assert await pg_session.scalar(
+        select(func.count()).select_from(DomainEvent).where(
+            DomainEvent.aggregate_id == shipment_id
+        )
+    ) == 2
