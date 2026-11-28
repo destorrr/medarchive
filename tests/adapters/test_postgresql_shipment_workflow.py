@@ -1280,3 +1280,71 @@ async def test_receipt_correction_event_storage_preserves_original_fact(pg_sessi
             DomainEvent.aggregate_id == shipment_id
         )
     ) == 2
+
+
+@pytest.mark.asyncio
+async def test_receipt_correction_storage_requires_existing_original(pg_session):
+    """The existing foreign key rejects references to absent historical facts."""
+    from sqlalchemy.exc import IntegrityError
+
+    _, _, _, _, _, archive_user, _, _ = await seed_locations(pg_session)
+    absent_id = (await pg_session.scalar(select(func.coalesce(func.max(DomainEvent.id), 0)))) + 1000000
+    with pytest.raises(IntegrityError) as error:
+        async with pg_session.begin_nested():
+            pg_session.add(DomainEvent(
+                event_type="test.box_receipt_corrected",
+                aggregate_type="shipment",
+                aggregate_id=uuid.uuid4(),
+                actor_user_id=archive_user.id,
+                correction_of_event_id=absent_id,
+                payload={"version": 1},
+            ))
+            await pg_session.flush()
+    assert error.value.orig.sqlstate == "23503"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["update", "delete"])
+async def test_receipt_correction_storage_preserves_append_only_history(pg_session, operation):
+    """Existing database guard protects original and correction facts alike."""
+    from sqlalchemy import delete, update
+
+    _, _, _, _, _, archive_user, _, _ = await seed_locations(pg_session)
+    original = DomainEvent(
+        event_type="test.box_received",
+        aggregate_type="shipment",
+        aggregate_id=uuid.uuid4(),
+        actor_user_id=archive_user.id,
+        payload={"version": 1},
+    )
+    pg_session.add(original)
+    await pg_session.flush()
+    original_id = original.id
+    correction = DomainEvent(
+        event_type="test.box_receipt_corrected",
+        aggregate_type="shipment",
+        aggregate_id=original.aggregate_id,
+        actor_user_id=archive_user.id,
+        correction_of_event_id=original_id,
+        payload={"version": 1, "reason_code": "test_reason"},
+    )
+    pg_session.add(correction)
+    await pg_session.flush()
+    correction_id = correction.id
+    for event_id in (original_id, correction_id):
+        statement = (
+            update(DomainEvent).where(DomainEvent.id == event_id).values(payload={})
+            if operation == "update"
+            else delete(DomainEvent).where(DomainEvent.id == event_id)
+        )
+        with pytest.raises(DBAPIError):
+            async with pg_session.begin_nested():
+                await pg_session.execute(statement)
+        assert await pg_session.scalar(
+            select(func.count()).select_from(DomainEvent).where(DomainEvent.id == event_id)
+        ) == 1
+    await pg_session.refresh(original)
+    await pg_session.refresh(correction)
+    assert original.payload == {"version": 1}
+    assert correction.payload == {"version": 1, "reason_code": "test_reason"}
+    assert correction.correction_of_event_id == original_id
