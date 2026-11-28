@@ -98,3 +98,39 @@ async def inspect_reconciliation(connection: AsyncConnection) -> ReconciliationI
     """Inspect only; no transaction ownership, autoflush, commits or writes."""
     row = (await connection.execute(_INVENTORY)).mappings().one()
     return ReconciliationInventory(**row)
+
+
+@dataclass(frozen=True, slots=True)
+class CutoverReview:
+    """Conservative E3 gate; not authorization to execute E4."""
+
+    blockers: tuple[tuple[str, int], ...]
+
+    @property
+    def clear(self) -> bool:
+        return not self.blockers
+
+
+async def inspect_cutover_review(connection: AsyncConnection) -> CutoverReview:
+    """Require disposition of all unresolved E3 inventory before cutover.
+
+    Caller must use a stable maintenance snapshot with legacy writers stopped.
+    No repairs, deletion, role conversion or implicit historical approval.
+    This is an E3 data check, not proof of E4 schema or deployment readiness.
+    """
+    from medarchive.adapters.postgresql.request_reconciliation import (
+        plan_pending_request_mappings,
+    )
+
+    inventory = await inspect_reconciliation(connection)
+    plan = await plan_pending_request_mappings(connection)
+    blockers = [
+        (name, getattr(inventory, name))
+        for name in inventory.__dataclass_fields__
+        if getattr(inventory, name)
+    ]
+    if plan.review_count:
+        blockers.append(("unresolved_request_mappings", plan.review_count))
+    if plan.candidates:
+        blockers.append(("pending_request_backfill", len(plan.candidates)))
+    return CutoverReview(tuple(blockers))

@@ -275,3 +275,60 @@ async def test_e3_inventory_detects_membership_conflict_before_deferred_rejectio
             await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
     assert error.value.orig.sqlstate == "23514"
     assert await inspect_reconciliation(connection) == before
+
+
+@pytest.mark.asyncio
+async def test_cutover_review_clean_and_legacy_directory_conflict(pg_session):
+    from medarchive.adapters.postgresql.reconciliation import inspect_cutover_review
+
+    connection = await pg_session.connection()
+    before = await inspect_cutover_review(connection)
+    assert before.clear
+    marker = uuid4().hex
+    await connection.execute(text("""
+        INSERT INTO public.users (username, full_name, password_hash, role)
+        VALUES (:name, 'Synthetic viewer', 'test-only', 'viewer')
+    """), {"name": marker})
+    await connection.execute(text("""
+        INSERT INTO public.couriers (full_name)
+        VALUES (:first), (:second)
+    """), {"first": marker + " Test", "second": marker.upper() + " TEST"})
+    review = await inspect_cutover_review(connection)
+    assert not review.clear
+    assert dict(review.blockers) == {"viewer_accounts": 1, "courier_duplicate_groups": 1}
+    assert review == await inspect_cutover_review(connection)
+
+
+@pytest.mark.asyncio
+async def test_cutover_review_requires_pending_backfill_and_detects_item_conflict(pg_session):
+    from datetime import date
+    from medarchive.adapters.postgresql.models import ArchiveRequest, Card
+    from medarchive.adapters.postgresql.reconciliation import inspect_cutover_review
+    from medarchive.adapters.postgresql.request_reconciliation import backfill_pending_request_items
+    from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
+
+    branch, _, archive, _, _, archivist, central_user, _ = await seed_locations(pg_session)
+    connection = await pg_session.connection()
+    assert (await inspect_cutover_review(connection)).clear
+    card = Card(card_number=uuid4().hex, full_name="Synthetic patient",
+                date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+                current_location_id=archive.id, status="active")
+    pg_session.add(card)
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=archive.id, actor_id=archivist.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=archivist.id)
+    request = ArchiveRequest(card_id=card.id, requested_by=central_user.id, status="new")
+    pg_session.add(request)
+    await pg_session.flush()
+    review = await inspect_cutover_review(connection)
+    assert dict(review.blockers) == {"legacy_requests": 1, "pending_request_backfill": 1}
+    assert await backfill_pending_request_items(connection) == 1
+    assert (await inspect_cutover_review(connection)).clear
+    await connection.execute(text("""
+        UPDATE public.archive_request_items SET reservation_active = false
+        WHERE request_id = :request
+    """), {"request": request.id})
+    review = await inspect_cutover_review(connection)
+    assert not review.clear
+    assert dict(review.blockers) == {"unresolved_request_mappings": 1}
