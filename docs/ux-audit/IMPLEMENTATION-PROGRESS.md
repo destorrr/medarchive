@@ -237,3 +237,8 @@ Verified every CI run at a636e37bad30893de13cbff0c588eb8ef1860b47: Foundation #1
 ### I02/E3.1 — initial read-only reconciliation implementation
 
 Verified all CI at b8b4ac74a806c84ccf5ed0cc0b07986bc415541d: Foundation #1760 (46111259900, job 140875083776), 614 passed, 53 skipped, 36 warnings; dedicated #146 (46111259901, job 140875084097), 19+25+35 passed, both manifests, all steps successful. I02.5 historical storage accepted. Owner authorized E3 then E4. Added count-only PostgreSQL inventory adapter and three rollback-only Foundation tests for stable counts, viewer/courier duplicates, unmapped request/individual placement. See I02-E3-RECONCILIATION.md. No migration, writes to retained data, production access, frontend changes or guard bypass. CI pending. E3.1 partial, E3/E4 not accepted; I02.3/4 blocked. Overall 2/12.
+
+
+### I02/E3.1 — inventory integration coverage expanded
+
+All CI for 7a92ee0be9ac74616006427390415bfb76688c65 verified: Foundation #1761 (46112178861, job 140877933964) 617 passed, 53 skipped, 36 warnings; dedicated #147 (46112178835, job 140877933981) 19+25+35 passed, both manifests, all steps successful including backup/restore. Added five parametrized PostgreSQL cases for four legacy incoming/excluded route combinations and mismatched additive item link; corrected diagnostic courier whitespace normalization and exercised tabs/newlines. CI pending. No guard bypass, no retained data access or production changes. E3.1 partial; I02.3/4 blocker unchanged; no package acceptance claimed.

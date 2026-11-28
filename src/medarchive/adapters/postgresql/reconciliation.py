@@ -42,7 +42,7 @@ SELECT
     (SELECT count(*) FROM public.users WHERE role = 'viewer')
         AS viewer_accounts,
     (SELECT count(*) FROM (
-        SELECT lower(regexp_replace(btrim(full_name), '[[:space:]]+', ' ', 'g'))
+        SELECT lower(btrim(regexp_replace(full_name, '[[:space:]]+', ' ', 'g')))
         FROM public.couriers
         GROUP BY 1 HAVING count(*) > 1
     ) duplicates) AS courier_duplicate_groups,
