@@ -1352,12 +1352,11 @@ async def test_receipt_correction_storage_preserves_append_only_history(pg_sessi
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("scenario", [
-    "valid", "foreign_box", "draft", "absent_event", "missing_receipt", "wrong_receipt_actor",
+    "missing_receipt", "foreign_box", "draft", "absent_event", "guarded_receipt_write",
 ])
 async def test_resolve_receipt_correction_manifest(pg_session, scenario):
-    """Resolve actual manifest rows; receipt vocabulary here is synthetic."""
+    """Check actual manifest and retained E2 guards; receipt vocabulary is synthetic."""
     from datetime import date
-    from sqlalchemy import inspect
     from medarchive.adapters.postgresql.receipt_correction import resolve_receipt_correction_event
     from medarchive.domain.receipt_correction import ReceiptCorrectionPayload
 
@@ -1393,15 +1392,17 @@ async def test_resolve_receipt_correction_manifest(pg_session, scenario):
     await pg_session.refresh(original)
     from sqlalchemy import update
     from medarchive.adapters.postgresql.models import ShipmentBox
-    if scenario not in ("draft", "missing_receipt"):
-        await pg_session.execute(
-            update(ShipmentBox).where(
-                ShipmentBox.shipment_id == shipment_id, ShipmentBox.box_id == box.id,
-            ).values(
-                received_at=original.occurred_at,
-                received_by=branch_user.id if scenario == "wrong_receipt_actor" else archive_user.id,
-            )
-        )
+    if scenario == "guarded_receipt_write":
+        # E2 deliberately retains the legacy draft-only manifest guard.
+        # Real post-handover receipt writes require the coupled E4 transition.
+        with pytest.raises(DBAPIError) as error:
+            async with pg_session.begin_nested():
+                await pg_session.execute(
+                    update(ShipmentBox).where(
+                        ShipmentBox.shipment_id == shipment_id, ShipmentBox.box_id == box.id,
+                    ).values(received_at=original.occurred_at, received_by=archive_user.id)
+                )
+        assert error.value.orig.sqlstate == "23514"
     original_id = original.id
     if scenario == "absent_event":
         original_id = (await pg_session.scalar(select(func.max(DomainEvent.id)))) + 1000000
@@ -1412,13 +1413,21 @@ async def test_resolve_receipt_correction_manifest(pg_session, scenario):
         allowed_reason_codes=frozenset({"test_reason"}),
     )
     before = await pg_session.scalar(select(func.count()).select_from(DomainEvent))
-    if scenario == "valid":
-        event = await resolve_receipt_correction_event(pg_session, fact, **options)
-        assert inspect(event).transient
-        assert event.correction_of_event_id == original_id
-    else:
-        with pytest.raises(ValueError):
-            await resolve_receipt_correction_event(pg_session, fact, **options)
+    expected = {
+        "missing_receipt": "metadata is absent",
+        "guarded_receipt_write": "metadata is absent",
+        "foreign_box": "No handed-over",
+        "draft": "No handed-over",
+        "absent_event": "Original receipt event not found",
+    }
+    with pytest.raises(ValueError, match=expected[scenario]):
+        await resolve_receipt_correction_event(pg_session, fact, **options)
+    stored = (await pg_session.execute(select(
+        ShipmentBox.received_at, ShipmentBox.received_by,
+    ).where(
+        ShipmentBox.shipment_id == shipment_id, ShipmentBox.box_id == box.id,
+    ))).one()
+    assert tuple(stored) == (None, None)
     assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == before
 
 
@@ -1428,9 +1437,8 @@ async def test_resolve_receipt_correction_manifest(pg_session, scenario):
 async def test_fixed_receipt_correction_catalog_on_incoming_routes(
     pg_session, source_kind, original_type,
 ):
-    """Real manifest and fixed event vocabulary; original fact is synthetic."""
+    """Both incoming routes reject missing receipt facts under the E2 schema."""
     from datetime import date
-    from sqlalchemy import inspect
     from medarchive.adapters.postgresql.receipt_correction import (
         resolve_ordinary_box_receipt_correction,
     )
@@ -1464,24 +1472,13 @@ async def test_fixed_receipt_correction_catalog_on_incoming_routes(
     )
     pg_session.add(original)
     await pg_session.flush()
-    await pg_session.refresh(original)
-    from sqlalchemy import update
-    from medarchive.adapters.postgresql.models import ShipmentBox
-    await pg_session.execute(
-        update(ShipmentBox).where(
-            ShipmentBox.shipment_id == shipment.id, ShipmentBox.box_id == box.id,
-        ).values(received_at=original.occurred_at, received_by=archive_user.id)
-    )
     fact = ReceiptCorrectionPayload(shipment.id, box.id, original.id, "test_reason")
     options = dict(actor_id=archive_user.id, allowed_reason_codes=frozenset({"test_reason"}))
     before = await pg_session.scalar(select(func.count()).select_from(DomainEvent))
-    if original_type == "shipment.box_received":
-        event = await resolve_ordinary_box_receipt_correction(pg_session, fact, **options)
-        assert inspect(event).transient
-        assert event.event_type == "shipment.box_receipt_corrected"
-        assert event.correction_of_event_id == original.id
-        assert event.payload["version"] == 1
-    else:
-        with pytest.raises(ValueError, match="expected receipt type"):
-            await resolve_ordinary_box_receipt_correction(pg_session, fact, **options)
+    expected = (
+        "metadata is absent" if original_type == "shipment.box_received"
+        else "expected receipt type"
+    )
+    with pytest.raises(ValueError, match=expected):
+        await resolve_ordinary_box_receipt_correction(pg_session, fact, **options)
     assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == before

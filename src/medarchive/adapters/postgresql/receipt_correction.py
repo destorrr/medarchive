@@ -1,4 +1,5 @@
 """Build an unpersisted correction event for the future protected command."""
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -57,6 +58,17 @@ def build_receipt_correction_event(
     )
 
 
+def validate_box_receipt_metadata(
+    received_at: datetime | None, received_by: UUID | None, original: DomainEvent,
+) -> None:
+    """Validate current receipt projection before any compensation."""
+    if received_at is None or received_by is None:
+        raise ValueError("Individual box receipt metadata is absent")
+    if received_by != original.actor_user_id:
+        raise ValueError("Individual box receipt actor does not match original event")
+    # Timestamp equality awaits the individual receipt producer contract.
+
+
 async def resolve_receipt_correction_event(
     session: AsyncSession,
     fact: ReceiptCorrectionPayload,
@@ -104,11 +116,7 @@ async def resolve_receipt_correction_event(
             receipt_payload_version=receipt_payload_version,
             allowed_reason_codes=allowed_reason_codes,
         )
-        if receipt.received_at is None or receipt.received_by is None:
-            raise ValueError("Individual box receipt metadata is absent")
-        if receipt.received_by != original.actor_user_id:
-            raise ValueError("Individual box receipt actor does not match original event")
-        # Timestamp equality is not assumed until the producer contract is finalized.
+        validate_box_receipt_metadata(receipt.received_at, receipt.received_by, original)
         # This pre-compensation check is not a general historical replay validator.
         return event
 

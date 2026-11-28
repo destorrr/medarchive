@@ -114,3 +114,22 @@ async def test_ordinary_resolver_uses_server_owned_event_vocabulary(monkeypatch)
         receipt_payload_version=1,
         allowed_reason_codes=catalog,
     )
+
+
+@pytest.mark.parametrize("scenario", ["valid", "missing_time", "missing_actor", "wrong_actor"])
+def test_box_receipt_metadata_contract(scenario):
+    from medarchive.adapters.postgresql.receipt_correction import validate_box_receipt_metadata
+
+    original = original_receipt()
+    received_at = None if scenario == "missing_time" else original.occurred_at
+    received_by = None if scenario == "missing_actor" else ACTOR
+    if scenario == "wrong_actor":
+        received_by = CORRECTOR
+    if scenario == "valid":
+        validate_box_receipt_metadata(received_at, received_by, original)
+    else:
+        expected = "does not match" if scenario == "wrong_actor" else "metadata is absent"
+        with pytest.raises(ValueError, match=expected):
+            validate_box_receipt_metadata(received_at, received_by, original)
+    assert original.actor_user_id == ACTOR
+    assert original.correction_of_event_id is None
