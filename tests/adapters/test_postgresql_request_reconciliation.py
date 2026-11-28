@@ -130,3 +130,83 @@ async def test_historical_fulfillment_inventory(pg_session, scenario):
     statuses[request.status] = statuses.get(request.status, 0) + 1
     assert dict(after.review_by_status) == statuses
     assert after.candidates == plan_before.candidates
+
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scenario", ["success", "unresolved", "rollback", "insert_failure"])
+async def test_pending_backfill_atomicity(pg_session, scenario):
+    from sqlalchemy.exc import IntegrityError
+    from medarchive.adapters.postgresql.request_reconciliation import (
+        UnresolvedRequestMappings, backfill_pending_request_items,
+    )
+
+    branch, _, archive, _, _, archivist, central_user, _ = await seed_locations(pg_session)
+    connection = await pg_session.connection()
+    initial = await plan_pending_request_mappings(connection)
+    assert not initial.candidates and initial.review_count == 0
+    assert await backfill_pending_request_items(connection) == 0
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    requests = []
+    for index in range(2):
+        card = Card(card_number=uuid4().hex, full_name="Synthetic patient",
+                    date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+                    current_location_id=archive.id, status="active")
+        pg_session.add(card)
+        await pg_session.flush()
+        if not (scenario == "unresolved" and index == 1):
+            box = await workflow.create_box(location_id=archive.id, actor_id=archivist.id)
+            await workflow.add_card_to_box(
+                box_id=box.id, card_id=card.id, actor_id=archivist.id,
+            )
+        request = ArchiveRequest(card_id=card.id, requested_by=central_user.id, status="new")
+        pg_session.add(request)
+        await pg_session.flush()
+        requests.append(request)
+    plan = await plan_pending_request_mappings(connection)
+    assert len(plan.candidates) == (1 if scenario == "unresolved" else 2)
+    if scenario == "insert_failure":
+        # Occupy the second deterministic UUID using a non-reserving historical
+        # row on a separate parent. The planner must refuse the conflict or the
+        # unique constraint must abort all attempted inserts.
+        other_card = Card(card_number=uuid4().hex, full_name="Synthetic patient",
+                          date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+                          current_location_id=archive.id, status="active")
+        pg_session.add(other_card)
+        await pg_session.flush()
+        other = ArchiveRequest(card_id=other_card.id, requested_by=central_user.id, status="new")
+        pg_session.add(other)
+        await pg_session.flush()
+        await connection.execute(text("""
+            INSERT INTO public.archive_request_items
+                (id, request_id, card_id, status, reservation_active, added_at, added_by)
+            VALUES (:id, :request, :card, 'cancelled', false, now(), :actor)
+        """), {"id": plan.candidates[-1].item_id, "request": other.id,
+               "card": other_card.id, "actor": central_user.id})
+    async def count_items():
+        return (await connection.execute(text("""
+            SELECT count(*) FROM public.archive_request_items
+            WHERE request_id IN (:first, :second)
+        """), {"first": requests[0].id, "second": requests[1].id})).scalar_one()
+    if scenario in {"unresolved", "insert_failure"}:
+        with pytest.raises((UnresolvedRequestMappings, IntegrityError)):
+            await backfill_pending_request_items(connection)
+        assert await count_items() == 0
+    elif scenario == "rollback":
+        savepoint = await connection.begin_nested()
+        assert await backfill_pending_request_items(connection) == 2
+        assert await count_items() == 2
+        await savepoint.rollback()
+        assert await count_items() == 0
+    else:
+        assert await backfill_pending_request_items(connection) == 2
+        assert await count_items() == 2
+        assert await backfill_pending_request_items(connection) == 0
+        assert await count_items() == 2
+        after = await plan_pending_request_mappings(connection)
+        assert not after.candidates and after.review_count == 0
+        assert after.matching_item_count == initial.matching_item_count + 2
+    assert (await connection.execute(text("""
+        SELECT count(*) FROM public.archive_requests
+        WHERE id IN (:first, :second) AND status = 'new'
+    """), {"first": requests[0].id, "second": requests[1].id})).scalar_one() == 2

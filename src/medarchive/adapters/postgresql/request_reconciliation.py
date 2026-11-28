@@ -1,9 +1,9 @@
-"""E3.2 conservative legacy request mapping plan; no workflow writes.
+"""E3.2 conservative legacy request mapping and additive backfill.
 
 Only an unprocessed request for a currently boxed archive card can be
 automatically proposed as submitted/pending with known creation provenance.
 Other states remain explicit review cases until their historical evidence and
-target constraints are reconciled. This is not a migration or command.
+target constraints are reconciled. The backfill is maintenance-only and is not a runtime workflow command.
 """
 from dataclasses import dataclass
 from datetime import datetime
@@ -217,3 +217,53 @@ async def inspect_historical_fulfillments(
     """
     row = (await connection.execute(_HISTORICAL_QUERY)).mappings().one()
     return HistoricalFulfillmentInventory(**row)
+
+
+
+class UnresolvedRequestMappings(RuntimeError):
+    """The maintenance backfill cannot safely proceed."""
+
+
+_INSERT_PENDING = text("""
+INSERT INTO public.archive_request_items
+    (id, request_id, card_id, status, reservation_active, added_at, added_by)
+VALUES (:item_id, :parent_id, :card_id, 'pending', true, :added_at, :added_by)
+""")
+
+
+async def backfill_pending_request_items(connection: AsyncConnection) -> int:
+    """Apply the supported subset atomically, or refuse all unresolved rows.
+
+    Maintenance-only: caller must stop legacy writers, verify backup and own
+    the enclosing PostgreSQL transaction. This function never commits it.
+    Lock every relation read by the planner against concurrent DML before
+    planning. A savepoint rolls back all inserts on any failure. The legacy
+    parent status and historical facts remain unchanged until E4.
+    """
+    if not connection.in_transaction():
+        raise RuntimeError("Request backfill requires an explicit transaction")
+    async with connection.begin_nested():
+        await connection.execute(text("""
+            LOCK TABLE public.archive_request_items, public.archive_requests,
+                public.box_card_memberships, public.box_cycles, public.boxes,
+                public.card_placements, public.cards, public.locations,
+                public.shipment_cards, public.shipments, public.users
+            IN SHARE ROW EXCLUSIVE MODE
+        """))
+        plan = await plan_pending_request_mappings(connection)
+        if plan.review_count:
+            raise UnresolvedRequestMappings(
+                f"Unresolved legacy request mappings: {plan.review_count}"
+            )
+        for item in plan.candidates:
+            await connection.execute(_INSERT_PENDING, {
+                "item_id": item.item_id, "parent_id": item.parent_id,
+                "card_id": item.card_id, "added_at": item.added_at,
+                "added_by": item.added_by,
+            })
+        verified = await plan_pending_request_mappings(connection)
+        if (verified.review_count or verified.candidates
+                or verified.matching_item_count !=
+                plan.matching_item_count + len(plan.candidates)):
+            raise UnresolvedRequestMappings("Request backfill verification failed")
+        return len(plan.candidates)

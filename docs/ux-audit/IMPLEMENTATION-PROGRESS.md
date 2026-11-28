@@ -267,3 +267,8 @@ All CI at cfba102fe2e6a090a5f883b319a1e72aa9187eb2 verified: Foundation #1765 (4
 ### I02/E3.2 — historical evidence classification
 
 All CI at 6649366cd566215eccb94c3799f7490ac5b08948 verified: Foundation #1766 (46118735268, job 140898287661) 635 passed, 53 skipped, 36 warnings; dedicated #152 (46118735564, job 140898288222) 19+25+35, both manifests, all 37 steps successful. Implemented historical fulfillment evidence counts and per-status review counts; added five synthetic PostgreSQL cases. No inferred receipt times or reason codes; no historical writes or migration. CI pending. I02.3/4 blocker unchanged, overall 2/12.
+
+
+### I02/E3.2 — bounded additive backfill implementation
+
+All CI at 8fa906f6d6033aafd8f9d8730baf1dbc5fdac5a2 verified: Foundation #1767 (46119135036, job 140899552116) 640 passed, 53 skipped, 36 warnings; dedicated #153 (46119135044, job 140899552215) 19+25+35, both manifests verified, all 37 steps successful. Implemented atomic maintenance-only pending child backfill, conflict refusal, repeat no-op and outer rollback tests. Limit further E3 depth to migration safety requirements; no general historical repair engine. New CI pending. No actual retained database access, no migration activation, no guard bypass. Overall 2/12, E3.1 accepted, E3.2 candidate pending CI, I02.3/4 blocker unchanged.
