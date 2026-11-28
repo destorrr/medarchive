@@ -133,3 +133,69 @@ def test_box_receipt_metadata_contract(scenario):
             validate_box_receipt_metadata(received_at, received_by, original)
     assert original.actor_user_id == ACTOR
     assert original.correction_of_event_id is None
+
+
+def stored_correction_pair():
+    original = original_receipt()
+    original.event_type = "shipment.box_received"
+    correction = build(
+        original, receipt_event_type="shipment.box_received",
+        correction_event_type="shipment.box_receipt_corrected",
+    )
+    correction.id = 43
+    correction.occurred_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    return correction, original
+
+
+def test_read_stored_correction_preserves_historical_fact():
+    from medarchive.adapters.postgresql.receipt_correction import read_ordinary_box_receipt_correction
+
+    correction, original = stored_correction_pair()
+    before = correction.payload.copy(), original.payload.copy()
+    assert read_ordinary_box_receipt_correction(correction, original) == ReceiptCorrectionPayload(
+        SHIPMENT, BOX, 42, "test_reason",
+    )
+    assert (correction.payload, original.payload) == before
+
+
+@pytest.mark.parametrize("field,value", [
+    ("id", None), ("id", 42), ("event_type", "shipment.received"),
+    ("correction_of_event_id", 41), ("actor_user_id", None),
+    ("occurred_at", None), ("aggregate_type", "card"), ("aggregate_id", BOX),
+    ("payload", []),
+])
+def test_read_stored_correction_rejects_invalid_envelope(field, value):
+    from medarchive.adapters.postgresql.receipt_correction import read_ordinary_box_receipt_correction
+
+    correction, original = stored_correction_pair()
+    setattr(correction, field, value)
+    with pytest.raises(ValueError):
+        read_ordinary_box_receipt_correction(correction, original)
+
+
+@pytest.mark.parametrize("key,value", [
+    ("version", True), ("version", 2), ("original_event_id", 41),
+    ("original_event_id", "42"), ("box_id", str(SHIPMENT)),
+    ("shipment_id", str(BOX)), ("box_id", None), ("reason_code", ""),
+    ("unexpected", "value"),
+])
+def test_read_stored_correction_rejects_invalid_payload(key, value):
+    from medarchive.adapters.postgresql.receipt_correction import read_ordinary_box_receipt_correction
+
+    correction, original = stored_correction_pair()
+    correction.payload[key] = value
+    with pytest.raises(ValueError):
+        read_ordinary_box_receipt_correction(correction, original)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("event_type", "shipment.received"), ("correction_of_event_id", 41),
+    ("actor_user_id", None), ("occurred_at", None), ("aggregate_id", BOX),
+])
+def test_read_stored_correction_rejects_invalid_original(field, value):
+    from medarchive.adapters.postgresql.receipt_correction import read_ordinary_box_receipt_correction
+
+    correction, original = stored_correction_pair()
+    setattr(original, field, value)
+    with pytest.raises(ValueError):
+        read_ordinary_box_receipt_correction(correction, original)
