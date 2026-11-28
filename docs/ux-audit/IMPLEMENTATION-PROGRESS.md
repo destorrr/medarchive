@@ -8,7 +8,7 @@
 |---|---|
 | I00 | Clean CI accepted; external inventory open |
 | I01 | Accepted for isolated implementation; workstation check deferred to I11 |
-| I02 | In progress: E2, I02.1–I02.2 accepted, I02.3 open |
+| I02 | In progress: I02.1, I02.2 and I02.5 historical storage accepted; I02.3/I02.4 downgrade gates open; E3/E4 pending |
 | I03–I11 | Planned |
 
 ## I00 — исходный baseline
@@ -227,3 +227,8 @@ All CI at b1809540fa5a07af214af648a4c743a8a8afe6fb verified: Foundation #1757 (4
 ### I02.5 — return to storage closure
 
 Owner directed frontend pause and I02.5 completion first. All CI for 41e530e66939306373bd5a51f0b0e2be4be03371 verified by exact SHA and logs: Foundation #1758 (46110071582, job 140871423163), 613 passed, 53 skipped, 36 warnings; dedicated #144 (46110071727, job 140871423253), 19 infrastructure +25 I01 +35 I02, both manifests verified; all steps successful including backup/restore. Frontend changes retained, no new frontend work. Reviewed approved repeat receipt and separate correction effects (UX06 readiness 2026-11-21). Final historical storage boundary uses existing append-only DomainEvent, separate IDs for repeated receipts and references to individual original receipt. Added real PostgreSQL rollback-only roundtrip for two synthetic receipt/correction pairs, fresh ORM load and cross-pair rejection. No production mutation, no guard bypass, no new DDL or reason/permission/outcome values. I02.5 historical additive storage closure candidate pending CI; E4 effective receipt projection and I05 exact compensation/authorization remain separate required gates. I02.3/4 blocked downgrade tests unchanged. Overall 2/12; no package acceptance claimed before CI.
+
+
+### I02.5 — historical additive storage accepted
+
+Verified every CI run at a636e37bad30893de13cbff0c588eb8ef1860b47: Foundation #1759 (46110773318, job 140873582881), 614 passed, 53 skipped, 36 warnings; dedicated #145 (46110773356, job 140873582952), 19 infrastructure +25 I01 +35 I02, both manifests verified; all steps successful including encrypted backup/restore. PostgreSQL repeated receipt/correction roundtrip passed. I02.5 historical additive storage accepted without new revision. Local I02 tracked substeps 3/5 (60%); overall accepted packages 2/12. E2/E3/E4 overall not accepted; I02.3/4 populated downgrade blocker remains, effective receipt projection/compensation/permissions are mandatory later gates. Frontend pause respected through this acceptance. No new business rules, migrations or production changes. Next eligible independent work must not bypass blocked acceptance or dependency gates. Verify CI of this documentation commit.
