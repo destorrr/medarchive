@@ -1406,3 +1406,60 @@ async def test_resolve_receipt_correction_manifest(pg_session, scenario):
         with pytest.raises(ValueError):
             await resolve_receipt_correction_event(pg_session, fact, **options)
     assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source_kind", ["branch", "central_office"])
+@pytest.mark.parametrize("original_type", ["shipment.box_received", "shipment.received"])
+async def test_fixed_receipt_correction_catalog_on_incoming_routes(
+    pg_session, source_kind, original_type,
+):
+    """Real manifest and fixed event vocabulary; original fact is synthetic."""
+    from datetime import date
+    from sqlalchemy import inspect
+    from medarchive.adapters.postgresql.receipt_correction import (
+        resolve_ordinary_box_receipt_correction,
+    )
+    from medarchive.domain.receipt_correction import ReceiptCorrectionPayload
+
+    branch, branch_loc, archive_loc, central_loc, branch_user, archive_user, central_user, courier = (
+        await seed_locations(pg_session)
+    )
+    source = branch_loc if source_kind == "branch" else central_loc
+    sender = branch_user if source_kind == "branch" else central_user
+    card = Card(
+        card_number=f"C-{uuid.uuid4().hex}", full_name="Synthetic patient",
+        date_of_birth=date(1980, 1, 1), origin_branch_id=branch.id,
+        current_location_id=source.id, status="active",
+    )
+    pg_session.add(card)
+    await pg_session.flush()
+    workflow = PostgreSQLShipmentWorkflow(pg_session)
+    box = await workflow.create_box(location_id=source.id, actor_id=sender.id)
+    await workflow.add_card_to_box(box_id=box.id, card_id=card.id, actor_id=sender.id)
+    shipment = await workflow.create_draft(
+        from_location_id=source.id, to_location_id=archive_loc.id,
+        courier_id=courier.id, issued_by=sender.id,
+    )
+    await workflow.add_box(shipment_id=shipment.id, box_id=box.id, actor_id=sender.id)
+    await workflow.hand_over(shipment_id=shipment.id, actor_id=sender.id)
+    original = DomainEvent(
+        event_type=original_type, aggregate_type="shipment",
+        aggregate_id=shipment.id, actor_user_id=archive_user.id,
+        payload={"version": 1, "shipment_id": str(shipment.id), "box_id": str(box.id)},
+    )
+    pg_session.add(original)
+    await pg_session.flush()
+    fact = ReceiptCorrectionPayload(shipment.id, box.id, original.id, "test_reason")
+    options = dict(actor_id=archive_user.id, allowed_reason_codes=frozenset({"test_reason"}))
+    before = await pg_session.scalar(select(func.count()).select_from(DomainEvent))
+    if original_type == "shipment.box_received":
+        event = await resolve_ordinary_box_receipt_correction(pg_session, fact, **options)
+        assert inspect(event).transient
+        assert event.event_type == "shipment.box_receipt_corrected"
+        assert event.correction_of_event_id == original.id
+        assert event.payload["version"] == 1
+    else:
+        with pytest.raises(ValueError, match="expected receipt type"):
+            await resolve_ordinary_box_receipt_correction(pg_session, fact, **options)
+    assert await pg_session.scalar(select(func.count()).select_from(DomainEvent)) == before
