@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from medarchive.adapters.postgresql.models import DomainEvent, Location, Shipment, ShipmentBox
-from medarchive.domain.receipt_correction import ReceiptCorrectionPayload
+from medarchive.domain.receipt_correction import (
+    BOX_RECEIVED_EVENT,
+    BOX_RECEIPT_CORRECTED_EVENT,
+    BOX_RECEIPT_PAYLOAD_VERSION,
+    ReceiptCorrectionPayload,
+)
 
 
 def build_receipt_correction_event(
@@ -98,3 +103,22 @@ async def resolve_receipt_correction_event(
             receipt_payload_version=receipt_payload_version,
             allowed_reason_codes=allowed_reason_codes,
         )
+
+
+async def resolve_ordinary_box_receipt_correction(
+    session: AsyncSession,
+    fact: ReceiptCorrectionPayload,
+    *,
+    actor_id: UUID,
+    allowed_reason_codes: frozenset[str],
+) -> DomainEvent:
+    """Server-owned event vocabulary; not a mutation or authorization boundary."""
+    return await resolve_receipt_correction_event(
+        session,
+        fact,
+        actor_id=actor_id,
+        receipt_event_type=BOX_RECEIVED_EVENT,
+        correction_event_type=BOX_RECEIPT_CORRECTED_EVENT,
+        receipt_payload_version=BOX_RECEIPT_PAYLOAD_VERSION,
+        allowed_reason_codes=allowed_reason_codes,
+    )
