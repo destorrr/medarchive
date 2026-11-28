@@ -45,3 +45,56 @@ def test_receipt_correction_rejects_reason_outside_catalog(catalog):
     fact = ReceiptCorrectionPayload(SHIPMENT, BOX, 42, "test_reason")
     with pytest.raises(ValueError):
         fact.to_event_payload(allowed_reason_codes=catalog)
+
+
+def original_receipt_fields():
+    return {
+        "event_id": 42,
+        "event_type": "test.box_received",
+        "expected_receipt_type": "test.box_received",
+        "aggregate_type": "shipment",
+        "aggregate_id": SHIPMENT,
+        "payload": {"version": 1, "box_id": str(BOX), "shipment_id": str(SHIPMENT)},
+        "expected_payload_version": 1,
+    }
+
+
+def test_original_receipt_matches_correction():
+    fact = ReceiptCorrectionPayload(SHIPMENT, BOX, 42, "test_reason")
+    fields = original_receipt_fields()
+    before = fields["payload"].copy()
+    fact.validate_original_receipt(**fields)
+    assert fields["payload"] == before
+
+
+@pytest.mark.parametrize("changes", [
+    {"event_id": 43},
+    {"event_type": "shipment.received"},
+    {"expected_receipt_type": ""},
+    {"aggregate_type": "card"},
+    {"aggregate_id": BOX},
+    {"expected_payload_version": 2},
+    {"expected_payload_version": True},
+])
+def test_original_receipt_rejects_mismatched_metadata(changes):
+    fact = ReceiptCorrectionPayload(SHIPMENT, BOX, 42, "test_reason")
+    fields = original_receipt_fields()
+    fields.update(changes)
+    with pytest.raises(ValueError):
+        fact.validate_original_receipt(**fields)
+
+
+@pytest.mark.parametrize("changes", [
+    {"version": True},
+    {"version": None},
+    {"box_id": str(SHIPMENT)},
+    {"box_id": None},
+    {"shipment_id": str(BOX)},
+    {"shipment_id": None},
+])
+def test_original_receipt_rejects_mismatched_payload(changes):
+    fact = ReceiptCorrectionPayload(SHIPMENT, BOX, 42, "test_reason")
+    fields = original_receipt_fields()
+    fields["payload"].update(changes)
+    with pytest.raises(ValueError):
+        fact.validate_original_receipt(**fields)
