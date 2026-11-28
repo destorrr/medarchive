@@ -9,6 +9,14 @@ from dataclasses import dataclass
 from uuid import UUID
 
 
+# Server-owned vocabulary for new ordinary per-box receipt events.
+# Legacy shipment.received remains a distinct whole-shipment fact.
+BOX_RECEIVED_EVENT = "shipment.box_received"
+BOX_RECEIPT_CORRECTED_EVENT = "shipment.box_receipt_corrected"
+BOX_RECEIPT_PAYLOAD_VERSION = 1
+BOX_RECEIPT_CORRECTION_PAYLOAD_VERSION = 1
+
+
 @dataclass(frozen=True, slots=True)
 class ReceiptCorrectionPayload:
     shipment_id: UUID
@@ -31,7 +39,7 @@ class ReceiptCorrectionPayload:
         if self.reason_code not in allowed_reason_codes:
             raise ValueError("Unknown receipt correction reason code")
         return {
-            "version": 1,
+            "version": BOX_RECEIPT_CORRECTION_PAYLOAD_VERSION,
             "shipment_id": str(self.shipment_id),
             "box_id": str(self.box_id),
             "original_event_id": self.original_event_id,
