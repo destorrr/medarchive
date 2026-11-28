@@ -70,6 +70,8 @@ class ReceiptCorrectionPayload:
             raise ValueError("Original event is not the expected receipt type")
         if aggregate_type != "shipment" or aggregate_id != self.shipment_id:
             raise ValueError("Original receipt belongs to another aggregate")
+        if not isinstance(payload, Mapping):
+            raise ValueError("Original receipt payload must be a JSON object")
         if (
             type(expected_payload_version) is not int
             or expected_payload_version <= 0

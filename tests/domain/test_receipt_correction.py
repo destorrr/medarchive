@@ -98,3 +98,12 @@ def test_original_receipt_rejects_mismatched_payload(changes):
     fields["payload"].update(changes)
     with pytest.raises(ValueError):
         fact.validate_original_receipt(**fields)
+
+
+@pytest.mark.parametrize("payload", [None, [], "receipt", 1, True])
+def test_original_receipt_rejects_non_object_json_payload(payload):
+    fact = ReceiptCorrectionPayload(SHIPMENT, BOX, 42, "test_reason")
+    fields = original_receipt_fields()
+    fields["payload"] = payload
+    with pytest.raises(ValueError, match="JSON object"):
+        fact.validate_original_receipt(**fields)
