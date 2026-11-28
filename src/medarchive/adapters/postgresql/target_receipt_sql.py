@@ -1,6 +1,6 @@
 """Candidate E4 per-object receipt and transport pointer validation.
 
-Install only as part of the coupled migration. The caller must lock the
+Installed by revision 0016; activation requires the coupled migration. The caller must lock the
 shipment, parent (P09), manifest and affected objects. No legacy receipt
 timestamps are substituted for missing per-object facts.
 """

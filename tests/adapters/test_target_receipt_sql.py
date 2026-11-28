@@ -7,7 +7,6 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from medarchive.adapters.postgresql.models import Card
-from medarchive.adapters.postgresql.target_receipt_sql import TARGET_RECEIPT_SQL
 from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
 from tests.adapters.test_postgresql_shipment_workflow import pg_session, seed_locations
 
@@ -19,7 +18,6 @@ async def test_target_receipt_sql_ordinary(pg_session, scenario):
         await seed_locations(pg_session)
     )
     connection = await pg_session.connection()
-    await connection.execute(text(TARGET_RECEIPT_SQL))
     workflow = PostgreSQLShipmentWorkflow(pg_session)
     shipment = await workflow.create_draft(
         from_location_id=branch_loc.id,

@@ -7,7 +7,6 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from medarchive.adapters.postgresql.models import ArchiveRequest, Card
-from medarchive.adapters.postgresql.target_manifest_sql import TARGET_MANIFEST_SQL
 from medarchive.services.postgresql_shipment_workflow import PostgreSQLShipmentWorkflow
 from tests.adapters.test_postgresql_shipment_workflow import pg_session, seed_locations
 
@@ -20,8 +19,6 @@ async def test_target_manifest_sql(pg_session, scenario):
         await seed_locations(pg_session)
     )
     connection = await pg_session.connection()
-    # Transactional candidate DDL only; existing guard functions are untouched.
-    await connection.execute(text(TARGET_MANIFEST_SQL))
     workflow = PostgreSQLShipmentWorkflow(pg_session)
     if scenario in {"ordinary", "empty", "excluded"}:
         shipment = await workflow.create_draft(

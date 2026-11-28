@@ -1,6 +1,6 @@
 """E4 SQL manifest validator for the coupled cutover.
 
-Not installed by an Alembic revision yet. Legacy workflows remain unchanged.
+Installed by revision 0016; not yet connected to active triggers. Legacy workflows remain unchanged.
 The validator is called at the final manifest boundary, after the parent and
 shipment are locked and before handover changes extracted item statuses.
 """
@@ -52,6 +52,7 @@ BEGIN
     IF EXISTS (
         SELECT 1 FROM public.archive_request_items i
         WHERE i.request_id = parent_id
+          AND NOT (i.status = 'removed_by_central_office' AND NOT i.reservation_active)
           AND (i.status NOT IN ('extracted', 'not_found', 'removed_by_archive')
                OR NOT i.reservation_active)
     ) OR EXISTS (
