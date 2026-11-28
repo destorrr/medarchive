@@ -107,3 +107,13 @@ def test_individual_card_placement_has_one_active_shelf_location():
     assert index.unique is True
     assert [column.name for column in index.columns] == ["card_id"]
     assert str(index.dialect_options["postgresql"]["where"]) == "removed_at IS NULL"
+
+
+def test_domain_event_correction_references_original_event():
+    table = Base.metadata.tables["domain_events"]
+    column = table.c.correction_of_event_id
+    fk, = column.foreign_keys
+    assert column.nullable is True
+    assert fk.target_fullname == "domain_events.id"
+    assert fk.ondelete == "RESTRICT"
+    assert table.c.id.primary_key is True
