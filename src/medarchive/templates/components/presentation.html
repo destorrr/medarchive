@@ -1,0 +1,12 @@
+{# Shared presentation primitives. No authorization or workflow decisions. #}
+{% macro panel(heading, heading_id) -%}
+<section class="ma-panel" aria-labelledby="{{ heading_id }}">
+  <h2 id="{{ heading_id }}">{{ heading }}</h2>
+  {{ caller() }}
+</section>
+{%- endmacro %}
+
+{% macro feedback(message, tone="neutral") -%}
+{% set safe_tone = tone if tone in ["neutral", "success", "warning", "error"] else "neutral" %}
+<div class="ma-feedback" data-tone="{{ safe_tone }}" role="{{ 'alert' if safe_tone == 'error' else 'status' }}">{{ message }}</div>
+{%- endmacro %}

@@ -1,0 +1,60 @@
+/* Shared UX-08 design tokens. Opt-in scope; legacy shell remains unchanged.
+   Workspace variants preserve approved prototype dimensions. */
+.ma-design {
+  --ma-text: #233c4b;
+  --ma-page: #f2f6f8;
+  --ma-header: #153d52;
+  --ma-primary: #116d7b;
+  --ma-surface: #fff;
+  --ma-border: #d8e4e9;
+  --ma-control-border: #c0d1dc;
+  --ma-muted: #667d8b;
+  --ma-focus: #e5a852;
+  --ma-radius-panel: 13px;
+  --ma-radius-control: 8px;
+  --ma-panel-padding: 20px;
+  --ma-layout-gap: 18px;
+  --ma-grid-gap: 12px;
+  --ma-font: "Segoe UI", Arial, sans-serif;
+  --ma-workspace-width: 1320px;
+  --ma-sidebar-width: 240px;
+  --ma-heading-size: 25px;
+  color: var(--ma-text);
+  font-family: var(--ma-font);
+}
+.ma-design[data-workspace="branch"] {
+  --ma-workspace-width: 1200px;
+  --ma-sidebar-width: 215px;
+  --ma-border: #d8e3e9;
+}
+.ma-design[data-workspace="archive"] {
+  --ma-workspace-width: 1250px;
+  --ma-sidebar-width: 205px;
+  --ma-heading-size: 24px;
+}
+.ma-design .ma-panel {
+  min-width: 0;
+  padding: var(--ma-panel-padding);
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border);
+  border-radius: var(--ma-radius-panel);
+  overflow-wrap: anywhere;
+}
+.ma-design .ma-panel > h2 {
+  margin: 0 0 12px;
+  color: var(--ma-text);
+  font-size: 18px;
+}
+.ma-design .ma-feedback {
+  padding: 12px;
+  border: 1px solid var(--ma-border);
+  border-radius: var(--ma-radius-control);
+  overflow-wrap: anywhere;
+}
+.ma-design .ma-feedback[data-tone="success"] { background: #e5f5ed; }
+.ma-design .ma-feedback[data-tone="warning"] { background: #fff4df; }
+.ma-design .ma-feedback[data-tone="error"] { background: #fee9e9; }
+.ma-design :focus-visible {
+  outline: 3px solid var(--ma-focus);
+  outline-offset: 2px;
+}
