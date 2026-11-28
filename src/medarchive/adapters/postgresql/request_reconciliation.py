@@ -27,14 +27,27 @@ class RequestMappingPlan:
     candidates: tuple[PendingRequestMapping, ...]
     review_count: int
     existing_item_count: int
+    matching_item_count: int
+    conflicting_item_count: int
 
 
 # Deterministic namespace scoped by the preserved parent UUID. No generated
 # historical event, submission timestamp, extraction or receipt fact.
 _QUERY = text("""
 SELECT r.id AS parent_id, r.card_id, r.requested_by, r.created_at,
+       (SELECT count(*) FROM public.archive_request_items i
+        WHERE i.request_id = r.id) AS item_count,
+       (SELECT i.id FROM public.archive_request_items i
+        WHERE i.request_id = r.id ORDER BY i.id LIMIT 1) AS existing_id,
        EXISTS (SELECT 1 FROM public.archive_request_items i
-               WHERE i.request_id = r.id) AS has_items,
+               WHERE i.request_id = r.id AND i.card_id = r.card_id
+                 AND i.status = 'pending' AND i.reservation_active
+                 AND i.added_by = r.requested_by AND i.added_at = r.created_at
+                 AND i.extracted_at IS NULL AND i.extracted_by IS NULL
+                 AND i.resolved_at IS NULL AND i.resolved_by IS NULL
+                 AND i.source_membership_id IS NULL AND i.returned_membership_id IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM public.shipment_cards sc
+                                 WHERE sc.request_item_id = i.id)) AS matching_fields,
        (
            r.status = 'new'
            AND r.fulfillment_shipment_id IS NULL
@@ -59,6 +72,7 @@ SELECT r.id AS parent_id, r.card_id, r.requested_by, r.created_at,
            AND NOT EXISTS (
                SELECT 1 FROM public.archive_request_items i
                WHERE i.card_id = c.id AND i.reservation_active
+                 AND i.request_id <> r.id
            )
            AND NOT EXISTS (
                SELECT 1 FROM public.shipments s WHERE s.request_id = r.id
@@ -80,24 +94,32 @@ ORDER BY r.id
 async def plan_pending_request_mappings(connection: AsyncConnection) -> RequestMappingPlan:
     """Internal mapping data; never log or expose candidate identifiers.
 
-    Any existing items are excluded from automatic planning and require separate
-    equality/consistency verification before actual migration. No writes.
+    Existing items are never rewritten. Only exact deterministic pending rows
+    with still-eligible parents count as matching. No writes.
     """
     rows = (await connection.execute(_QUERY)).mappings()
     candidates = []
-    review_count = existing_item_count = 0
+    review_count = existing_item_count = matching_item_count = conflicting_item_count = 0
     for row in rows:
-        if row["has_items"]:
+        parent_id = row["parent_id"]
+        item_id = uuid5(parent_id, "medarchive:legacy-request-item:v1")
+        if row["item_count"]:
             existing_item_count += 1
+            if (row["item_count"] == 1 and row["eligible"] and row["matching_fields"]
+                    and row["existing_id"] == item_id):
+                matching_item_count += 1
+            else:
+                conflicting_item_count += 1
+                review_count += 1
         elif row["eligible"]:
-            parent_id = row["parent_id"]
             candidates.append(PendingRequestMapping(
                 parent_id=parent_id,
-                item_id=uuid5(parent_id, "medarchive:legacy-request-item:v1"),
+                item_id=item_id,
                 card_id=row["card_id"],
                 added_by=row["requested_by"],
                 added_at=row["created_at"],
             ))
         else:
             review_count += 1
-    return RequestMappingPlan(tuple(candidates), review_count, existing_item_count)
+    return RequestMappingPlan(tuple(candidates), review_count, existing_item_count,
+                              matching_item_count, conflicting_item_count)

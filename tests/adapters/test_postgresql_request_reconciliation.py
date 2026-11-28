@@ -12,7 +12,8 @@ from tests.adapters.test_postgresql_shipment_workflow import pg_session, seed_lo
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("scenario", ["boxed", "unboxed", "existing_item", "cancelled"])
+@pytest.mark.parametrize("scenario", ["boxed", "unboxed", "existing_item", "cancelled", "matching_item",
+                                      "wrong_actor", "wrong_status", "extra_item", "wrong_time"])
 async def test_pending_request_mapping_is_conservative(pg_session, scenario):
     branch, _, archive, _, _, archivist, central_user, _ = await seed_locations(pg_session)
     connection = await pg_session.connection()
@@ -33,18 +34,32 @@ async def test_pending_request_mapping_is_conservative(pg_session, scenario):
     if scenario == "cancelled":
         request.status = "cancelled"
         await pg_session.flush()
-    if scenario == "existing_item":
+    if scenario in {"existing_item", "matching_item", "wrong_actor", "wrong_status", "extra_item", "wrong_time"}:
         await connection.execute(text("""
             INSERT INTO public.archive_request_items
-                (request_id, card_id, status, reservation_active, added_at, added_by)
-            VALUES (:request, :card, 'pending', true, :added_at, :actor)
-        """), {"request": request.id, "card": card.id,
-               "added_at": request.created_at, "actor": central_user.id})
+                (id, request_id, card_id, status, reservation_active, added_at, added_by)
+            VALUES (:id, :request, :card, :status, true, :added_at, :actor)
+        """), {"id": uuid4() if scenario == "existing_item" else uuid5(request.id, "medarchive:legacy-request-item:v1"),
+               "request": request.id, "card": card.id,
+               "status": "extracted" if scenario == "wrong_status" else "pending",
+               "added_at": request.created_at if scenario != "wrong_time" else request.created_at.replace(year=2000),
+               "actor": archivist.id if scenario == "wrong_actor" else central_user.id})
+        if scenario == "extra_item":
+            await connection.execute(text("""
+                INSERT INTO public.archive_request_items
+                    (request_id, card_id, status, reservation_active, added_at, added_by)
+                VALUES (:request, :card, 'removed_by_central_office', false, :added_at, :actor)
+            """), {"request": request.id, "card": card.id,
+                   "added_at": request.created_at, "actor": central_user.id})
     await connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
     after = await plan_pending_request_mappings(connection)
     assert after == await plan_pending_request_mappings(connection)
-    assert after.review_count == before.review_count + int(scenario in {"unboxed", "cancelled"})
-    assert after.existing_item_count == before.existing_item_count + int(scenario == "existing_item")
+    conflict = scenario in {"existing_item", "wrong_actor", "wrong_status", "extra_item", "wrong_time"}
+    has_item = conflict or scenario == "matching_item"
+    assert after.review_count == before.review_count + int(conflict or scenario in {"unboxed", "cancelled"})
+    assert after.existing_item_count == before.existing_item_count + int(has_item)
+    assert after.matching_item_count == before.matching_item_count + int(scenario == "matching_item")
+    assert after.conflicting_item_count == before.conflicting_item_count + int(conflict)
     assert len(after.candidates) == len(before.candidates) + int(scenario == "boxed")
     candidates = [item for item in after.candidates if item.parent_id == request.id]
     if scenario == "boxed":
@@ -57,4 +72,4 @@ async def test_pending_request_mapping_is_conservative(pg_session, scenario):
         assert not candidates
     assert (await connection.execute(text("""
         SELECT count(*) FROM public.archive_request_items WHERE request_id = :request
-    """), {"request": request.id})).scalar_one() == int(scenario == "existing_item")
+    """), {"request": request.id})).scalar_one() == int(has_item) + int(scenario == "extra_item")
